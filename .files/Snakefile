@@ -17,56 +17,135 @@ rule all:
     input:
         expand("output/{sample}_imputation_stats.html", sample=SAMPLE)
 
-rule stats:
-    input:
-    output: "output/{sample}_imputation_stats.html"
-    params:
-        path = INPATH,
-        chrom = CHROM,
-        cohort = "{sample}",
-        pypath = config["anaconda"],
-        maf = config["maf"],
-        rsq = config["rsq"],
-        sampsize = config["sampsize"]
-    R:
-        
-
 #Pre-split QC
 
-'''
-rule var_qc:
+rule var_qc_initial:
     input:
         expand(INPATH + "{{sample}}.{ext}", ext=BPLINK)
     output:
-        plink = expand("data/plink/{{sample}}_varqc.{ext}", ext=BPLINK)
+        expand("data/unpruned/{{sample}}_varqc.{ext}", ext=BPLINK)
     params:
         ins = INPATH + "{sample}",
-        out = "data/plink/{sample}_varqc",
+        out = "data/unpruned/{sample}_varqc",
         geno = config["qc"]["geno"],
-        hwe = config["qc"]["hwe"],
         maf = config["qc"]["maf"]
     threads: 1
     shell: "module load plink/1.90; "
         "plink -bfile {params.ins} --geno {params.geno} --memory 128 "
-        "--keep-allele-order --hwe {params.hwe} --maf {params.maf} "
+        "--keep-allele-order --maf {params.maf} "
         "--make-bed --out {params.out} --silent"
 
 rule subj_qc:
     input:
-        plink = rules.var_qc.output.plink
+        plink = rules.var_qc.output
     params:
         ins = rules.var_qc.params.out,
-        out = "data/plink/{sample}_indivqc",
+        out = "data/unpruned/{sample}_indivqc",
         mind = config["qc"]["mind"],
         keep = keep_command
     output:
-        expand("data/plink/{{sample}}_indivqc.{ext}", ext=BPLINK)
+        expand("data/unpruned/{{sample}}_indivqc.{ext}", ext=BPLINK)
     threads: 1
     shell: "module load plink/1.90; "
         "plink -bfile {params.ins} --memory 128 --keep-allele-order "
         "--mind {params.mind} --remove samp.irem {params.keep}"
         "--make-bed --out {params.out} --silent"
 
+if config['qc']['sexcheck']:
+    rule sexcheck:
+        input:
+            filtered = rules.subj_qc.output
+            original = expand(INPATH + '{{sample}}' +
+                              config['qc']['sex_original'] +
+                              '.{ext}', ext=BPLINK)
+        params:
+            ins = rules.var_qc.params.out,
+            out = "data/unpruned/{sample}_sexchecked",
+            exclude = "data/unpruned/exclude_sex_{sample}.txt",
+            sexcheck = "data/unpruned/{sample}.sexcheck"
+        output:
+            expand("data/unpruned/{{sample}}_sexchecked.{ext}", ext=BPLINK)
+        threads: 1
+        shell: "module load plink/1.90; "
+            "plink -bfile {params.ins} --memory 128 --keep-allele-order "
+            "--check-sex --out {params.sexcheck} --silent; "
+            ""
+            "Rscript scripts/sexcheck_QC.R {params.sexcheck} {params.exclude}; "
+            ""
+            "plink -bfile {params.ins} --memory 128 --keep-allele-order "
+            "--remove {params.exclude} --make-bed --out {params.out} --silent"
+else: ##TODO: this might not work because input and output are the same. Check.
+    rule sexcheck:
+        input: rules.subj_qc.output
+        output: rules.subj_qc.output
+        log: "no_sexcheck.log"
+        shell:
+            "echo No sexcheck performed because it was deselected > {log}"
+            "echo the configuration file. Ensure no sample swapping >> {log}"
+            "echo occured and self-reported sexes are correct. >> {log}"
+
+rule prune:
+    input: rules.subj_qc.output
+    output:
+        "data/pruned/{sample}_pruned.prune.in"
+    params:
+        ins = rules.var_qc.params.out,
+        ibd_file = "data/pruned/{sample}_prune"
+    threads: 1
+    shell: "module load plink/1.90; "
+        "plink -bfile {params.ins} --memory 128 --keep-allele-order "
+        "--autosome --indep 50 5 1.5 --out {params.ibd_file}"
+
+rule IBD:
+    input:
+        plink = rules.subj_qc.output,
+        ibd = rules.prune.output,
+        fam = rules.var_qc_initial.params.out + '.fam'
+    output:
+        genome = "data/pruned/{sample}_IBD.genome",
+        plink = expand("data/pruned/{{sample}}_unrelated.{ext}", ext=BPLINK)
+    params:
+        ins = rules.var_qc.params.out,
+        ibd_file = "data/pruned/{sample}_IBD",
+        exclude = "data/pruned/{sample}_IBD_excl.txt"
+        pi_hat = 0.05,
+        plink = "data/pruned/{sample}_unrelated"
+    threads: 1
+    shell: "module load plink/1.90; "
+        "plink -bfile {params.ins} --memory 128 --keep-allele-order "
+        "--extract {input.ibd} --genome --min {pi_hat} --out {params.ibd_file}; "
+        ""
+        "Rscript scripts/relatedness_QC.R {output.genome} {input.fam} {params.exclude}; "
+        ""
+        "plink -bfile {params.ins} --memory 128 --keep-allele-order "
+        "--remove {params.exclude} --make-bed --out {params.plink}"
+
+rule heterozygosity:
+    input:
+        plink = rules.subj_qc.output,
+        ibd = rules.prune.output,
+        fam = rules.var_qc_initial.params.out + '.fam'
+    output:
+        het = "data/pruned/{sample}_het.het",
+        plink = expand(
+            "data/pruned/{{sample}}_unrelated_hetfilt.{ext}", ext=BPLINK)
+    params:
+        ins = rules.var_qc.params.out,
+        het_file = "data/pruned/{sample}_het",
+        exclude = "data/pruned/{sample}_het_excl.txt"
+        plink = "data/pruned/{sample}_unrelated_hetfilt"
+    threads: 1
+    shell: "module load plink/1.90; "
+        "plink -bfile {params.ins} --memory 128 --keep-allele-order "
+        "--extract {input.ibd} --het --out {params.het_file}; "
+        ""
+        "Rscript scripts/heterozygosity_QC.R {output.het} {input.fam}
+        "{params.exclude}; "
+        ""
+        "plink -bfile {params.ins} --memory 128 --keep-allele-order "
+        "--remove {params.exclude} --make-bed --out {params.plink}"
+
+'''
 rule flippyr:
     input:
         fasta = config["ref"],

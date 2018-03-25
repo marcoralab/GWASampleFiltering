@@ -23,6 +23,12 @@ qc:
   geno: 0.05
   #Subject level missingness cutoff
   mind: 0.05
+  # Check sex?
+  sexcheck: True #Logical
+  #_[string] appended to original fileset
+  #  with sex chromosomes included.
+  #  leave blank if main fileset has sex.
+  sex_original:
 
 # Sample filtering
 
