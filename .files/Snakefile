@@ -85,7 +85,7 @@ else: ##TODO: this might not work because input and output are the same. Check.
             "echo occured and self-reported sexes are correct. >> {log}"
 
 rule prune:
-    input: rules.subj_qc.output
+    input: rules.sexcheck.output
     output:
         "data/pruned/{sample}_pruned.prune.in"
     params:
@@ -98,7 +98,7 @@ rule prune:
 
 rule IBD:
     input:
-        plink = rules.subj_qc.output,
+        plink = rules.prune.output,
         ibd = rules.prune.output,
         fam = rules.var_qc_initial.params.out + '.fam'
     output:
