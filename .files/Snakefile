@@ -78,6 +78,8 @@ else: ##TODO: this might not work because input and output are the same. Check.
     rule sexcheck:
         input: rules.subj_qc.output
         output: rules.subj_qc.output
+        params:
+            out = rules.subj_qc.params.out
         log: "no_sexcheck.log"
         shell:
             "echo No sexcheck performed because it was deselected > {log}"
@@ -89,7 +91,7 @@ rule prune:
     output:
         "data/pruned/{sample}_pruned.prune.in"
     params:
-        ins = rules.var_qc.params.out,
+        ins = rules.sexcheck.params.out,
         ibd_file = "data/pruned/{sample}_prune"
     threads: 1
     shell: "module load plink/1.90; "
@@ -98,14 +100,14 @@ rule prune:
 
 rule IBD:
     input:
-        plink = rules.prune.output,
+        plink = rules.sexcheck.output,
         ibd = rules.prune.output,
         fam = rules.var_qc_initial.params.out + '.fam'
     output:
         genome = "data/pruned/{sample}_IBD.genome",
         plink = expand("data/pruned/{{sample}}_unrelated.{ext}", ext=BPLINK)
     params:
-        ins = rules.var_qc.params.out,
+        ins = rules.sexcheck.params.out,
         ibd_file = "data/pruned/{sample}_IBD",
         exclude = "data/pruned/{sample}_IBD_excl.txt"
         pi_hat = 0.05,
@@ -122,7 +124,7 @@ rule IBD:
 
 rule heterozygosity:
     input:
-        plink = rules.subj_qc.output,
+        plink = rules.IBD.output,
         ibd = rules.prune.output,
         fam = rules.var_qc_initial.params.out + '.fam'
     output:
@@ -130,7 +132,7 @@ rule heterozygosity:
         plink = expand(
             "data/pruned/{{sample}}_unrelated_hetfilt.{ext}", ext=BPLINK)
     params:
-        ins = rules.var_qc.params.out,
+        ins = rules.IBD.params.out,
         het_file = "data/pruned/{sample}_het",
         exclude = "data/pruned/{sample}_het_excl.txt"
         plink = "data/pruned/{sample}_unrelated_hetfilt"
