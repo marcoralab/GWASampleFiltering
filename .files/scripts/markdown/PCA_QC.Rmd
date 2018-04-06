@@ -1,23 +1,32 @@
 ---
 title: "GWAS QC: Principal Component Analysis"
 author: "Shea Andrews"
-date: "3/21/2018"
-output: html_document
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
 params:
-   path.eigenvec: ~/Dropbox/Research/PostDoc/MitoWax/2_Derived_Data/GWAS_pres_processing/ADNI_1/merged_1000_adni_clust.eigenvec
-   path.eigenval: ~/Dropbox/Research/PostDoc/MitoWax/2_Derived_Data/GWAS_pres_processing/ADNI_1/merged_1000_adni_clust.eigenval
-   path.base_pops: ~/Documents/0_Data/1000genomes/20130606_g1k.ped.txt
-   path.target_pops: /Users/sheaandrews/Dropbox/Research/PostDoc/MitoWax/2_Derived_Data/GWAS_pres_processing/ADNI_1/ADNI1_05_thined.fam
-   path.out: ~/Dropbox/Research/PostDoc/MitoWax/2_Derived_Data/GWAS_pres_processing/ADNI_1/
-   cohort: 'ADNI'
+  path.eigenvec: '~/Dropbox/Research/PostDoc-MSSM/3_mitoWAX/2_DerivedData/ADNI_1/merged_1000_adni_clust.eigenvec'
+  path.eigenval: '~/Dropbox/Research/PostDoc-MSSM/3_mitoWAX/2_DerivedData/ADNI_1/merged_1000_adni_clust.eigenval'
+  path.base_pops: '~/Dropbox/Research/PostDoc/MitoWax/2_Derived_Data/GWAS_pres_processing/20130606_g1k.ped'
+  path.target_pops: '~/Dropbox/Research/PostDoc-MSSM/3_mitoWAX/2_DerivedData/ADNI_1/ADNI1_05_thined.fam'
+  cohort: 'ADNI'
 editor_options:
   chunk_output_type: console
 ---
 
+## Population Outliers
 Population stratification occurs when the study population under investigation comprises several differnt subpopulation that differ in both genetic ancestry and in the phenotype of interest. As such, spurious apparent associations can be due to genetic ancestry rather than true associations of alleles with the phenotype. Principal component analysis (PCA) can be used to identify population outliers by perfoming a PCA in a reference panael such as 1000 genomes and projecting the sample of interest onto the resulting space.
+<br>
 
-Prior to performing the PCA, the dataset should be LD pruned to eliminate a large degree of the redundency in the data and reduce the influce of potential chromsomal artifacts and related samples should be excluded. A PCA can be conducted with PLINK.
-
+To perform a PCA analysis in PLINK, first genotype data and pedigree infromation for the 1000 genomes reference panal needs to be downloaded (http://www.internationalgenome.org/data) and converted into a plink format. Two additional files are required, one listing the FID, IID and population for each sample in the reference dataset and the second listing the population clusters in the reference data. The alleles in the sample dataset need to be alighed to the same DNA strand as the refernce dataset to allow the datasets to be merged correctly. Both datasets should be LD pruned to eliminate a large degree of the redundency in the data and reduce the influce of potential chromsomal artifacts and related samples should be excluded. The following commands for performing the PCA analysis shouild be entered at the shell prompt to generate two files containing the principal component eigenvalues and Principal component eigenvectors.
+```{bash, eval=F}
+plink_1.9 --bfile merged-reference-sample-data \
+  --pca 10 --within sample_population.txt \
+  --pca-clusters population_clusters.txt \
+  --out pca.output
+```
+<br>
 
 
 ```{r setup, include=FALSE, cache=F}
@@ -29,7 +38,6 @@ library(ggforce)    ## for zoom plots
 library(GGally)     ## For Pairs plot
 library(tidyverse)  ## for data wrangling
 library(plotly)     ## For 3d interactive scatter plots
-library(kableExtra) ## For html tables
 library(gridExtra)
 
 ##  Standarize varibles to have a mean of 0 and sd of 1
@@ -86,7 +94,7 @@ pca$Population_2 <- factor(pca$Population, level = c(params$cohort, 'GBR', 'FIN'
 
 ```
 
-## Scree Plot
+### Scree Plot
 The below scree plot shows the amount of variation retained by each principal component (Fig. 1) and the cumualtive proportion of variance explained by each principal compoent (Fig. 2). The number of principal compoents to include in the anlysis can be determined by the number of components that account for 95% of variation.
 
 
@@ -110,22 +118,18 @@ grid.arrange(p1, p2, ncol = 2)
 ```
 
 
-## Pairs Plot
+### Pairs Plot
 The following pairs plot displays the population structure across the first 4 principal components for `r params$cohort` compared with the refernce populations from 1000 genomes.
 
-
-```{r, echo=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Fig. 3: Population Structure Pairs Plots '}
+```{r, echo=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Fig. 3: Population Structure Pairs Plots'}
 ##---- Plot pairs plots ----##
-
-ggpairs(pca, columns = paste0('PC', 1:PC.inc), aes(colour = SuperPopulation, shape = cohort)) + theme_bw()
+GGally::ggpairs(pca, columns = paste0('PC', 1:PC.inc), aes(colour = SuperPopulation, shape = cohort)) +  theme_bw()
 ```
 
-
-## European Population Structure
+### European Population Structure
 The following plots show the population structure of `r params$cohort` (Black Triangles) based on the first two (Fig. 4) and three (Fig. 5) principal components compared with the reference populations from 1000 Genomes. The static plot is zoomed into the European refernce super population composed of Utah Residents (CEPH) with Northern and Western European Ancestry (CEU), Toscani in Italia (TSI), Finnish in Finland (FIN), British in England and Scotland (GBR), and Iberian Population in Spain (IBS).
 
-
-```{r 2PC_static_SuperPops, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Fig. 4: Autosomal Population Structure for PC 1 & 2'}
+```{r 2PC_static_SuperPops, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Fig. 4: Ancestery clustering based on PC 1 & 2'}
 ##  Plot Superpopulations, PC1 + PC2
 ggplot(pca, aes(x = PC2, y = PC1, colour = SuperPopulation, shape = cohort)) +
   geom_point() + facet_zoom(xy = SuperPopulation == 'EUR') + scale_color_manual(values = c('black', "#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00")) +
@@ -133,17 +137,19 @@ ggplot(pca, aes(x = PC2, y = PC1, colour = SuperPopulation, shape = cohort)) +
 ```
 \
 
-```{r 3PC_interactive_SuperPops, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Fig. 5: Tridimensional Plot of PC 1, 2 & 3 for Autosmoal Population Structure'}
+```{r 3PC_interactive_SuperPops, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Fig. 5: Tridimensional plot of ancestery clustering of PC 1, 2 & 3'}
 ##  Plot Superpopulations, PC1 + PC2 + PC3
-plot_ly(pca, x = ~PC2, y = ~PC1, z = ~PC3, color = ~SuperPopulation, type = 'scatter3d', mode = 'markers', marker = list(size = 3),
-        colors = c('black', "#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00"), hoverinfo = 'text', text = ~paste('</br> ID: ', IID,
-                                                                                                                      '</br> Population: ', Population,
-                                                                            '</br> PC1: ', round(PC1, 2),
-                                                                            '</br> PC2: ', round(PC2, 2),
-                                                                            '</br> PC3: ', round(PC3, 2)))
+plot_ly(pca, x = ~PC2, y = ~PC1, z = ~PC3, color = ~SuperPopulation, type = 'scatter3d', mode = 'markers',
+        marker = list(size = 3),
+        colors = c('black', "#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00"),
+        hoverinfo = 'text', text = ~paste('</br> ID: ', IID,
+                                          '</br> Population: ', Population,
+                                          '</br> PC1: ', round(PC1, 2),
+                                          '</br> PC2: ', round(PC2, 2),
+                                          '</br> PC3: ', round(PC3, 2)))
 ```
 
-## Population Outliers
+### Population Outliers
 Individules of non-European ancestry were identified by determining the mean and standard deviation of the 10 principal components scores for the EUR super population (Table 1). Participants in `r params$cohort` who were \pm 6 SD from the EUR population mean were determined to be of non-European ancestry (Table 2).
 
 ```{r population outliers, echo=F}
@@ -153,15 +159,10 @@ EurPca <- pca %>%
   gather(key = 'PC', value = 'eigenvalue', PC1, PC2, PC3, PC4, PC5, PC6, PC7, PC8, PC9, PC10) %>%
   filter(SuperPopulation == 'EUR') %>%
   group_by(SuperPopulation, PC) %>%
-  summarize(mean = mean(eigenvalue), sd = sd(eigenvalue)) %>%
+  dplyr::summarize(mean = mean(eigenvalue), sd = sd(eigenvalue)) %>%
   mutate(lower = mean - sd*6, upper = mean + sd*6) %>%
   mutate(PC = factor(PC, levels = paste0('PC', 1:10))) %>%
   arrange(PC)
-
-##  Print table for meand and SD
-EurPca %>%
-  knitr::kable(format = 'html', caption = 'Table 1: Mean and SD of PC in EUR population') %>%
-  kable_styling(full_width = F, position = "center")
 
 EurPca <- as.data.frame(EurPca)
 
@@ -182,6 +183,11 @@ sample.pca <- pca %>%
 ```
 \
 
+***Table 1:*** Mean and SD of PC in EUR population
+```{r eur pca table, echo=F}
+EurPca
+```
+
 Fig. 6 and Fig. 7 display the population structure of `r params$cohort` with EUR population outliers highlighted in red.
 ```{r, pop_outliers_2PC, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Fig. 6: EUR population outliers on PC 1 & 2'}
 ggplot(sample.pca, aes(x = PC2, y = PC1, colour = pop.outliers)) +
@@ -201,15 +207,15 @@ plot_ly(sample.pca, x = ~PC2, y = ~PC1, z = ~PC3, color = ~pop.outliers, type = 
 ```
 \
 
-
+***Table 2:*** EUR Population Outliers for each PC
 ```{r, population outliers table, echo=F, results='asis'}
-sample.pca %>%
+
+as.data.frame(
+  sample.pca %>%
   select(FID, IID, PC1.outliers, PC2.outliers, PC3.outliers, PC4.outliers, PC5.outliers, PC6.outliers, PC7.outliers, PC8.outliers, PC9.outliers, PC10.outliers, pop.outliers) %>%
   filter(pop.outliers == T) %>%
-  dplyr::rename(PC1 = PC1.outliers, PC2 = PC2.outliers, PC3 = PC3.outliers, PC4 = PC4.outliers, PC5 = PC5.outliers, PC6 = PC6.outliers, PC7 = PC7.outliers, PC8 = PC8.outliers, PC9 = PC9.outliers, PC10 = PC10.outliers, 'EUR Outlier' = pop.outliers) %>%
-  knitr::kable(format = 'html', caption = 'Table 2: EUR Population Outliers for each PC') %>%
-  kable_styling(full_width = F, position = "center") %>%
-  scroll_box(height = "400px")
+  dplyr::rename(PC1 = PC1.outliers, PC2 = PC2.outliers, PC3 = PC3.outliers, PC4 = PC4.outliers, PC5 = PC5.outliers, PC6 = PC6.outliers, PC7 = PC7.outliers, PC8 = PC8.outliers, PC9 = PC9.outliers, PC10 = PC10.outliers, 'EUR Outlier' = pop.outliers)
+)
 
 ```
 \
@@ -217,8 +223,8 @@ sample.pca %>%
 
 ```{r, echo=F}
 ## ---- Export list of population outliers for plink ---- ##
-exclude_pop_outliers <- sample.pca %>%
-  filter(pop.outliers == FALSE) %>%
-  select(FID, IID)
-write_tsv(exclude_pop_outliers, paste0(params$path.out, 'exclude_pop_outliers.txt'), col_names = F)
+#exclude_pop_outliers <- sample.pca %>%
+#  filter(pop.outliers == FALSE) %>%
+#  select(FID, IID)
+#write_tsv(exclude_pop_outliers, paste0(params$path.out, 'exclude_pop_outliers.txt'), col_names = F)
 ```
