@@ -6,12 +6,12 @@ output:
   html_document:
     df_print: paged
 params:
-  Path_eigenval:
+  Path_eigenval: 
   Path_eigenvec: 
   Path_TargetPops: 
   PATH_BasePops:  
   Sample: 
-  rwd:
+  rwd: 
 editor_options: 
   chunk_output_type: console
 ---

@@ -7,7 +7,7 @@ output:
     df_print: paged
 params:
     rwd: 
-    Path_hwe:
+    Path_hwe: 
     Sample: 
 editor_options: 
   chunk_output_type: console
@@ -115,11 +115,11 @@ hwe.dat <- snpsum.col %>%
 
 Figure 2 displays a ternary plot for the genotype frequency of all typed SNPs, with `r nrow(filter(hwe.dat, hwe == F))` SNPs that are violating HWE coloured red. 
 ```{r hwe plot, echo=F, warning=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Fig. 2: SNPs that are in Hardy Weinberg Equilibrium'}
-ggtern::ggtern(data=hwe.dat,aes(AA,AB,BB, colour = hwe)) + 
-  geom_point(size = 0.5, aes(alpha = hwe))  + 
-  scale_colour_manual(name= 'Hardy Weinberg \n Equilibrium', values = c( "#E41A1C", "#377EB8")) + 
-  scale_alpha_discrete(name= 'Hardy Weinberg \n Equilibrium', range = c(0.8, 0.2)) +
-  theme_bw() + theme(legend.position = 'bottom') 
+#ggtern::ggtern(data=hwe.dat,aes(AA,AB,BB, colour = hwe)) + 
+#  geom_point(size = 0.5, aes(alpha = hwe))  + 
+#  scale_colour_manual(name= 'Hardy Weinberg \n Equilibrium', values = c( "#E41A1C", "#377EB8")) + 
+#  scale_alpha_discrete(name= 'Hardy Weinberg \n Equilibrium', range = c(0.8, 0.2)) +
+#  theme_bw() + theme(legend.position = 'bottom') 
 
 ```
 

@@ -14,11 +14,12 @@ rule all:
 ## ---- Exlude SNPs with a high missing rate and low MAF----
 rule snp_qc:
     input:
-        expand("Data/{sample}.{ext}", ext = BPLINK, sample=SAMPLE)
+        expand("data/{sample}.{ext}", ext = BPLINK, sample=SAMPLE)
     output:
-        temp(expand("temp/{{sample}}_SnpQc.{ext}", ext = BPLINK))
+        temp(expand("temp/{{sample}}_SnpQc.{ext}", ext = BPLINK)),
+        'temp/{sample}_SnpQc.hwe'
     params:
-        indat = 'Data/{sample}',
+        indat = 'data/{sample}',
         out = 'temp/{sample}_SnpQc'
     shell:
         'plink --bfile {params.indat} --geno 0.05 --maf 0.01 --hardy --make-bed --out {params.out}'
@@ -40,11 +41,11 @@ rule sample_callRate:
 ##  Use ADNI hg18 data, as the liftover removed the x chromsome data
 rule sexcheck_QC:
     input:
-        expand("Data/{{sample}}_xy.{ext}", ext = BPLINK)
+        expand("data/{{sample}}_xy.{ext}", ext = BPLINK)
     output:
         "temp/{sample}_SexQC.sexcheck"
     params:
-        indat = 'Data/{sample}_xy',
+        indat = 'data/{sample}_xy',
         out = "temp/{sample}_SexQC"
     shell:
         'plink --bfile {params.indat} --check-sex --out {params.out}'
@@ -184,7 +185,7 @@ rule Sample_Flip:
         bim = "temp/{sample}_samp_thinned.bim",
         bed = "temp/{sample}_samp_thinned.bed",
         fam = "temp/{sample}_samp_thinned.fam",
-        fasta = "Data/hg19.fa"
+        fasta = "data/hg19.fa"
     output:
         temp(expand("temp/{{sample}}_samp_thinned_flipped.{ext}", ext = BPLINK))
     shell:
@@ -217,12 +218,12 @@ rule Sample_IndexBcf:
 ##  Extract a pruned dataset from 1000 genomes using the same pruning SNPs from Sample
 rule Reference_prune:
     input:
-        expand("Data/1000genomes_allChr.{ext}", ext = BPLINK),
+        expand("data/1000genomes_allChr.{ext}", ext = BPLINK),
         "temp/{sample}_thinned.prune.in"
     output:
         temp(expand("temp/{{sample}}_1kg_thinned.{ext}", ext = BPLINK))
     params:
-        indat_plink = 'Data/1000genomes_allChr',
+        indat_plink = 'data/1000genomes_allChr',
         indat_prune_in = "temp/{sample}_thinned.prune.in",
         out = 'temp/{sample}_1kg_thinned'
     shell:
@@ -235,7 +236,7 @@ rule Reference_flip:
         bim = "temp/{sample}_1kg_thinned.bim",
         bed = "temp/{sample}_1kg_thinned.bed",
         fam = "temp/{sample}_1kg_thinned.fam",
-        fasta = "Data/hg19.fa"
+        fasta = "data/hg19.fa"
     output:
         temp(expand("temp/{{sample}}_1kg_thinned_flipped.{ext}", ext = BPLINK))
     shell:
@@ -298,15 +299,15 @@ rule PcaPopulationOutliers:
     input:
         expand("temp/{{sample}}_1kg_merged.{ext}", ext = BPLINK),
         "temp/{sample}_1kg_merged_fixed.fam",
-        "Data/1000genomes_pops.txt",
-        "Data/pops.txt"
+        "data/1000genomes_pops.txt",
+        "data/pops.txt"
     output:
         expand("temp/{{sample}}_1kg_merged.{ext}", ext = ['eigenval', 'eigenvec'])
     params:
         indat_plink = "temp/{sample}_1kg_merged",
         indat_fam = "temp/{sample}_1kg_merged_fixed.fam",
-        indat_pop = "Data/1000genomes_pops.txt",
-        indat_clust = "Data/pops.txt",
+        indat_pop = "data/1000genomes_pops.txt",
+        indat_clust = "data/pops.txt",
         out = "temp/{sample}_1kg_merged"
     shell:
         'plink --bfile {params.indat_plink} --fam {params.indat_fam} --pca 10 --within {params.indat_pop} --pca-clusters {params.indat_clust} --out {params.out}'
@@ -317,7 +318,7 @@ rule ExcludePopulationOutliers:
         indat_eigenval = "temp/{sample}_1kg_merged.eigenval",
         indat_eigenvec = "temp/{sample}_1kg_merged.eigenvec",
         indat_fam = "temp/{sample}_samp_thinned.fam",
-        indat_1kgped = "Data/20130606_g1k.ped"
+        indat_1kgped = "data/20130606_g1k.ped"
     output:
         out = "temp/{sample}_exclude.pca"
     shell:
@@ -356,11 +357,11 @@ rule GWAS_QC_Report:
         "scripts/GWAS_QC.Rmd",
         "temp/{sample}_SnpQc.hwe",
         "temp/{sample}_IBDQC.genome",
-        "Data/{sample}.fam",
+        "data/{sample}.fam",
         "temp/{sample}_1kg_merged.eigenval",
         "temp/{sample}_1kg_merged.eigenvec",
         "temp/{sample}_samp_thinned.fam",
-        "Data/20130606_g1k.ped",
+        "data/20130606_g1k.ped",
         "temp/{sample}_filtered_PCA.eigenval",
         "temp/{sample}_filtered_PCA.eigenvec"
     output:
@@ -373,11 +374,11 @@ rule GWAS_QC_Report:
         Path_hwe = "temp/{sample}_SnpQc.hwe",
         Path_HetFile = "temp/{sample}_HetQC.het",
         Path_GenomeFile = "temp/{sample}_IBDQC.genome",
-        Path_FamFile = "Data/{sample}.fam",
+        Path_FamFile = "data/{sample}.fam",
         Path_eigenval = "temp/{sample}_1kg_merged.eigenval",
         Path_eigenvec = "temp/{sample}_1kg_merged.eigenvec",
         Path_TargetPops = "temp/{sample}_samp_thinned.fam",
-        PATH_BasePops = "Data/20130606_g1k.ped",
+        PATH_BasePops = "data/20130606_g1k.ped",
         Path_PopStrat_eigenval = "temp/{sample}_filtered_PCA.eigenval",
         Path_PopStrat_eigenvec = "temp/{sample}_filtered_PCA.eigenvec",
         out = "{sample}_GWAS_QC.html",
