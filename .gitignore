@@ -1,5 +1,4 @@
 .DS_Store
 .snakemake/*
 data/*
-DerivedData/*
-www.well.ox.ac.uk/*
+temp/*

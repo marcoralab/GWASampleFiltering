@@ -9,11 +9,7 @@ rule all:
     input:
         expand("temp/{sample}_filtered_PCA.{ext}", ext = ['eigenval', 'eigenvec'], sample=SAMPLE),
         expand("temp/{sample}_exclude.samples", sample=SAMPLE),
-        expand("stats/{sample}_sexcheck_QC.html", sample=SAMPLE),
-        expand("stats/{sample}_CallRates_QC.html", sample=SAMPLE),
-        expand("stats/{sample}_Heterozygosity_QC.html", sample=SAMPLE),
-        expand("stats/{sample}_PCA_QC.html", sample=SAMPLE),
-        expand("stats/{sample}_population_stratification_QC.html", sample=SAMPLE)
+        expand("stats/{sample}_GWAS_QC.html", sample=SAMPLE)
 
 ## ---- Exlude SNPs with a high missing rate and low MAF----
 rule snp_qc:
@@ -353,117 +349,46 @@ rule SampleExclusion:
     shell:
         'Rscript scripts/sample_QC.R {input.SampCallRate} {input.het} {input.sex} {input.pca} {input.relat} {output.out}'
 
-rule SexQC_Report:
-    input:
-        "scripts/sexcheck_QC.Rmd"
-    output:
-        "stats/{sample}_sexcheck_QC.html"
-    params:
-        Path_SexFile = "temp/{sample}_SexQC.sexcheck",
-        out = "{sample}_sexcheck_QC.html",
-        output_dir = "stats",
-        rwd = RWD
-    shell:
-        "R -e 'rmarkdown::render("
-        """"{input[0]}", output_file = "{params.out}", output_dir = "{params.output_dir}", \
-        params = list(rwd = "{params.rwd}", Path_SexFile = "{params.Path_SexFile}"))' --slave
-        """
 
-rule CallRate_Report:
-    input:
-        "scripts/call_rates.Rmd",
-        "temp/{sample}_SnpQc.hwe"
-    output:
-        "stats/{sample}_CallRates_QC.html"
-    params:
-        Path_hwe = "temp/{sample}_SnpQc.hwe",
-        out = "{sample}_CallRates_QC.html",
-        Sample = "{sample}",
-        output_dir = "stats",
-        rwd = RWD
-    shell:
-        "R -e 'rmarkdown::render("
-        """"{input[0]}", output_file = "{params.out}", output_dir = "{params.output_dir}", \
-        params = list(rwd = "{params.rwd}", Path_hwe = "{params.Path_hwe}", Sample = "{params.Sample}"))' --slave
-        """
 
-rule Heterozygosity_Report:
+rule GWAS_QC_Report:
     input:
-        "scripts/Heterozygosity_QC.Rmd"
-    output:
-        "stats/{sample}_Heterozygosity_QC.html"
-    params:
-        Path_HetFile = "temp/{sample}_HetQC.het",
-        out = "{sample}_Heterozygosity_QC.html",
-        Sample = "{sample}",
-        output_dir = "stats",
-        rwd = RWD
-    shell:
-        "R -e 'rmarkdown::render("
-        """"{input}", output_file = "{params.out}", output_dir = "{params.output_dir}", \
-        params = list(rwd = "{params.rwd}", Path_HetFile = "{params.Path_HetFile}", sample = "{params.Sample}"))' --slave
-        """
-
-rule Relatdness_Report:
-    input:
-        "scripts/relatedness_QC.Rmd",
+        "scripts/GWAS_QC.Rmd",
+        "temp/{sample}_SnpQc.hwe",
         "temp/{sample}_IBDQC.genome",
-        "Data/{sample}.fam"
-    output:
-        "stats/{sample}_Relatedness_QC.html"
-    params:
-        Path_GenomeFile = "temp/{sample}_IBDQC.genome",
-        Path_FamFile = "Data/{sample}.fam",
-        out = "{sample}_Heterozygosity_QC.html",
-        Sample = "{sample}",
-        output_dir = "stats",
-        rwd = RWD
-    shell:
-        "R -e 'rmarkdown::render("
-        """"{input[0]}", output_file = "{params.out}", output_dir = "{params.output_dir}", \
-        params = list(rwd = "{params.rwd}", Path_HetFile = "{params.Path_GenomeFile}", Path_FamFile = "{params.Path_FamFile}", sample = "{params.Sample}"))' --slave
-        """
-
-rule PCA_Report:
-    input:
-        "scripts/PCA_QC.Rmd",
+        "Data/{sample}.fam",
         "temp/{sample}_1kg_merged.eigenval",
         "temp/{sample}_1kg_merged.eigenvec",
         "temp/{sample}_samp_thinned.fam",
-        "Data/20130606_g1k.ped"
+        "Data/20130606_g1k.ped",
+        "temp/{sample}_filtered_PCA.eigenval",
+        "temp/{sample}_filtered_PCA.eigenvec"
     output:
-        "stats/{sample}_PCA_QC.html"
+        "stats/{sample}_GWAS_QC.html"
     params:
+        rwd = RWD,
+        Sample = "{sample}",
+        output_dir = "stats",
+        Path_SexFile = "temp/{sample}_SexQC.sexcheck",
+        Path_hwe = "temp/{sample}_SnpQc.hwe",
+        Path_HetFile = "temp/{sample}_HetQC.het",
+        Path_GenomeFile = "temp/{sample}_IBDQC.genome",
+        Path_FamFile = "Data/{sample}.fam",
         Path_eigenval = "temp/{sample}_1kg_merged.eigenval",
         Path_eigenvec = "temp/{sample}_1kg_merged.eigenvec",
         Path_TargetPops = "temp/{sample}_samp_thinned.fam",
         PATH_BasePops = "Data/20130606_g1k.ped",
-        out = "{sample}_PCA_QC.html",
-        Sample = "{sample}",
-        output_dir = "stats",
-        rwd = RWD
+        Path_PopStrat_eigenval = "temp/{sample}_filtered_PCA.eigenval",
+        Path_PopStrat_eigenvec = "temp/{sample}_filtered_PCA.eigenvec",
+        out = "{sample}_GWAS_QC.html",
     shell:
         "R -e 'rmarkdown::render("
         """"{input[0]}", output_file = "{params.out}", output_dir = "{params.output_dir}", \
-        params = list(rwd = "{params.rwd}", Path_eigenval = "{params.Path_eigenval}", Path_eigenvec = "{params.Path_eigenvec}", Path_TargetPops = "{params.Path_TargetPops}", PATH_BasePops = "{params.PATH_BasePops}", Sample = "{params.Sample}"))' --slave
-        """
-
-rule PopuluationStratification_Report:
-    input:
-        "scripts/population_stratification_QC.Rmd",
-        "temp/{sample}_filtered_PCA.eigenval",
-        "temp/{sample}_filtered_PCA.eigenvec",
-    output:
-        "stats/{sample}_population_stratification_QC.html"
-    params:
-        Path_eigenval = "temp/{sample}_filtered_PCA.eigenval",
-        Path_eigenvec = "temp/{sample}_filtered_PCA.eigenvec",
-        out = "{sample}_population_stratification_QC.html",
-        Sample = "{sample}",
-        output_dir = "stats",
-        rwd = RWD
-    shell:
-        "R -e 'rmarkdown::render("
-        """"{input[0]}", output_file = "{params.out}", output_dir = "{params.output_dir}", \
-        params = list(rwd = "{params.rwd}", Path_eigenval = "{params.Path_eigenval}", Path_eigenvec = "{params.Path_eigenvec}", Sample = "{params.Sample}"))' --slave
+        params = list(rwd = "{params.rwd}", Sample = "{params.Sample}", \
+        Path_SexFile = "{params.Path_SexFile}", \
+        Path_hwe = "{params.Path_hwe}", \
+        Path_HetFile = "{params.Path_HetFile}", \
+        Path_GenomeFile = "{params.Path_GenomeFile}", Path_FamFile = "{params.Path_FamFile}", \
+        Path_eigenval = "{params.Path_eigenval}", Path_eigenvec = "{params.Path_eigenvec}", Path_TargetPops = "{params.Path_TargetPops}", PATH_BasePops = "{params.PATH_BasePops}", \
+        Path_PopStrat_eigenval = "{params.Path_PopStrat_eigenval}", Path_PopStrat_eigenvec = "{params.Path_PopStrat_eigenvec}"))' --slave
         """

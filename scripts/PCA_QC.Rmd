@@ -30,7 +30,7 @@ plink_1.9 --bfile merged-reference-sample-data \
 <br> 
 
 
-```{r setup, include=FALSE, cache=F}
+```{r setupPCA, include=FALSE, cache=F}
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(root.dir = params$rwd)
 

@@ -6,7 +6,7 @@ output: html_document
 params:
   Path_GenomeFile: 
   Path_FamFile: 
-  sample: 
+  Sample: 
 editor_options: 
   chunk_output_type: console
 ---
@@ -31,11 +31,14 @@ knitr::opts_knit$set(root.dir = params$rwd)
 library(tidyverse)
 library(ggplot2)
 library(knitr)
+```
 
+```{r readData, echo=F, warning=F, message=F}
 ## ---- Read in Data ----##
 
 ##  Read in .genome file obtained from PLINK using the --genome option
 dat.inter <- as.tibble(read.table(params$Path_GenomeFile, header = TRUE, check.names = FALSE, as.is = TRUE))
+#dat.inter <- read_table(params$Path_GenomeFile, col_names = TRUE)
 
 ##  Read in PLINK .fam file
 fam <- read_delim(params$Path_FamFile, delim = " ", col_names = F)
