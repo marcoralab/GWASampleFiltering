@@ -4,6 +4,7 @@ configfile: "config.yaml"
 BPLINK = ["bed", "bim", "fam"]
 RWD = os.getcwd()
 SAMPLE = config['sample']
+print(SAMPLE)
 if config['SampleSex']:
     SAMPLESEX = config['SampleSex']
 else:
@@ -13,7 +14,7 @@ DATAOUT = config['DataOut']
 
 rule all:
     input:
-        expand("temp/{sample}_filtered_PCA.{ext}", ext = ['eigenval', 'eigenvec'], sample=SAMPLE),
+        expand("{DataOut}/{sample}_filtered_PCA.{ext}", ext = ['eigenval', 'eigenvec'], sample=SAMPLE, DataOut=DATAOUT),
         expand("{DataOut}/{sample}_exclude.samples", sample=SAMPLE, DataOut=DATAOUT),
         expand("stats/{sample}_GWAS_QC.html", sample=SAMPLE)
 
@@ -35,11 +36,11 @@ rule sample_callRate:
     input:
         rules.snp_qc.output
     output:
-        temp(expand("temp/{{sample}}_callRate.{ext}", ext = BPLINK)),
-        "temp/{sample}_callRate.irem"
+        temp(expand("{DataOut}/{{sample}}_callRate.{ext}", ext = BPLINK, DataOut=DATAOUT)),
+        "{DataOut}/{{sample}}_callRate.irem".format(DataOut=DATAOUT)
     params:
         indat = rules.snp_qc.params.out,
-        out = 'temp/{sample}_callRate'
+        out = "{DataOut}/{{sample}}_callRate".format(DataOut=DATAOUT)
     shell:
         'plink --bfile {params.indat} --mind 0.05 --make-bed --out {params.out}'
 
@@ -47,169 +48,163 @@ rule sample_callRate:
 ##  Use ADNI hg18 data, as the liftover removed the x chromsome data
 rule sexcheck_QC:
     input:
-        expand("data/{{SampleSex}}.{ext}", ext = BPLINK)
+        expand("{DataIn}/{{SampleSex}}.{ext}", ext = BPLINK, DataIn=DATAIN)
     output:
-        "temp/{SampleSex}_SexQC.sexcheck"
+        "{DataOut}/{{SampleSex}}_SexQC.sexcheck".format(DataOut=DATAOUT)
     params:
-        indat = 'data/{SampleSex}',
-        out = "temp/{SampleSex}_SexQC",
+        indat = '{DataIn}/{{SampleSex}}'.format(DataIn=DATAIN),
+        out = "{DataOut}/{{SampleSex}}_SexQC".format(DataOut=DATAOUT),
     shell:
         'plink --bfile {params.indat} --check-sex --out {params.out}'
 
 rule sex_sample_fail:
     input:
-        expand("temp/{SampleSex}_SexQC.sexcheck", SampleSex=SAMPLESEX),
+        "{DataOut}/{SampleSex}_SexQC.sexcheck".format(DataOut=DATAOUT, SampleSex=SAMPLESEX)
     output:
-        "temp/{sample}_exclude.sexcheck"
-    params:
-        out = "temp/{sample}_exclude.sexcheck"
+        "{DataOut}/{{sample}}_exclude.sexcheck".format(DataOut=DATAOUT),
     shell:
-        'Rscript scripts/sexcheck_QC.R {input} {params.out}'
+        'Rscript scripts/sexcheck_QC.R {input} {output}'
 
 rule sex__exclude_failed:
     input:
-        "temp/{sample}_exclude.sexcheck",
-        expand("temp/{{sample}}_callRate.{ext}", ext = BPLINK)
+        expand("{DataOut}/{{sample}}_callRate.{ext}", ext=BPLINK, DataOut=DATAOUT),
+        indat_exclude = "{DataOut}/{{sample}}_exclude.sexcheck".format(DataOut=DATAOUT)
     output:
-        temp(expand("temp/{{sample}}_SexExclude.{ext}", ext = BPLINK))
+        temp(expand("{DataOut}/{{sample}}_SexExclude.{ext}", ext = BPLINK, DataOut=DATAOUT))
     params:
-        indat_exclude = "temp/{sample}_exclude.sexcheck",
-        indat_plink = 'temp/{sample}_callRate',
-        out = 'temp/{sample}_SexExclude'
+        indat_plink = "{DataOut}/{{sample}}_callRate".format(DataOut=DATAOUT),
+        out = "{DataOut}/{{sample}}_SexExclude".format(DataOut=DATAOUT)
     shell:
-        'plink --bfile {params.indat_plink} --remove {params.indat_exclude} --make-bed --out {params.out}'
+        'plink --bfile {params.indat_plink} --remove {input.indat_exclude} --make-bed --out {params.out}'
 
 ## ---- Prune SNPs, autosome only ----
 ##  Pruned SNP list is used for IBD, PCA and heterozigosity calculations
 rule Prune_snps:
     input:
-        expand("temp/{{sample}}_SexExclude.{ext}", ext = BPLINK)
+        expand("{DataOut}/{{sample}}_SexExclude.{ext}", ext = BPLINK, DataOut=DATAOUT)
     output:
-        temp(expand("temp/{{sample}}_thinned.{ext}", ext = ['prune.in', 'prune.out']))
+        temp(expand("{DataOut}/{{sample}}_thinned.{ext}", ext = ['prune.in', 'prune.out'], DataOut=DATAOUT))
     params:
-        indat = 'temp/{sample}_SexExclude',
-        out = "temp/{sample}_thinned"
+        indat = "{DataOut}/{{sample}}_SexExclude".format(DataOut=DATAOUT),
+        out = "{DataOut}/{{sample}}_thinned".format(DataOut=DATAOUT)
     shell:
         'plink --bfile {params.indat} --autosome --indep 50 5 1.5 --out {params.out}'
 
 ## ---- Exclude Samples with interealtedness ----
 rule relatedness_QC:
     input:
-        expand("temp/{{sample}}_SexExclude.{ext}", ext = BPLINK),
-        "temp/{sample}_thinned.prune.in"
+        expand("{DataOut}/{{sample}}_SexExclude.{ext}", ext = BPLINK, DataOut=DATAOUT),
+        expand("{DataOut}/{{sample}}_thinned.prune.in", DataOut=DATAOUT)
     output:
-        "temp/{sample}_IBDQC.genome"
+        "{DataOut}/{{sample}}_IBDQC.genome".format(DataOut=DATAOUT)
     params:
-        indat_plink = 'temp/{sample}_SexExclude',
-        indat_prune_in = "temp/{sample}_thinned.prune.in",
-        out = 'temp/{sample}_IBDQC'
+        indat_plink = "{DataOut}/{{sample}}_SexExclude".format(DataOut=DATAOUT),
+        indat_prune_in = "{DataOut}/{{sample}}_thinned.prune.in".format(DataOut=DATAOUT),
+        out = "{DataOut}/{{sample}}_IBDQC".format(DataOut=DATAOUT)
     shell:
         'plink --bfile {params.indat_plink} --extract {params.indat_prune_in} --genome --min 0.05 --out {params.out}'
 
 rule relatedness_sample_fail:
     input:
-        indat_genome = "temp/{sample}_IBDQC.genome",
+        indat_genome = expand("{DataOut}/{{sample}}_IBDQC.genome", DataOut=DATAOUT),
         indat_fam = "{DataOut}/{{sample}}_SnpQc.fam".format(DataOut=DATAOUT)
     output:
-        out = "temp/{sample}_exclude.relatedness"
+        out = "{DataOut}/{{sample}}_exclude.relatedness".format(DataOut=DATAOUT)
     shell:
         'Rscript scripts/relatedness_QC.R {input.indat_genome} {input.indat_fam} {output.out}'
 
 rule relatedness_exclude_failed:
     input:
-        "temp/{sample}_exclude.relatedness",
-        expand("temp/{{sample}}_SexExclude.{ext}", ext = BPLINK)
+        expand("{DataOut}/{{sample}}_exclude.relatedness", DataOut=DATAOUT),
+        expand("{DataOut}/{{sample}}_SexExclude.{ext}", ext = BPLINK, DataOut=DATAOUT)
     output:
-        temp(expand("temp/{{sample}}_RelatednessExclude.{ext}", ext = BPLINK))
+        temp(expand("{DataOut}/{{sample}}_RelatednessExclude.{ext}", ext = BPLINK, DataOut=DATAOUT))
     params:
-        indat_exclude = "temp/{sample}_exclude.relatedness",
-        indat_plink = 'temp/{sample}_SexExclude',
-        out = 'temp/{sample}_RelatednessExclude'
+        indat_exclude = "{DataOut}/{{sample}}_exclude.relatedness".format(DataOut=DATAOUT),
+        indat_plink = "{DataOut}/{{sample}}_SexExclude".format(DataOut=DATAOUT),
+        out = "{DataOut}/{{sample}}_RelatednessExclude".format(DataOut=DATAOUT)
     shell:
         'plink --bfile {params.indat_plink} --remove {params.indat_exclude} --make-bed --out {params.out}'
 
 ## ---- Exclude Samples with outlying heterozigosity ----
 rule heterozigosity_QC:
     input:
-        expand("temp/{{sample}}_RelatednessExclude.{ext}", ext = BPLINK),
-        "temp/{sample}_thinned.prune.in"
+        expand("{DataOut}/{{sample}}_RelatednessExclude.{ext}", ext = BPLINK, DataOut=DATAOUT),
+        expand("{DataOut}/{{sample}}_thinned.prune.in", DataOut=DATAOUT)
     output:
-        "temp/{sample}_HetQC.het"
+        expand("{DataOut}/{{sample}}_HetQC.het", DataOut=DATAOUT)
     params:
-        indat_plink = 'temp/{sample}_RelatednessExclude',
-        indat_prune_in = "temp/{sample}_thinned.prune.in",
-        out = 'temp/{sample}_HetQC'
+        indat_plink = "{DataOut}/{{sample}}_RelatednessExclude".format(DataOut=DATAOUT),
+        indat_prune_in = "{DataOut}/{{sample}}_thinned.prune.in".format(DataOut=DATAOUT),
+        out = "{DataOut}/{{sample}}_HetQC".format(DataOut=DATAOUT)
     shell:
         'plink --bfile {params.indat_plink} --extract {params.indat_prune_in} --het --out {params.out}'
 
 rule heterozigosity_sample_fail:
     input:
-        "temp/{sample}_HetQC.het",
+        expand("{DataOut}/{{sample}}_HetQC.het", DataOut=DATAOUT),
     output:
-        "temp/{sample}_exclude.heterozigosity"
-    params:
-        indat_het = "temp/{sample}_HetQC.het",
-        out = "temp/{sample}_exclude.heterozigosity"
+        "{DataOut}/{{sample}}_exclude.heterozigosity".format(DataOut=DATAOUT)
     shell:
-        'Rscript scripts/heterozygosity_QC.R {params.indat_het} {params.out}'
+        'Rscript scripts/heterozygosity_QC.R {input} {output}'
 
 rule heterozigosity_exclude_failed:
     input:
-        "temp/{sample}_exclude.heterozigosity",
-        expand("temp/{{sample}}_RelatednessExclude.{ext}", ext = BPLINK)
+        expand("{DataOut}/{{sample}}_exclude.heterozigosity", DataOut=DATAOUT),
+        expand("{DataOut}/{{sample}}_RelatednessExclude.{ext}", ext = BPLINK, DataOut=DATAOUT)
     output:
-        temp(expand("temp/{{sample}}_HetExclude.{ext}", ext = BPLINK))
+        temp(expand("{DataOut}/{{sample}}_HetExclude.{ext}", ext = BPLINK, DataOut=DATAOUT))
     params:
-        indat_exclude = "temp/{sample}_exclude.heterozigosity",
-        indat_plink = 'temp/{sample}_RelatednessExclude',
-        out = 'temp/{sample}_HetExclude'
+        indat_exclude = "{DataOut}/{{sample}}_exclude.heterozigosity".format(DataOut=DATAOUT),
+        indat_plink = "{DataOut}/{{sample}}_RelatednessExclude".format(DataOut=DATAOUT),
+        out = "{DataOut}/{{sample}}_HetExclude".format(DataOut=DATAOUT)
     shell:
         'plink --bfile {params.indat_plink} --remove {params.indat_exclude} --make-bed --out {params.out}'
 
 ## Prune sample dataset
 rule sample_prune:
     input:
-        expand("temp/{{sample}}_HetExclude.{ext}", ext = BPLINK),
-        "temp/{sample}_thinned.prune.in"
+        expand("{DataOut}/{{sample}}_HetExclude.{ext}", ext = BPLINK, DataOut=DATAOUT),
+        expand("{DataOut}/{{sample}}_thinned.prune.in", DataOut=DATAOUT),
     output:
-        temp(expand("temp/{{sample}}_samp_thinned.{ext}", ext = BPLINK))
+        temp(expand("{DataOut}/{{sample}}_samp_thinned.{ext}", ext = BPLINK, DataOut=DATAOUT))
     params:
-        indat_plink = 'temp/{sample}_HetExclude',
-        indat_prune_in = "temp/{sample}_thinned.prune.in",
-        out = 'temp/{sample}_samp_thinned'
+        indat_plink = "{DataOut}/{{sample}}_HetExclude".format(DataOut=DATAOUT),
+        indat_prune_in = "{DataOut}/{{sample}}_thinned.prune.in".format(DataOut=DATAOUT),
+        out = "{DataOut}/{{sample}}_samp_thinned".format(DataOut=DATAOUT)
     shell:
         'plink --bfile {params.indat_plink} --extract {params.indat_prune_in} --make-bed --out {params.out}'
 
 ## align 1000 genomes to fasta refrence
 rule Sample_Flip:
     input:
-        bim = "temp/{sample}_samp_thinned.bim",
-        bed = "temp/{sample}_samp_thinned.bed",
-        fam = "temp/{sample}_samp_thinned.fam",
+        bim = expand("{DataOut}/{{sample}}_samp_thinned.bim", DataOut=DATAOUT),
+        bed = expand("{DataOut}/{{sample}}_samp_thinned.bed", DataOut=DATAOUT),
+        fam = expand("{DataOut}/{{sample}}_samp_thinned.fam", DataOut=DATAOUT),
         fasta = "data/hg19.fa"
     output:
-        temp(expand("temp/{{sample}}_samp_thinned_flipped.{ext}", ext = BPLINK))
+        temp(expand("{DataOut}/{{sample}}_samp_thinned_flipped.{ext}", ext = BPLINK, DataOut=DATAOUT))
     shell:
         "/Users/sheaandrews/Programs/flippyr/flippyr.py -p {input.fasta} {input.bim}"
 
 ## Recode sample plink file to vcf
 rule Sample_Plink2Bcf:
     input:
-        expand("temp/{{sample}}_samp_thinned_flipped.{ext}", ext = BPLINK)
+        expand("{DataOut}/{{sample}}_samp_thinned_flipped.{ext}", ext = BPLINK, DataOut=DATAOUT)
     output:
-        temp("temp/{sample}_samp_thinned_flipped.vcf.gz")
+        temp(expand("{DataOut}/{{sample}}_samp_thinned_flipped.vcf.gz", DataOut=DATAOUT))
     params:
-        indat = "temp/{sample}_samp_thinned_flipped",
-        out = "temp/{sample}_samp_thinned_flipped"
+        indat = "{DataOut}/{{sample}}_samp_thinned_flipped".format(DataOut=DATAOUT),
+        out = "{DataOut}/{{sample}}_samp_thinned_flipped".format(DataOut=DATAOUT)
     shell:
         'plink --bfile {params.indat} --recode vcf bgz --keep-allele-order --real-ref-alleles --out {params.out}'
 
 ## Index bcf
 rule Sample_IndexBcf:
     input:
-        bcf = "temp/{sample}_samp_thinned_flipped.vcf.gz"
+        bcf = expand("{DataOut}/{{sample}}_samp_thinned_flipped.vcf.gz", DataOut=DATAOUT)
     output:
-        temp("temp/{sample}_samp_thinned_flipped.vcf.gz.csi")
+        temp("{DataOut}/{{sample}}_samp_thinned_flipped.vcf.gz.csi".format(DataOut=DATAOUT))
     shell:
         'bcftools index -f {input.bcf}'
 
@@ -220,13 +215,13 @@ rule Sample_IndexBcf:
 rule Reference_prune:
     input:
         expand("data/1000genomes_allChr.{ext}", ext = BPLINK),
-        "temp/{sample}_thinned.prune.in"
+        expand("{DataOut}/{{sample}}_thinned.prune.in", DataOut=DATAOUT),
     output:
-        temp(expand("temp/{{sample}}_1kg_thinned.{ext}", ext = BPLINK))
+        temp(expand("{DataOut}/{{sample}}_1kg_thinned.{ext}", ext = BPLINK, DataOut=DATAOUT))
     params:
         indat_plink = 'data/1000genomes_allChr',
-        indat_prune_in = "temp/{sample}_thinned.prune.in",
-        out = 'temp/{sample}_1kg_thinned'
+        indat_prune_in = "{DataOut}/{{sample}}_thinned.prune.in".format(DataOut=DATAOUT),
+        out = "{DataOut}/{{sample}}_1kg_thinned".format(DataOut=DATAOUT)
     shell:
         'plink --bfile {params.indat_plink} --filter-founders --extract {params.indat_prune_in} --make-bed --out {params.out}'
 
@@ -234,118 +229,118 @@ rule Reference_prune:
 ## align 1000 genomes to fasta refrence
 rule Reference_flip:
     input:
-        bim = "temp/{sample}_1kg_thinned.bim",
-        bed = "temp/{sample}_1kg_thinned.bed",
-        fam = "temp/{sample}_1kg_thinned.fam",
+        bim = "{DataOut}/{{sample}}_1kg_thinned.bim".format(DataOut=DATAOUT),
+        bed = "{DataOut}/{{sample}}_1kg_thinned.bed".format(DataOut=DATAOUT),
+        fam = "{DataOut}/{{sample}}_1kg_thinned.fam".format(DataOut=DATAOUT),
         fasta = "data/hg19.fa"
     output:
-        temp(expand("temp/{{sample}}_1kg_thinned_flipped.{ext}", ext = BPLINK))
+        temp(expand("{DataOut}/{{sample}}_1kg_thinned_flipped.{ext}", ext=BPLINK, DataOut=DATAOUT))
     shell:
         "/Users/sheaandrews/Programs/flippyr/flippyr.py -p {input.fasta} {input.bim}"
 
 ## Recode 1kg to vcf
 rule Reference_Plink2Bcf:
     input:
-        expand("temp/{{sample}}_1kg_thinned_flipped.{ext}", ext = BPLINK)
+        expand("{DataOut}/{{sample}}_1kg_thinned_flipped.{ext}", ext=BPLINK, DataOut=DATAOUT)
     output:
-        temp(expand("temp/{{sample}}_1kg_thinned_flipped.{ext}", ext = 'vcf.gz'))
+        temp(expand("{DataOut}/{{sample}}_1kg_thinned_flipped.vcf.gz", DataOut=DATAOUT))
     params:
-        indat = "temp/{sample}_1kg_thinned_flipped",
-        out = "temp/{sample}_1kg_thinned_flipped"
+        indat = "{DataOut}/{{sample}}_1kg_thinned_flipped".format(DataOut=DATAOUT),
+        out = "{DataOut}/{{sample}}_1kg_thinned_flipped".format(DataOut=DATAOUT)
     shell:
         'plink --bfile {params.indat} --recode vcf bgz --keep-allele-order --real-ref-alleles --out {params.out}'
 
 ## Index bcf
 rule Reference_IndexBcf:
     input:
-        bcf = "temp/{sample}_1kg_thinned_flipped.vcf.gz"
+        bcf = expand("{DataOut}/{{sample}}_1kg_thinned_flipped.vcf.gz", DataOut=DATAOUT)
     output:
-        temp("temp/{sample}_1kg_thinned_flipped.vcf.gz.csi")
+        temp("{DataOut}/{{sample}}_1kg_thinned_flipped.vcf.gz.csi".format(DataOut=DATAOUT))
     shell:
         'bcftools index -f {input.bcf}'
 
 ## Merge ref and sample
 rule Merge_RefenceSample:
     input:
-        bcf_1kg = "temp/{sample}_1kg_thinned_flipped.vcf.gz",
-        csi_1kg = "temp/{sample}_1kg_thinned_flipped.vcf.gz.csi",
-        bcf_samp = "temp/{sample}_samp_thinned_flipped.vcf.gz",
-        csi_samp = "temp/{sample}_samp_thinned_flipped.vcf.gz.csi"
+        bcf_1kg = expand("{DataOut}/{{sample}}_1kg_thinned_flipped.vcf.gz", DataOut=DATAOUT),
+        csi_1kg = expand("{DataOut}/{{sample}}_1kg_thinned_flipped.vcf.gz.csi", DataOut=DATAOUT),
+        bcf_samp = expand("{DataOut}/{{sample}}_samp_thinned_flipped.vcf.gz", DataOut=DATAOUT),
+        csi_samp = expand("{DataOut}/{{sample}}_samp_thinned_flipped.vcf.gz.csi", DataOut=DATAOUT)
     output:
-        out = temp("temp/{sample}_1kg_merged.vcf")
+        out = "{DataOut}/{{sample}}_1kg_merged.vcf".format(DataOut=DATAOUT)
     shell:
         'bcftools merge -m none {input.bcf_1kg} {input.bcf_samp} -Ov -o {output.out}'
 
 ## recode merged sample to plink
 rule Plink_RefenceSample:
     input:
-        vcf = "temp/{sample}_1kg_merged.vcf",
+        vcf = "{DataOut}/{{sample}}_1kg_merged.vcf".format(DataOut=DATAOUT),
     output:
-        temp(temp(expand("temp/{{sample}}_1kg_merged.{ext}", ext = BPLINK)))
+        temp(expand("{DataOut}/{{sample}}_1kg_merged.{ext}", ext = BPLINK, DataOut=DATAOUT))
     params:
-        out = "temp/{sample}_1kg_merged"
+        out = "{DataOut}/{{sample}}_1kg_merged".format(DataOut=DATAOUT)
     shell:
         'plink --vcf {input.vcf} --const-fid --make-bed --out {params.out}'
 
 rule fix_fam:
     input:
-        fam = "temp/{sample}_1kg_merged.fam",
+        fam = "{DataOut}/{{sample}}_1kg_merged.fam".format(DataOut=DATAOUT)
     output:
-        out = temp("temp/{sample}_1kg_merged_fixed.fam")
+        out = "{DataOut}/{{sample}}_1kg_merged_fixed.fam".format(DataOut=DATAOUT)
     shell:
         'scripts/fix_fam.py {input.fam} {output.out}'
 
 ## PCA analysis to identify population outliers
 rule PcaPopulationOutliers:
     input:
-        expand("temp/{{sample}}_1kg_merged.{ext}", ext = BPLINK),
-        "temp/{sample}_1kg_merged_fixed.fam",
+        expand("{DataOut}/{{sample}}_1kg_merged.{ext}", ext = BPLINK, DataOut=DATAOUT),
+        "{DataOut}/{{sample}}_1kg_merged_fixed.fam".format(DataOut=DATAOUT),
         "data/1000genomes_pops.txt",
         "data/pops.txt"
     output:
-        expand("temp/{{sample}}_1kg_merged.{ext}", ext = ['eigenval', 'eigenvec'])
+        expand("{DataOut}/{{sample}}_1kg_merged.{ext}", ext = ['eigenval', 'eigenvec'], DataOut=DATAOUT)
     params:
-        indat_plink = "temp/{sample}_1kg_merged",
-        indat_fam = "temp/{sample}_1kg_merged_fixed.fam",
+        indat_plink = "{DataOut}/{{sample}}_1kg_merged".format(DataOut=DATAOUT),
+        indat_fam = "{DataOut}/{{sample}}_1kg_merged_fixed.fam".format(DataOut=DATAOUT),
         indat_pop = "data/1000genomes_pops.txt",
         indat_clust = "data/pops.txt",
-        out = "temp/{sample}_1kg_merged"
+        out = "{DataOut}/{{sample}}_1kg_merged".format(DataOut=DATAOUT),
     shell:
         'plink --bfile {params.indat_plink} --fam {params.indat_fam} --pca 10 --within {params.indat_pop} --pca-clusters {params.indat_clust} --out {params.out}'
 
 ## Rscript to identify EUR population outliers
 rule ExcludePopulationOutliers:
     input:
-        indat_eigenval = "temp/{sample}_1kg_merged.eigenval",
-        indat_eigenvec = "temp/{sample}_1kg_merged.eigenvec",
-        indat_fam = "temp/{sample}_samp_thinned.fam",
+        indat_eigenval = "{DataOut}/{{sample}}_1kg_merged.eigenval".format(DataOut=DATAOUT),
+        indat_eigenvec = "{DataOut}/{{sample}}_1kg_merged.eigenvec".format(DataOut=DATAOUT),
+        indat_fam = "{DataOut}/{{sample}}_samp_thinned.fam".format(DataOut=DATAOUT),
         indat_1kgped = "data/20130606_g1k.ped"
     output:
-        out = "temp/{sample}_exclude.pca"
+        out = "{DataOut}/{{sample}}_exclude.pca".format(DataOut=DATAOUT)
     shell:
         'Rscript scripts/PCA_QC.R {input.indat_eigenvec} {input.indat_1kgped} {input.indat_fam} {input.indat_eigenval} {output.out} '
 
 ## Run PCA to for population stratification
 rule PopulationStratification:
     input:
-        expand("temp/{{sample}}_samp_thinned.{ext}", ext = BPLINK),
-        "temp/{sample}_exclude.pca"
+        expand("{DataOut}/{{sample}}_samp_thinned.{ext}", ext = BPLINK, DataOut=DATAOUT),
+        "{DataOut}/{{sample}}_exclude.pca".format(DataOut=DATAOUT)
     output:
-        expand("temp/{{sample}}_filtered_PCA.{ext}", ext = ['eigenval', 'eigenvec'])
+        expand("{DataOut}/{{sample}}_filtered_PCA.{ext}", ext = ['eigenval', 'eigenvec'], DataOut=DATAOUT),
     params:
-        indat = "temp/{sample}_samp_thinned",
-        exclude = "temp/{sample}_exclude.pca",
-        out = "temp/{sample}_filtered_PCA"
+        indat = "{DataOut}/{{sample}}_samp_thinned".format(DataOut=DATAOUT),
+        exclude = "{DataOut}/{{sample}}_exclude.pca".format(DataOut=DATAOUT),
+        out = "{DataOut}/{{sample}}_filtered_PCA".format(DataOut=DATAOUT)
     shell:
         'plink --bfile {params.indat}  --remove {params.exclude} --pca 10 --out {params.out}'
 
 rule SampleExclusion:
     input:
-        SampCallRate = "temp/{sample}_callRate.irem",
-        het = "temp/{sample}_exclude.heterozigosity",
-        sex = "temp/{sample}_exclude.sexcheck",
-        pca = "temp/{sample}_exclude.pca",
-        relat = "temp/{sample}_exclude.relatedness"
+        SampCallRate = "{DataOut}/{{sample}}_callRate.irem".format(DataOut=DATAOUT),
+        het = "{DataOut}/{{sample}}_exclude.heterozigosity".format(DataOut=DATAOUT),
+        sex = "{DataOut}/{{sample}}_exclude.sexcheck".format(DataOut=DATAOUT),
+        pca = "{DataOut}/{{sample}}_exclude.pca".format(DataOut=DATAOUT),
+        relat = "{DataOut}/{{sample}}_exclude.relatedness".format(DataOut=DATAOUT)
     output:
         out = "{DataOut}/{{sample}}_exclude.samples".format(DataOut=DATAOUT)
     shell:
@@ -356,32 +351,32 @@ rule SampleExclusion:
 rule GWAS_QC_Report:
     input:
         "scripts/GWAS_QC.Rmd",
-        "temp/{sample}_SnpQc.hwe",
-        "temp/{sample}_IBDQC.genome",
-        "data/{sample}.fam",
-        "temp/{sample}_1kg_merged.eigenval",
-        "temp/{sample}_1kg_merged.eigenvec",
-        "temp/{sample}_samp_thinned.fam",
+        "{DataOut}/{{sample}}_SnpQc.hwe".format(DataOut=DATAOUT),
+        "{DataOut}/{{sample}}_IBDQC.genome".format(DataOut=DATAOUT),
+        "{DataIn}/{{sample}}.fam".format(DataIn=DATAIN),
+        "{DataOut}/{{sample}}_1kg_merged.eigenval".format(DataOut=DATAOUT),
+        "{DataOut}/{{sample}}_1kg_merged.eigenvec".format(DataOut=DATAOUT),
+        "{DataOut}/{{sample}}_samp_thinned.fam".format(DataOut=DATAOUT),
         "data/20130606_g1k.ped",
-        "temp/{sample}_filtered_PCA.eigenval",
-        "temp/{sample}_filtered_PCA.eigenvec"
+        "{DataOut}/{{sample}}_filtered_PCA.eigenval".format(DataOut=DATAOUT),
+        "{DataOut}/{{sample}}_filtered_PCA.eigenvec".format(DataOut=DATAOUT)
     output:
         "stats/{sample}_GWAS_QC.html"
     params:
         rwd = RWD,
         Sample = "{sample}",
         output_dir = "stats",
-        Path_SexFile = expand("temp/{SampleSex}_SexQC.sexcheck", SampleSex=SAMPLESEX),
-        Path_hwe = "temp/{sample}_SnpQc.hwe",
-        Path_HetFile = "temp/{sample}_HetQC.het",
-        Path_GenomeFile = "temp/{sample}_IBDQC.genome",
-        Path_FamFile = "data/{sample}.fam",
-        Path_eigenval = "temp/{sample}_1kg_merged.eigenval",
-        Path_eigenvec = "temp/{sample}_1kg_merged.eigenvec",
-        Path_TargetPops = "temp/{sample}_samp_thinned.fam",
+        Path_SexFile = expand("{DataOut}/{SampleSex}_SexQC.sexcheck", SampleSex=SAMPLESEX, DataOut=DATAOUT),
+        Path_hwe = "{DataOut}/{{sample}}_SnpQc.hwe".format(DataOut=DATAOUT),
+        Path_HetFile = "{DataOut}/{{sample}}_HetQC.het".format(DataOut=DATAOUT),
+        Path_GenomeFile = "{DataOut}/{{sample}}_IBDQC.genome".format(DataOut=DATAOUT),
+        Path_FamFile = "{DataIn}/{{sample}}.fam".format(DataIn=DATAIN),
+        Path_eigenval = "{DataOut}/{{sample}}_1kg_merged.eigenval".format(DataOut=DATAOUT),
+        Path_eigenvec = "{DataOut}/{{sample}}_1kg_merged.eigenvec".format(DataOut=DATAOUT),
+        Path_TargetPops = "{DataOut}/{{sample}}_samp_thinned.fam".format(DataOut=DATAOUT),
         PATH_BasePops = "data/20130606_g1k.ped",
-        Path_PopStrat_eigenval = "temp/{sample}_filtered_PCA.eigenval",
-        Path_PopStrat_eigenvec = "temp/{sample}_filtered_PCA.eigenvec",
+        Path_PopStrat_eigenval = "{DataOut}/{{sample}}_filtered_PCA.eigenval".format(DataOut=DATAOUT),
+        Path_PopStrat_eigenvec = "{DataOut}/{{sample}}_filtered_PCA.eigenvec".format(DataOut=DATAOUT),
         out = "{sample}_GWAS_QC.html",
     shell:
         "R -e 'rmarkdown::render("
