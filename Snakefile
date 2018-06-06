@@ -4,23 +4,29 @@ configfile: "config.yaml"
 BPLINK = ["bed", "bim", "fam"]
 RWD = os.getcwd()
 SAMPLE = config['sample']
+if config['SampleSex']:
+    SAMPLESEX = config['SampleSex']
+else:
+    SAMPLESEX = SAMPLE
+DATAIN = config['DataIn']
+DATAOUT = config['DataOut']
 
 rule all:
     input:
         expand("temp/{sample}_filtered_PCA.{ext}", ext = ['eigenval', 'eigenvec'], sample=SAMPLE),
-        expand("temp/{sample}_exclude.samples", sample=SAMPLE),
+        expand("{DataOut}/{sample}_exclude.samples", sample=SAMPLE, DataOut=DATAOUT),
         expand("stats/{sample}_GWAS_QC.html", sample=SAMPLE)
 
 ## ---- Exlude SNPs with a high missing rate and low MAF----
 rule snp_qc:
     input:
-        expand("data/{sample}.{ext}", ext = BPLINK, sample=SAMPLE)
+        expand("{DataIn}/{{sample}}.{ext}", ext = BPLINK, DataIn=DATAIN)
     output:
-        temp(expand("temp/{{sample}}_SnpQc.{ext}", ext = BPLINK)),
-        'temp/{sample}_SnpQc.hwe'
+        temp(expand("{DataOut}/{{sample}}_SnpQc.{ext}", ext = BPLINK, DataOut=DATAOUT)),
+        expand("{DataOut}/{{sample}}_SnpQc.hwe", sample=SAMPLE, DataOut=DATAOUT),
     params:
-        indat = 'data/{sample}',
-        out = 'temp/{sample}_SnpQc'
+        indat = '{DataIn}/{{sample}}'.format(DataIn=DATAIN),
+        out = "{DataOut}/{{sample}}_SnpQc".format(DataOut=DATAOUT)
     shell:
         'plink --bfile {params.indat} --geno 0.05 --maf 0.01 --hardy --make-bed --out {params.out}'
 
@@ -41,25 +47,24 @@ rule sample_callRate:
 ##  Use ADNI hg18 data, as the liftover removed the x chromsome data
 rule sexcheck_QC:
     input:
-        expand("data/{{sample}}_xy.{ext}", ext = BPLINK)
+        expand("data/{{SampleSex}}.{ext}", ext = BPLINK)
     output:
-        "temp/{sample}_SexQC.sexcheck"
+        "temp/{SampleSex}_SexQC.sexcheck"
     params:
-        indat = 'data/{sample}_xy',
-        out = "temp/{sample}_SexQC"
+        indat = 'data/{SampleSex}',
+        out = "temp/{SampleSex}_SexQC",
     shell:
         'plink --bfile {params.indat} --check-sex --out {params.out}'
 
 rule sex_sample_fail:
     input:
-        "temp/{sample}_SexQC.sexcheck"
+        expand("temp/{SampleSex}_SexQC.sexcheck", SampleSex=SAMPLESEX),
     output:
         "temp/{sample}_exclude.sexcheck"
     params:
-        indat = "temp/{sample}_SexQC.sexcheck",
         out = "temp/{sample}_exclude.sexcheck"
     shell:
-        'Rscript scripts/sexcheck_QC.R {params.indat} {params.out}'
+        'Rscript scripts/sexcheck_QC.R {input} {params.out}'
 
 rule sex__exclude_failed:
     input:
@@ -103,16 +108,12 @@ rule relatedness_QC:
 
 rule relatedness_sample_fail:
     input:
-        "temp/{sample}_IBDQC.genome",
-        "temp/{sample}_SnpQc.fam"
-    output:
-        "temp/{sample}_exclude.relatedness"
-    params:
         indat_genome = "temp/{sample}_IBDQC.genome",
-        indat_fam = "temp/{sample}_SnpQc.fam",
+        indat_fam = "{DataOut}/{{sample}}_SnpQc.fam".format(DataOut=DATAOUT)
+    output:
         out = "temp/{sample}_exclude.relatedness"
     shell:
-        'Rscript scripts/relatedness_QC.R {params.indat_genome} {params.indat_fam} {params.out}'
+        'Rscript scripts/relatedness_QC.R {input.indat_genome} {input.indat_fam} {output.out}'
 
 rule relatedness_exclude_failed:
     input:
@@ -346,7 +347,7 @@ rule SampleExclusion:
         pca = "temp/{sample}_exclude.pca",
         relat = "temp/{sample}_exclude.relatedness"
     output:
-        out = "temp/{sample}_exclude.samples"
+        out = "{DataOut}/{{sample}}_exclude.samples".format(DataOut=DATAOUT)
     shell:
         'Rscript scripts/sample_QC.R {input.SampCallRate} {input.het} {input.sex} {input.pca} {input.relat} {output.out}'
 
@@ -370,7 +371,7 @@ rule GWAS_QC_Report:
         rwd = RWD,
         Sample = "{sample}",
         output_dir = "stats",
-        Path_SexFile = "temp/{sample}_SexQC.sexcheck",
+        Path_SexFile = expand("temp/{SampleSex}_SexQC.sexcheck", SampleSex=SAMPLESEX),
         Path_hwe = "temp/{sample}_SnpQc.hwe",
         Path_HetFile = "temp/{sample}_HetQC.het",
         Path_GenomeFile = "temp/{sample}_IBDQC.genome",

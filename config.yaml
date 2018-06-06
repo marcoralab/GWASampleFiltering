@@ -1,1 +1,4 @@
 sample: 'ADNI_1_hg19'
+SampleSex: 'ADNI_1_hg19_xy'
+DataIn: '/Users/sheaandrews/Documents/Test/Data'
+DataOut: '/Users/sheaandrews/Documents/Test/temp'
