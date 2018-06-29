@@ -1,4 +1,12 @@
-sample: 'ADNI_1_hg19'
-SampleSex: 'ADNI_1_hg19_xy'
-DataIn: '/Users/sheaandrews/Documents/Test/Data'
+#DIAN
+sample: '201711_CoreExome-DIAN'
+SampleSex:
+DataIn: '/Users/sheaandrews/Documents/0_Data/DIAN/Genetics_CoreExome'
 DataOut: '/Users/sheaandrews/Documents/Test/temp'
+family: 'T'
+
+#ADNI_1
+#sample: "ADNI_1_hg19"
+#SampleSex: 'ADNI_1_hg19_xy'
+#DataIn: '/Users/sheaandrews/Documents/Test/Data'
+#DataOut: '/Users/sheaandrews/Documents/Test/temp'

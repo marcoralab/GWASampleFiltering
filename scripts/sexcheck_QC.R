@@ -9,7 +9,8 @@ sexcheck.file = commandArgs(TRUE)[1]
 outfile = commandArgs(TRUE)[2]
 if(is.null(outfile)){print('Outfile is required! \n')}
 
-sexcheck <- as.tibble(read.table(sexcheck.file, header = TRUE, check.names = FALSE, as.is = TRUE))
+sexcheck <- as.tibble(read.table(sexcheck.file, header = TRUE, check.names = FALSE, as.is = TRUE, 
+                                 colClasses = c("character","character","integer","integer","character","numeric")))
 exclude.samples <- sexcheck %>% 
   filter(STATUS == 'PROBLEM') %>% 
   select(FID, IID)

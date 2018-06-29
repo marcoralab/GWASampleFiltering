@@ -42,6 +42,7 @@ base_pops <- base_pops.raw %>%
 target_pops <- target_pops.raw %>% 
   select(X2) %>% 
   rename(IID = X2) %>% 
+  mutate(IID = as.character(IID)) %>% 
   mutate(Population = 'Sample', SuperPopulation = 'Sample', cohort = 'Sample', Population_2 = 'Sample') 
 
 ##  Munge PCA, base pop and target pop

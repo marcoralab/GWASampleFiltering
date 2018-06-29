@@ -16,11 +16,15 @@ output:
 params:
     rwd: rwd
     Sample: Sample
+    DataIn: DataIn
     Path_hwe: Path_hwe
+    Path_frq: Path_frq
+    Path_frqx: Path_frqx
+    Path_imiss: Path_imiss
     Path_SexFile: Path_SexFile
     Path_HetFile: Path_HetFile
     Path_GenomeFile: Path_GenomeFile
-    Path_FamFile: Path_FamFile
+    Family: Family
     Path_eigenval: Path_eigenval
     Path_eigenvec: Path_eigenvec
     Path_TargetPops: Path_TargetPops

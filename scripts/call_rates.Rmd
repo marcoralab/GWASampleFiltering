@@ -7,8 +7,11 @@ output:
     df_print: paged
 params:
     rwd: 
-    Path_hwe: 
-    Sample: 
+    Path_hwe: /Users/sheaandrews/Documents/Test/temp/201711_CoreExome-DIAN_SnpQc.hwe
+    Path_frq: /Users/sheaandrews/Documents/Test2/DianTest_geno.frq 
+    Path_frqx: /Users/sheaandrews/Documents/Test2/DianTest_geno.frqx
+    Path_imiss: /Users/sheaandrews/Documents/Test2/DianTest_geno.imiss
+    Sample: 201711_CoreExome-DIAN
 editor_options: 
   chunk_output_type: console
 ---
@@ -23,22 +26,20 @@ library(Hmisc)
 library(ggplot2)
 library(ggforce)
 library(ggtern)
-library(snpStats)
-library(SNPRelate)
 ```
 
 ```{r read in call rate, echo=F, cache=T, warning=F, message=F}
 # ---- Global ----
 ##  set working directory
 
-# ---- readin plink files & gds files ---- ##
-geno <- read.plink(paste0('Data/', params$Sample, '.bed'), paste0('Data/', params$Sample, '.bim'), paste0('Data/', params$Sample, '.fam'))
+# ---- readin plink .feq ---- ##
+freq.raw <- read_table(params$Path_frq, col_names = T)
 
-# ---- readin plink .bim ---- ##
-bim.raw <- read_tsv( paste0('Data/', params$Sample, '.bim'), col_names = F)
+# ---- readin plink .feqx ---- ##
+freqx.raw <- read_tsv(params$Path_frqx, col_names = T)
 
-bim <- bim.raw %>% 
-  rename(CHR = X1, RS = X2, CM = X3, POS = X4, A1 = X5, A2 = X6) 
+# ---- readin plink .imiss ---- ##
+imiss.raw <- read_table(params$Path_imiss, col_names = T)
 
 # ---- readin plink .hwe ---- ##
 hwe.raw <- read_table(params$Path_hwe, col_names = T)
@@ -61,21 +62,20 @@ plink_1.9 --bfile raw-GWA-data \
 ## ==== SNP Level Filtering ====
 
 # ---- SNP level statisitcs ----
-snpsum.col <- col.summary(geno$genotypes)
-
-snpsum.col.dat <- snpsum.col %>% 
-  filter(str_detect(row.names(snpsum.col), 'rs')) %>%
+snps <- freq.raw %>% 
+  bind_cols(select(freqx.raw, -c('CHR', 'SNP', 'A1', 'A2'))) %>% 
+  bind_cols(select(hwe.raw, -c('CHR', 'SNP', 'A1', 'A2'))) %>% 
+  rename(AA = `C(HOM A1)`, AB = `C(HET)`, BB = `C(HOM A2)`, missing = `C(MISSING)`) %>% 
+  mutate(Call.rate = 1 - (missing / c(AA + AB + BB + missing))) %>%
   mutate(call = Call.rate <= 0.95) %>% 
   mutate(call.maf = MAF <= 0.01) %>% 
-  mutate(Call.rate = 1 - Call.rate) %>% 
-  mutate(MAF = ifelse(Call.rate == 1, 0, MAF))  %>%
+  mutate(hwe = P > 10^-6) %>%
   as.tibble()
-
 ```
 
-Figure 1 shows the SNP call rate versus minor allele frequncy across all typed SNPs in the study. The dashed lines denote the MAF and call rate QC thresholds. `r nrow(filter(snpsum.col.dat, call == T))` SNPs will be removed due to low call rate and `r nrow(filter(snpsum.col.dat, call.maf == T))` SNPs will be removed due to low minor allele frequency.
+Figure 1 shows the SNP call rate versus minor allele frequncy across all typed SNPs in the study. The dashed lines denote the MAF and call rate QC thresholds. `r nrow(filter(snps, call == T))` SNPs will be removed due to low call rate and `r nrow(filter(snps, call.maf == T))` SNPs will be removed due to low minor allele frequency.
 ```{r MAF by call rate, cache=T, echo=F, warning=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Fig. 1: Call rate by minor allele frequency '}
-ggplot(data = snpsum.col.dat, aes(x = MAF, y = Call.rate)) + 
+ggplot(data = snps, aes(x = MAF, y = Call.rate)) + 
   geom_point(alpha = 0.3, size = 0.5) + 
   geom_hline(yintercept = 0.05, linetype = 2, colour = 'red') + 
   geom_vline(xintercept = 0.01, linetype = 2, colour = 'red') +
@@ -99,21 +99,7 @@ plink_1.9 --bfile raw-GWA-data  \
 ```
 <br> 
 
-
-```{r, hwe calc, echo=F, message=F, warning=F, cache=T}
-##  ---- HWE calculations ----#
-# Remove SNPs in which the HWE test statistic has a corresponding p-value of less then 1x10-6
-hwe.dat <- snpsum.col %>% 
-  mutate(AA = Calls*P.AA, AB = Calls*P.AB, BB = Calls*P.BB) %>% 
-  bind_cols(bim) %>% 
-  select(-CHR, -CM, -A1, -A2) %>% 
-  left_join(filter(hwe.raw, TEST %in% 'ALL'), by = c('RS' = 'SNP')) %>% 
-  filter(str_detect(RS, 'rs')) %>% 
-  mutate(hwe = P > 10^-6)  %>% 
-  as.tibble()
-```
-
-Figure 2 displays a ternary plot for the genotype frequency of all typed SNPs, with `r nrow(filter(hwe.dat, hwe == F))` SNPs that are violating HWE coloured red. 
+Figure 2 displays a ternary plot for the genotype frequency of all typed SNPs, with `r nrow(filter(snps, hwe == F))` SNPs that are violating HWE coloured red. 
 ```{r hwe plot, echo=F, warning=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Fig. 2: SNPs that are in Hardy Weinberg Equilibrium'}
 #ggtern::ggtern(data=hwe.dat,aes(AA,AB,BB, colour = hwe)) + 
 #  geom_point(size = 0.5, aes(alpha = hwe))  + 
@@ -123,27 +109,6 @@ Figure 2 displays a ternary plot for the genotype frequency of all typed SNPs, w
 
 ```
 
-
-```{r, echo=F}
-
-# MAF and call rate thresholds 
-call <- 0.95
-minor <- 0.01
-
-# filter SNPs by MAF & Call rate
-use <- snpsum.col %>% 
-  mutate(SNP = rownames(snpsum.col)) %>% 
-  filter(!is.na(MAF)) %>% 
-  filter(MAF > minor) %>% 
-  filter(Call.rate >= call) %>% 
-  select(SNP) %>% 
-  as.tibble()
-
-# remove SNPS that did not pass MAF & call
-geno$genotypes <- geno$genotypes[,use$SNP]
-snpsum.col <- snpsum.col[use$SNP,]
-
-```
 
 ##  Sample Call Rate
 A low genotyping call rate in a sample can be indicative of poor DNA sample quality and samples with a call rate < 0.95 are excluded from further analysis. 
@@ -158,16 +123,15 @@ plink_1.9 --bfile raw-GWA-data  \
 <br> 
 
 ```{r, echo=FALSE}
-snpsum.row <- row.summary(geno$genotypes)
-snpsum.row.dat <- snpsum.row %>% 
-  mutate(call = Call.rate <= 0.95) %>% 
-  mutate(Call.rate = 1 - Call.rate) %>% 
+imiss <- imiss.raw %>% 
+  mutate(call = F_MISS >= 0.05) %>% 
   as.tibble()
+
 ```
 
-Figure 2 shows the distribution of sample call rates across all individules in the study, with the dashed line denoting the call rate QC threshold (typicaly <= 95%). Table 1 lists the samples that were excluded based on call rate.
+Figure 3 shows the distribution of sample call rates across all individules in the study, with the dashed line denoting the call rate QC threshold (typicaly <= 95%). Table 1 lists the samples that were excluded based on call rate.
 ```{r sample call rate plot, echo=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Fig. 3: Sample call rate distribution'}
-ggplot(data = snpsum.row.dat, aes(x = as.factor(1), y = Call.rate, colour = call, shape = call)) + 
+ggplot(data = imiss, aes(x = as.factor(1), y = F_MISS, colour = call, shape = call)) + 
   geom_sina(size = 1.5) + 
   geom_hline(yintercept = 0.05, linetype = 2, colour = 'red') + 
   scale_colour_manual(name= 'Missing >= 0.05', values = c("#377EB8", "#E41A1C")) + 
@@ -182,18 +146,14 @@ ggplot(data = snpsum.row.dat, aes(x = as.factor(1), y = Call.rate, colour = call
 
 ***Table 1:*** Samples with a call rate <= 95%
 ```{r sample excluded table, echo=F}
-geno$fam %>% 
-  bind_cols(snpsum.row.dat) %>% 
-  rename(FID = pedigree, IID = member) %>%
+imiss %>% 
   filter(call == T) %>% 
-  select(FID, IID, Call.rate) 
+  select(FID, IID, N_MISS, N_GENO, F_MISS) 
   
 ```
 
 ```{r unload packages, echo=F}
 detach("package:ggtern", unload=TRUE)
-detach("package:snpStats", unload=TRUE)
-detach("package:SNPRelate", unload=TRUE)
 ```
 
 

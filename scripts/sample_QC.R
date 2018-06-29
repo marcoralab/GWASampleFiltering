@@ -20,18 +20,23 @@ outfile = commandArgs(TRUE)[6]
 
 ##  ---- Read in sample exclusion files files ---- ##
 irem.raw <- read_tsv(irem.file, col_names = F)
-het.raw <- read_tsv(het.file, col_names = T)
-sex.raw <- read_tsv(sex.file, col_names = T)
-pca.raw <- read_tsv(pca.file, col_names = F)
-rel.raw <- read_tsv(rel.file, col_names = T)
+het.raw <- read_tsv(het.file, col_names = T, col_types = c('cc'))
+sex.raw <- read_tsv(sex.file, col_names = T, col_types = c('cc'))
+pca.raw <- read_tsv(pca.file, col_names = F, col_types = c('cc'))
+rel.raw <- read_tsv(rel.file, col_names = T, col_types = c('cc'))
 
 ##  ---- Data wrangling ---- ##
 
-irem <- irem.raw %>% 
-  rename(FID = X1, IID = X2) 
+## IF .irem file is empty, make empty tibble
+if(nrow(irem.raw) == 0){
+  irem <- tibble(FID = 'NA', IID = 'NA')
+  } else {
+    irem <- irem.raw %>% 
+      rename(FID = X1, IID = X2) 
+  }
 
-het <- het.raw 
-
+het <- het.raw  
+  
 sex <- sex.raw 
 
 pca <- pca.raw %>% 

@@ -9,7 +9,7 @@ params:
   Path_eigenval: 
   Path_eigenvec: 
   Path_TargetPops: 
-  PATH_BasePops:  
+  PATH_BasePops: 
   Sample: 
   rwd: 
 editor_options: 
@@ -43,7 +43,7 @@ library(plotly)     ## For 3d interactive scatter plots
 library(gridExtra)
 
 ##  Standarize varibles to have a mean of 0 and sd of 1
-zscore = function(x){(x - mean(x)) / sd(x)}
+zscore = function(x){(x - mean(x, na.rm = T)) / sd(x, na.rm = T)}
 
 ```
 
@@ -91,6 +91,7 @@ target_pops <- target_pops.raw %>%
 
 ##  Munge PCA, base pop and target pop
 pca <- target_pops %>% 
+  mutate(IID = as.character(IID)) %>%
   bind_rows(base_pops) %>% 
   right_join(pca, by = 'IID')
  
@@ -135,18 +136,30 @@ GGally::ggpairs(pca, columns = paste0('PC', 1:PC.inc), aes(colour = SuperPopulat
 The following plots show the population structure of `r params$Sample` (Black Triangles) based on the first two (Fig. 4) and three (Fig. 5) principal components compared with the reference populations from 1000 Genomes. The static plot is zoomed into the European refernce super population composed of Utah Residents (CEPH) with Northern and Western European Ancestry (CEU), Toscani in Italia (TSI), Finnish in Finland (FIN), British in England and Scotland (GBR), and Iberian Population in Spain (IBS). 
 
 ```{r 2PC_static_SuperPops, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Fig. 4: Ancestery clustering based on PC 1 & 2'}
+
+## Colours for plot
+pca_col <- pca %>% 
+  count(SuperPopulation) %>% 
+  mutate(colour = ifelse(SuperPopulation == params$Sample, 'black', NA)) %>% 
+  mutate(colour = ifelse(SuperPopulation == 'AFR', "#E41A1C", colour)) %>% 
+  mutate(colour = ifelse(SuperPopulation == 'AMR', "#377EB8", colour)) %>% 
+  mutate(colour = ifelse(SuperPopulation == 'EAS', "#4DAF4A", colour)) %>% 
+  mutate(colour = ifelse(SuperPopulation == 'EUR', "#984EA3", colour)) %>% 
+  mutate(colour = ifelse(SuperPopulation == 'SAS', "#FF7F00", colour))
+
 ##  Plot Superpopulations, PC1 + PC2
 ggplot(pca, aes(x = PC2, y = PC1, colour = SuperPopulation, shape = cohort)) + 
-  geom_point() + facet_zoom(xy = SuperPopulation == 'EUR') + scale_color_manual(values = c('black', "#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00")) + 
+  geom_point() + facet_zoom(xy = SuperPopulation == 'EUR') + scale_color_manual(values = pca_col$colour) + 
   coord_fixed(ratio = 1) + theme_bw() + theme(legend.position = 'right')
 ```
 \
 
 ```{r 3PC_interactive_SuperPops, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Fig. 5: Tridimensional plot of ancestery clustering of PC 1, 2 & 3'}
+
 ##  Plot Superpopulations, PC1 + PC2 + PC3
 plot_ly(pca, x = ~PC2, y = ~PC1, z = ~PC3, color = ~SuperPopulation, type = 'scatter3d', mode = 'markers',
         marker = list(size = 3),
-        colors = c('black', "#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00"), 
+        colors = pca_col$colour, 
         hoverinfo = 'text', text = ~paste('</br> ID: ', IID,
                                           '</br> Population: ', Population,
                                           '</br> PC1: ', round(PC1, 2),
