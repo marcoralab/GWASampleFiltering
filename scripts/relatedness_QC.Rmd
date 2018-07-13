@@ -55,8 +55,8 @@ rel_tab <- tibble(relationship = c('unrelated', 'identicial-twins', 'parent-chil
        )
 ##  Remove duplicate values, assign duplicate lables to same lable
 rel_tab_filt <- filter(rel_tab, relationship %nin% c('grandparent-grandchild', 'avuncular', 'half-avuncular'))
-rel_tab_filt[rel_tab_filt$relationship == 'half-siblings', ]$relationship <- "half-siblings \n grandparent-grandchild \n avuncular"
-rel_tab_filt[rel_tab_filt$relationship == 'first-cousin', ]$relationship <- "first-cousin \n half-avuncular"
+rel_tab_filt[rel_tab_filt$relationship == 'half-siblings', ]$relationship <- "first-degree relative"
+rel_tab_filt[rel_tab_filt$relationship == 'first-cousin', ]$relationship <- "second-degree relative"
 
 ## Match Pi-Hat, Z0, Z1, Z2 to closet values in IBD relationship table
 dat.inter$pi_hat <- sapply(dat.inter$PI_HAT, function(x){
