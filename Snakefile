@@ -26,15 +26,15 @@ def decorate(text):
 rule all:
     input:
         expand("stats/{sample}_GWAS_QC.html", sample=SAMPLE)
-        expand("{DataOut}/{sample}_filtered_PCA.{ext}",
-               ext=['eigenval', 'eigenvec'],
-               sample=SAMPLE, DataOut=DATAOUT),
-        decorate("exclude.samples"),
-        # snp_qc:
-        decorate("SnpQc.hwe"),  # hwe file
-        decorate("SnpQc.frq"),  # plink frequency file
-        decorate("SnpQc.frqx"),  #
-        decorate("exclude.sexcheck")  # exclusion file for sex discordance
+#        expand("{DataOut}/{sample}_filtered_PCA.{ext}",
+#               ext=['eigenval', 'eigenvec'],
+#               sample=SAMPLE, DataOut=DATAOUT),
+#        decorate("exclude.samples"),
+#        # snp_qc:
+#        decorate("SnpQc.hwe"),  # hwe file
+#        decorate("SnpQc.frq"),  # plink frequency file
+#        decorate("SnpQc.frqx"),  #
+#        decorate("exclude.sexcheck")  # exclusion file for sex discordance
 
 start = expand("{DataIn}/{{sample}}.{ext}", ext=BPLINK, DataIn=DATAIN)
 
@@ -247,7 +247,7 @@ rule Sample_Flip:
 /Users/sheaandrews/Programs/flippyr/flippyr.py -p {input.fasta} {input.bim}"""
 
 rule Sample_ChromPosRefAlt:
-    input: "{DataOut}/{{sample}}_HetExclude_flipped.bim"
+    input: "{DataOut}/{sample}_HetExclude_flipped.bim"
     output:
         bim = temp("{DataOut}/{sample}_HetExclude_flipped_ChromPos.bim"),
         snplist = temp("{DataOut}/{sample}_thinned_snplist")
@@ -258,31 +258,35 @@ Rscript scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"""
 # Recode sample plink file to vcf
 rule Sample_Plink2Bcf:
     input:
-        expand("{DataOut}/{{sample}}_HetExclude_flipped.{ext}", ext = BPLINK, DataOut=DATAOUT),
-        expand("{DataOut}/{{sample}}_HetExclude_flipped_ChromPos.bim", DataOut=DATAOUT)
+        expand("{{DataOut}}/{{sample}}_HetExclude_flipped.{ext}", ext=BPLINK),
+        "{DataOut}/{sample}_HetExclude_flipped_ChromPos.bim"
     output:
-        expand("{DataOut}/{{sample}}_samp_thinned_flipped.vcf.gz", DataOut=DATAOUT)
+        "{DataOut}/{sample}_samp_thinned_flipped.vcf.gz"
     params:
         indat = "{DataOut}/{sample}_HetExclude_flipped",
         bim = "{DataOut}/{sample}_HetExclude_flipped_ChromPos.bim",
         out = "{DataOut}/{sample}_samp_thinned_flipped"
     shell:
-        'plink --bfile {params.indat} --bim {params.bim} --recode vcf bgz --keep-allele-order --real-ref-alleles --out {params.out}'
+        """
+plink --bfile {params.indat} --bim {params.bim} --recode vcf bgz \
+--keep-allele-order --real-ref-alleles --out {params.out}"""
 
-## Index bcf
+# Index bcf
 rule Sample_IndexBcf:
     input:
-        bcf = expand("{DataOut}/{{sample}}_samp_thinned_flipped.vcf.gz", DataOut=DATAOUT)
+        bcf = "{DataOut}/{sample}_samp_thinned_flipped.vcf.gz"
     output:
         "{DataOut}/{sample}_samp_thinned_flipped.vcf.gz.csi"
     shell:
         'bcftools index -f {input.bcf}'
 
-## ---- Principal Compoent analysis ----
-##  Project ADNI onto a PCA using the 1000 Genomes dataset to identify population outliers
+# ---- Principal Compoent analysis ----
+#  Project ADNI onto a PCA using the 1000 Genomes dataset to identify
+#    population outliers
 
-##  Extract a pruned dataset from 1000 genomes using the same pruning SNPs from Sample
-## align 1000 genomes to fasta refrence
+#  Extract a pruned dataset from 1000 genomes using the same pruning SNPs
+#    from Sample
+# align 1000 genomes to fasta refrence
 rule Reference_flip:
     input:
         bim = "data/1000genomes_allChr.bim",
@@ -292,48 +296,51 @@ rule Reference_flip:
     output:
         temp(expand("data/1000genomes_allChr_flipped.{ext}", ext=BPLINK))
     shell:
-        "/Users/sheaandrews/Programs/flippyr/flippyr.py -p {input.fasta} {input.bim}"
+        "flippyr -p {input.fasta} {input.bim}"
 
 rule Reference_ChromPosRefAlt:
-    input:
-        bim = "data/1000genomes_allChr_flipped.bim".format(DataOut=DATAOUT),
+    input: "data/1000genomes_allChr_flipped.bim"
     output:
-        bim = temp("{DataOut}/1000genomes_allChr_flipped.bim".format(DataOut=DATAOUT)),
-        snplist = temp("{DataOut}/Reference_snplist".format(DataOut=DATAOUT))
+        bim = temp("{DataOut}/1000genomes_allChr_flipped.bim"),
+        snplist = temp("{DataOut}/Reference_snplist")
     shell:
-        "Rscript scripts/bim_ChromPosRefAlt.R {input.bim} {output.bim} {output.snplist}"
+        """
+Rscript scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}
+"""
 
 rule Reference_prune:
     input:
-        expand("data/1000genomes_allChr_flipped.{ext}", ext=BPLINK, DataOut=DATAOUT),
-        "{DataOut}/1000genomes_allChr_flipped.bim".format(DataOut=DATAOUT),
-        "{DataOut}/{sample}_thinned_snplist"
+        plink = expand("data/1000genomes_allChr_flipped.{ext}", ext=BPLINK),
+        bim = "{DataOut}/1000genomes_allChr_flipped.bim",
+        prune = "{DataOut}/{sample}_thinned_snplist"
     output:
-        expand("{DataOut}/{{sample}}_1kg_thinned_flipped.{ext}", ext=BPLINK, DataOut=DATAOUT)
+        expand("{{DataOut}}/{{sample}}_1kg_thinned_flipped.{ext}", ext=BPLINK)
     params:
-        indat_plink = "data/1000genomes_allChr_flipped".format(DataOut=DATAOUT),
-        bim = "{DataOut}/1000genomes_allChr_flipped.bim".format(DataOut=DATAOUT),
-        indat_prune_in = "{DataOut}/{sample}_thinned_snplist",
+        indat_plink = "data/1000genomes_allChr_flipped",
         out = "{DataOut}/{sample}_1kg_thinned_flipped"
     shell:
-        'plink --bfile {params.indat_plink} --bim {params.bim} --filter-founders --extract {params.indat_prune_in} --keep-allele-order --make-bed --out {params.out}'
+        """
+plink --bfile {params.indat_plink} --bim {input.bim} --filter-founders \
+--extract {input.prune} --keep-allele-order --make-bed --out {params.out}"""
 
-## Recode 1kg to vcf
+
+# Recode 1kg to vcf
 rule Reference_Plink2Bcf:
     input:
-        expand("{DataOut}/{{sample}}_1kg_thinned_flipped.{ext}", ext=BPLINK, DataOut=DATAOUT)
-    output:
-        expand("{DataOut}/{{sample}}_1kg_thinned_flipped.vcf.gz", DataOut=DATAOUT)
+        expand("{{DataOut}}/{{sample}}_1kg_thinned_flipped.{ext}", ext=BPLINK)
+    output: "{DataOut}/{sample}_1kg_thinned_flipped.vcf.gz"
     params:
         indat = "{DataOut}/{sample}_1kg_thinned_flipped",
         out = "{DataOut}/{sample}_1kg_thinned_flipped"
     shell:
-        'plink --bfile {params.indat} --recode vcf bgz --keep-allele-order --real-ref-alleles --out {params.out}'
+        """
+plink --bfile {params.indat} --recode vcf bgz \
+--real-ref-alleles --out {params.out}"""
 
-## Index bcf
+# Index bcf
 rule Reference_IndexBcf:
     input:
-        bcf = expand("{DataOut}/{{sample}}_1kg_thinned_flipped.vcf.gz", DataOut=DATAOUT)
+        bcf = "{DataOut}/{sample}_1kg_thinned_flipped.vcf.gz"
     output:
         "{DataOut}/{sample}_1kg_thinned_flipped.vcf.gz.csi"
     shell:
@@ -443,20 +450,19 @@ print(FAMILY)
 rule GWAS_QC_Report:
     input:
         script = "scripts/GWAS_QC.Rmd",
-        SexFile = "{DataOut}/{sample}_SexQC.sexcheck",
-        hwe = "{DataOut}/{sample}_SnpQc.hwe",
-        frq = "{DataOut}/{sample}_SnpQc.frq",
-        frqx = "{DataOut}/{sample}_SnpQc.frqx",
-        imiss = "{DataOut}/{sample}_callRate.imiss",
-        HetFile = "{DataOut}/{sample}_HetQC.het",
-        GenomeFile = "{DataOut}/{sample}_IBDQC.genome",
-        "{DataIn}/{sample}.fam"
-        eigenval = "{DataOut}/{sample}_1kg_merged.eigenval"
-        eigenvec = "{DataOut}/{sample}_1kg_merged.eigenvec"
-        TargetPops = "{DataOut}/{sample}_samp_thinned.fam"
+        SexFile = decorate("SexQC.sexcheck"),
+        hwe = decorate("SnpQc.hwe"),
+        frq = decorate("SnpQc.frq"),
+        frqx = decorate("SnpQc.frqx"),
+        imiss = decorate("callRate.imiss"),
+        HetFile = decorate("HetQC.het"),
+        GenomeFile = decorate("IBDQC.genome"),
+        eigenval = decorate("1kg_merged.eigenval"),
+        eigenvec = decorate("1kg_merged.eigenvec"),
+        TargetPops = decorate("samp_thinned.fam"),
         BasePops = "data/20130606_g1k.ped",
-        PopStrat_eigenval = "{DataOut}/{sample}_filtered_PCA.eigenval"
-        PopStrat_eigenvec = "{DataOut}/{sample}_filtered_PCA.eigenvec"
+        PopStrat_eigenval = decorate("filtered_PCA.eigenval"),
+        PopStrat_eigenvec = decorate("filtered_PCA.eigenvec")
     output:
         "stats/{sample}_GWAS_QC.html"
     params:
