@@ -12,9 +12,16 @@ QC_snp = True
 QC_callRate = True
 QC_sex = True
 
-commands = {'flippyr': '/Users/sheaandrews/Programs/flippyr/flippyr.py'}
+# com = {'flippyr': '/Users/sheaandrews/Programs/flippyr/flippyr.py',
+#        'plink': 'plink --keep-allele-order', 'plink2': 'plink',
+#        'bcftools': 'bcftools', 'R': 'Rscript', 'R2': 'R'}
+# loads = {'flippyr': '', 'plink': '', 'bcftools': '',  'R': ''}
 
-print(commands['flippyr'])
+com = {'flippyr': 'flippyr', 'plink': 'plink --keep-allele-order',
+       'plink2': 'plink', 'bcftools': 'bcftools', 'R': 'Rscript', 'R2': 'R'}
+loads = {'flippyr': '', 'plink': 'module load plink/1.90',
+         'bcftools': 'module load bcftools/1.7',
+         'R': 'module load R/3.4.3'}
 
 def decorate(text):
     return expand("{DataOut}/{sample}_" + text,
@@ -52,13 +59,14 @@ rule snp_qc:
         MAF = config['QC']['MAF']
     shell:
         """
+{loads.plink}
 #plink --bfile {DATAIN}/{wildcards.sample} --freq --out {params.out}
 #plink --bfile {DATAIN}/{wildcards.sample} --freqx --out {params.out}
 #plink --bfile {DATAIN}/{wildcards.sample} --geno 0.05 --maf 0.01 \
 #--hardy --make-bed --out {params.out}
-plink --bfile {params.stem} --keep-allele-order --freq --out {params.out}
-plink --bfile {params.stem} --keep-allele-order --freqx --out {params.out}
-plink --bfile {params.stem} --keep-allele-order --geno {params.miss} \
+{com.plink} --bfile {params.stem} --freq --out {params.out}
+{com.plink} --bfile {params.stem} --freqx --out {params.out}
+{com.plink} --bfile {params.stem} --geno {params.miss} \
 --maf {params.MAF} --hardy --make-bed --out {params.out}"""
 
 # ---- Exclude Samples with high missing rate ----
@@ -73,7 +81,8 @@ rule sample_callRate:
         out = "{DataOut}/{sample}_callRate"
     shell:
         """
-plink --bfile {params.indat} --mind 0.05 \
+{loads.plink}
+{com.plink} --bfile {params.indat} --mind 0.05 \
 --missing --make-bed --out {params.out}"""
 
 # ---- Exclude Samples with discordant sex ----
@@ -88,7 +97,10 @@ rule sexcheck_QC:
         indat = start['sex_stem'],
         out = "{DataOut}/{sample}_SexQC",
     shell:
-        'plink --bfile {params.indat} --check-sex --out {params.out}'
+        '''
+{loads.plink}
+{com.plink} --bfile {params.indat} --check-sex --out {params.out}
+'''
 
 rule sex_sample_fail:
     input:
@@ -96,7 +108,7 @@ rule sex_sample_fail:
     output:
         "{DataOut}/{sample}_exclude.sexcheck",
     shell:
-        'Rscript scripts/sexcheck_QC.R {input} {output}'
+        '{loads.R}; {com.R} scripts/sexcheck_QC.R {input} {output}'
 
 if QC_callRate:
     sexcheck_in_plink = rules.sample_callRate.output[0]
@@ -119,7 +131,8 @@ rule sex_exclude_failed:
         out = "{DataOut}/{sample}_SexExclude"
     shell:
         """
-plink --bfile {params.indat_plink} \
+{loads.plink}
+{com.plink} --bfile {params.indat_plink} \
 --remove {input.indat_exclude} \
 --make-bed --out {params.out}"""
 
@@ -151,9 +164,11 @@ rule PruneDupvar_snps:
         out = "{DataOut}/{sample}_thinned"
     shell:
         """
-plink --bfile {params.indat} --autosome --indep 50 5 1.5 \
+{loads.plink}
+{loads.R}
+{com.plink} --bfile {params.indat} --autosome --indep 50 5 1.5 \
 --list-duplicate-vars --out {params.out}
-Rscript scripts/DuplicateVars.R {params.dupvar}"""
+{com.R}  scripts/DuplicateVars.R {params.dupvar}"""
 
 # Prune sample dataset
 rule sample_prune:
@@ -168,7 +183,8 @@ rule sample_prune:
         out = "{DataOut}/{sample}_samp_thinned"
     shell:
         """
-plink --bfile {params.indat_plink} --extract {input.prune} \
+{loads.plink}
+{com.plink} --bfile {params.indat_plink} --extract {input.prune} \
 --exclude {input.dupvar} --make-bed --out {params.out}"""
 
 # ---- Exclude Samples with interealtedness ----
@@ -182,7 +198,9 @@ rule relatedness_QC:
         out = "{DataOut}/{sample}_IBDQC"
     shell:
         """
-plink --bfile {params.indat_plink} --genome --min 0.05 --out {params.out}"""
+{loads.plink}
+{com.plink} --bfile {params.indat_plink} --genome --min 0.05 \
+--out {params.out}"""
 
 rule relatedness_sample_fail:
     input:
@@ -194,7 +212,7 @@ rule relatedness_sample_fail:
         out = "{DataOut}/{sample}_exclude.relatedness"
     shell:
         """
-Rscript scripts/relatedness_QC.R {input.genome} {input.fam} \
+{loads.R}; {com.R}  scripts/relatedness_QC.R {input.genome} {input.fam} \
 {params.Family} {output.out}"""
 
 rule relatedness_exclude_failed:
@@ -209,7 +227,8 @@ rule relatedness_exclude_failed:
         out = "{DataOut}/{sample}_RelatednessExclude"
     shell:
         """
-plink --bfile {params.indat_plink} --remove {input.exclude} \
+{loads.plink}
+{com.plink} --bfile {params.indat_plink} --remove {input.exclude} \
 --make-bed --out {params.out}"""
 
 # ---- Exclude Samples with outlying heterozigosity ----
@@ -221,12 +240,14 @@ rule heterozigosity_QC:
         indat_plink = "{DataOut}/{sample}_RelatednessExclude",
         out = "{DataOut}/{sample}_HetQC"
     shell:
-        'plink --bfile {params.indat_plink} --het --out {params.out}'
+        '''
+{loads.plink}
+{com.plink} --bfile {params.indat_plink} --het --out {params.out}'''
 
 rule heterozigosity_sample_fail:
     input: rules.heterozigosity_QC.output
     output: "{DataOut}/{sample}_exclude.heterozigosity"
-    shell: 'Rscript scripts/heterozygosity_QC.R {input} {output}'
+    shell: '{loads.R}; {com.R}  scripts/heterozygosity_QC.R {input} {output}'
 
 rule heterozigosity_exclude_failed:
     input:
@@ -240,7 +261,8 @@ rule heterozigosity_exclude_failed:
         out = "{DataOut}/{sample}_HetExclude"
     shell:
         """
-plink --bfile {params.indat_plink} --remove {input.exclude} \
+{loads.plink}
+{com.plink} --bfile {params.indat_plink} --remove {input.exclude} \
 --make-bed --out {params.out}"""
 
 #print(os.getcwd())
@@ -257,7 +279,8 @@ rule Sample_Flip:
                     ext=BPLINK))
     shell:
         """
-{commands[flippyr]} -p {input.fasta} {input.bim}"""
+{loads.flippyr}
+{comm.flippyr} -p {input.fasta} {input.bim}"""
 
 rule Sample_ChromPosRefAlt:
     input: "{DataOut}/{sample}_HetExclude_flipped.bim"
@@ -266,7 +289,7 @@ rule Sample_ChromPosRefAlt:
         snplist = temp("{DataOut}/{sample}_thinned_snplist")
     shell:
         """
-Rscript scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"""
+{loads.R}; {com.R}  scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"""
 
 # Recode sample plink file to vcf
 rule Sample_Plink2Bcf:
@@ -281,7 +304,8 @@ rule Sample_Plink2Bcf:
         out = "{DataOut}/{sample}_samp_thinned_flipped"
     shell:
         """
-plink --bfile {params.indat} --bim {params.bim} --recode vcf bgz \
+{loads.plink}
+{com.plink} --bfile {params.indat} --bim {params.bim} --recode vcf bgz \
 --keep-allele-order --real-ref-alleles --out {params.out}"""
 
 # Index bcf
@@ -291,7 +315,7 @@ rule Sample_IndexBcf:
     output:
         "{DataOut}/{sample}_samp_thinned_flipped.vcf.gz.csi"
     shell:
-        'bcftools index -f {input.bcf}'
+        '{loads.bcftools}; {com.bcftools} index -f {input.bcf}'
 
 # ---- Principal Compoent analysis ----
 #  Project ADNI onto a PCA using the 1000 Genomes dataset to identify
@@ -309,7 +333,7 @@ rule Reference_flip:
     output:
         temp(expand("data/1000genomes_allChr_flipped.{ext}", ext=BPLINK))
     shell:
-        "{commands[flippyr]} -p {input.fasta} {input.bim}"
+        "{loads.flippyr}; {com.flippyr} -p {input.fasta} {input.bim}"
 
 rule Reference_ChromPosRefAlt:
     input: "data/1000genomes_allChr_flipped.bim"
@@ -318,7 +342,8 @@ rule Reference_ChromPosRefAlt:
         snplist = temp("{DataOut}/Reference_snplist")
     shell:
         """
-Rscript scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}
+{loads.R}
+{com.R} scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}
 """
 
 rule Reference_prune:
@@ -333,7 +358,8 @@ rule Reference_prune:
         out = "{DataOut}/{sample}_1kg_thinned_flipped"
     shell:
         """
-plink --bfile {params.indat_plink} --bim {input.bim} --filter-founders \
+{loads.plink}
+{com.plink} --bfile {params.indat_plink} --bim {input.bim} --filter-founders \
 --extract {input.prune} --keep-allele-order --make-bed --out {params.out}"""
 
 
@@ -347,7 +373,8 @@ rule Reference_Plink2Bcf:
         out = "{DataOut}/{sample}_1kg_thinned_flipped"
     shell:
         """
-plink --bfile {params.indat} --recode vcf bgz \
+{loads.plink}
+{com.plink2} --bfile {params.indat} --recode vcf bgz \
 --real-ref-alleles --out {params.out}"""
 
 # Index bcf
@@ -357,7 +384,7 @@ rule Reference_IndexBcf:
     output:
         "{DataOut}/{sample}_1kg_thinned_flipped.vcf.gz.csi"
     shell:
-        'bcftools index -f {input.bcf}'
+        '{loads.bcftools}; {com.bcftools} index -f {input.bcf}'
 
 # Merge ref and sample
 rule Merge_RefenceSample:
@@ -370,8 +397,9 @@ rule Merge_RefenceSample:
         out = "{DataOut}/{sample}_1kg_merged.vcf"
     shell:
         r"""
-bcftools merge -m none {input.bcf_1kg} {input.bcf_samp} | \
-bcftools view -g ^miss -Ov -o {output.out}"""
+{loads.bcftools}
+{com.bcftools} merge -m none {input.bcf_1kg} {input.bcf_samp} | \
+{com.bcftools} view -g ^miss -Ov -o {output.out}"""
 
 # recode merged sample to plink
 rule Plink_RefenceSample:
@@ -382,7 +410,9 @@ rule Plink_RefenceSample:
     params:
         out = "{DataOut}/{sample}_1kg_merged"
     shell:
-        'plink --vcf {input.vcf} --const-fid --make-bed --out {params.out}'
+        '''
+{loads.plink}
+{com.plink} --vcf {input.vcf} --const-fid --make-bed --out {params.out}'''
 
 rule fix_fam:
     input:
@@ -407,7 +437,8 @@ rule PcaPopulationOutliers:
         out = "{DataOut}/{sample}_1kg_merged"
     shell:
         """
-plink --bfile {params.indat_plink} --fam {input.fam} --pca 10 \
+{loads.plink}
+{com.plink} --bfile {params.indat_plink} --fam {input.fam} --pca 10 \
 --within {input.pop} --pca-clusters {input.clust} --out {params.out}
 """
 
@@ -422,7 +453,7 @@ rule ExcludePopulationOutliers:
         out = "{DataOut}/{sample}_exclude.pca"
     shell:
         """
-Rscript scripts/PCA_QC.R {input.indat_eigenvec} {input.indat_1kgped} \
+{loads.R}; {com.R}  scripts/PCA_QC.R {input.indat_eigenvec} {input.indat_1kgped} \
 {input.indat_fam} {input.indat_eigenval} {output.out}
 """
 
@@ -440,7 +471,8 @@ rule PopulationStratification:
         out = "{DataOut}/{sample}_filtered_PCA"
     shell:
         """
-plink --bfile {params.indat} --remove {input.exclude} --pca 10 \
+{loads.plink}
+{com.plink} --bfile {params.indat} --remove {input.exclude} --pca 10 \
 --out {params.out}
         """
 
@@ -455,7 +487,7 @@ rule SampleExclusion:
         out = "{DataOut}/{sample}_exclude.samples"
     shell:
         """
-Rscript scripts/sample_QC.R {input.SampCallRate} {input.het} \
+{loads.R}; {com.R}  scripts/sample_QC.R {input.SampCallRate} {input.het} \
 {input.sex} {input.pca} {input.relat} {output.out}'"""
 
 rule GWAS_QC_Report:
@@ -482,7 +514,8 @@ rule GWAS_QC_Report:
         output_dir = "stats"
     shell:
         """
-R -e 'rmarkdown::render("{input.script}", \
+{loads.R}
+{com.R2} -e 'rmarkdown::render("{input.script}", \
 output_file = "{output}", output_dir = "{params.output_dir}", \
 params = list(rwd = "{params.rwd}", Sample = "{wildcards.sample}", \
 Path_SexFile = "{input.SexFile}", Path_hwe = "{input.hwe}", \
