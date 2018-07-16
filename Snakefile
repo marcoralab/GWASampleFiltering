@@ -1,16 +1,11 @@
-'''Snakefile for GWAS Variant and Sample QC Version 0.1'''
+'''Snakefile for GWAS Variant and Sample QC Version 0.2'''
 
+from scripts.parse_config import parser
 configfile: "config.yaml"
 BPLINK = ["bed", "bim", "fam"]
 RWD = os.getcwd()
-SAMPLE = config['sample']
-FAMILY = config['family']
-if config['SampleSex']:
-    SAMPLESEX = config['SampleSex']
-else:
-    SAMPLESEX = SAMPLE
-DATAIN = config['DataIn']
-DATAOUT = config['DataOut']
+start, FAMILY, SAMPLE, DATAOUT = parser(config)
+print(start)
 
 # QC Steps:
 QC_snp = True
@@ -39,11 +34,10 @@ rule all:
 #        decorate("SnpQc.frqx"),  #
 #        decorate("exclude.sexcheck")  # exclusion file for sex discordance
 
-start = expand("{DataIn}/{{sample}}.{ext}", ext=BPLINK, DataIn=DATAIN)
 
 # ---- Exlude SNPs with a high missing rate and low MAF----
 rule snp_qc:
-    input: start
+    input: start['files']
     output:
         temp(expand("{{DataOut}}/{{sample}}_SnpQc.{ext}", ext=BPLINK)),
         "{DataOut}/{sample}_SnpQc.hwe",
@@ -52,23 +46,30 @@ rule snp_qc:
     params:
         #indir = DATAIN
         #dat = expand("{DataIn}/{{sample}}", DataIn=DATAIN),
+        stem = start['stem']
         out = "{DataOut}/{sample}_SnpQc",
+        miss = config['QC']['GenoMiss']
+        MAF = config['QC']['MAF']
     shell:
         """
-plink --bfile {DATAIN}/{wildcards.sample} --freq --out {params.out}
-plink --bfile {DATAIN}/{wildcards.sample} --freqx --out {params.out}
-plink --bfile {DATAIN}/{wildcards.sample} --geno 0.05 --maf 0.01 \
---hardy --make-bed --out {params.out}"""
+#plink --bfile {DATAIN}/{wildcards.sample} --freq --out {params.out}
+#plink --bfile {DATAIN}/{wildcards.sample} --freqx --out {params.out}
+#plink --bfile {DATAIN}/{wildcards.sample} --geno 0.05 --maf 0.01 \
+#--hardy --make-bed --out {params.out}
+plink --bfile {params.stem} --keep-allele-order --freq --out {params.out}
+plink --bfile {params.stem} --keep-allele-order --freqx --out {params.out}
+plink --bfile {params.stem} --keep-allele-order --geno {params.miss} \
+--maf {params.MAF} --hardy --make-bed --out {params.out}"""
 
 # ---- Exclude Samples with high missing rate ----
 rule sample_callRate:
-    input: rules.snp_qc.output if QC_snp else start
+    input: rules.snp_qc.output if QC_snp else start['files']
     output:
         expand("{{DataOut}}/{{sample}}_callRate.{ext}", ext=BPLINK),
         "{DataOut}/{sample}_callRate.imiss",
         touch("{DataOut}/{sample}_callRate.irem")
     params:
-        indat = rules.snp_qc.params.out,
+        indat = rules.snp_qc.params.out if QC_snp else start['stem'],
         out = "{DataOut}/{sample}_callRate"
     shell:
         """
@@ -80,14 +81,11 @@ plink --bfile {params.indat} --mind 0.05 \
 
 
 rule sexcheck_QC:
-    input:
-        expand("{DataIn}/{SampleSex}.{ext}",
-               ext=BPLINK, SampleSex=SAMPLESEX, DataIn=DATAIN)
+    input: start['sex']
     output:
         "{DataOut}/{sample}_SexQC.sexcheck"
     params:
-        indat = expand('{DataIn}/{SampleSex}',
-                       DataIn=DATAIN, SampleSex=SAMPLESEX),
+        indat = start['sex_stem'],
         out = "{DataOut}/{sample}_SexQC",
     shell:
         'plink --bfile {params.indat} --check-sex --out {params.out}'
@@ -102,10 +100,13 @@ rule sex_sample_fail:
 
 if QC_callRate:
     sexcheck_in_plink = rules.sample_callRate.output[0]
+    sexcheck_in_plink_stem = rules.sample_callRate.params.out
 elif QC_snp:
     sexcheck_in_plink = rules.snp_qc.output
+    sexcheck_in_plink_stem = rules.snp_qc.params.out
 else:
-    sexcheck_in_plink = start
+    sexcheck_in_plink = start['files']
+    sexcheck_in_plink_stem = start['stem']
 
 rule sex_exclude_failed:
     input:
@@ -114,7 +115,7 @@ rule sex_exclude_failed:
     output:
         temp(expand("{{DataOut}}/{{sample}}_SexExclude.{ext}", ext=BPLINK))
     params:
-        indat_plink = "{DataOut}/{sample}_callRate",
+        indat_plink = sexcheck_in_plink_stem,
         out = "{DataOut}/{sample}_SexExclude"
     shell:
         """
@@ -127,12 +128,16 @@ plink --bfile {params.indat_plink} \
 
 if QC_sex:
     QCd_plink = rules.sex_exclude_failed.output
+    QCd_plink_stem = rules.sex_exclude_failed.params.out
 elif QC_callRate:
     QCd_plink = rules.sample_callRate.output[0]
+    QCd_plink_stem = rules.sample_callRate.params.out
 elif QC_snp:
     QCd_plink = rules.snp_qc.output
+    QCd_plink_stem = rules.snp_qc.params.out
 else:
-    QCd_plink = start
+    QCd_plink = start['files']
+    QCd_plink_stem = start['stem']
 
 rule PruneDupvar_snps:
     input: QCd_plink
@@ -141,7 +146,7 @@ rule PruneDupvar_snps:
                ext=['prune.in', 'prune.out']),
         "{DataOut}/{sample}_thinned.dupvar.delete"
     params:
-        indat = "{DataOut}/{sample}_SexExclude",
+        indat = QCd_plink_stem,
         dupvar = "{DataOut}/{sample}_thinned.dupvar",
         out = "{DataOut}/{sample}_thinned"
     shell:
@@ -452,8 +457,6 @@ rule SampleExclusion:
         """
 Rscript scripts/sample_QC.R {input.SampCallRate} {input.het} \
 {input.sex} {input.pca} {input.relat} {output.out}'"""
-
-print(FAMILY)
 
 rule GWAS_QC_Report:
     input:
