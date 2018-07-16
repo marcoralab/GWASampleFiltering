@@ -6,6 +6,7 @@ editor_options:
   chunk_output_type: console
 output:
   html_document:
+    self_contained: no
     df_print: paged
     toc: true
     number_sections: true

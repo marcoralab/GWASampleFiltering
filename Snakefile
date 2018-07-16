@@ -17,6 +17,9 @@ QC_snp = True
 QC_callRate = True
 QC_sex = True
 
+commands = {'flippyr': '/Users/sheaandrews/Programs/flippyr/flippyr.py'}
+
+print(commands['flippyr'])
 
 def decorate(text):
     return expand("{DataOut}/{sample}_" + text,
@@ -47,20 +50,21 @@ rule snp_qc:
         "{DataOut}/{sample}_SnpQc.frq",
         "{DataOut}/{sample}_SnpQc.frqx",
     params:
-        indat = '{DataIn}/{sample}',
+        #indir = DATAIN
+        #dat = expand("{DataIn}/{{sample}}", DataIn=DATAIN),
         out = "{DataOut}/{sample}_SnpQc",
     shell:
         """
-plink --bfile {params.indat} --freq --out {params.out}
-plink --bfile {params.indat} --freqx --out {params.out}
-plink --bfile {params.indat} --geno 0.05 --maf 0.01 \
+plink --bfile {DATAIN}/{wildcards.sample} --freq --out {params.out}
+plink --bfile {DATAIN}/{wildcards.sample} --freqx --out {params.out}
+plink --bfile {DATAIN}/{wildcards.sample} --geno 0.05 --maf 0.01 \
 --hardy --make-bed --out {params.out}"""
 
 # ---- Exclude Samples with high missing rate ----
 rule sample_callRate:
     input: rules.snp_qc.output if QC_snp else start
     output:
-        temp(expand("{{DataOut}}/{{sample}}_callRate.{ext}", ext=BPLINK)),
+        expand("{{DataOut}}/{{sample}}_callRate.{ext}", ext=BPLINK),
         "{DataOut}/{sample}_callRate.imiss",
         touch("{DataOut}/{sample}_callRate.irem")
     params:
@@ -77,12 +81,14 @@ plink --bfile {params.indat} --mind 0.05 \
 
 rule sexcheck_QC:
     input:
-        expand("{DataIn}/{SampleSex}.{ext}", ext=BPLINK)
+        expand("{DataIn}/{SampleSex}.{ext}",
+               ext=BPLINK, SampleSex=SAMPLESEX, DataIn=DATAIN)
     output:
-        "{DataOut}/{Sample}_SexQC.sexcheck"
+        "{DataOut}/{sample}_SexQC.sexcheck"
     params:
-        indat = '{DataIn}/{{SampleSex}}'.format(DataIn=DATAIN),
-        out = "{DataOut}/{Sample}_SexQC",
+        indat = expand('{DataIn}/{SampleSex}',
+                       DataIn=DATAIN, SampleSex=SAMPLESEX),
+        out = "{DataOut}/{sample}_SexQC",
     shell:
         'plink --bfile {params.indat} --check-sex --out {params.out}'
 
@@ -232,19 +238,21 @@ rule heterozigosity_exclude_failed:
 plink --bfile {params.indat_plink} --remove {input.exclude} \
 --make-bed --out {params.out}"""
 
+#print(os.getcwd())
+
 # align sample to fasta refrence
 rule Sample_Flip:
     input:
         bim = "{DataOut}/{sample}_HetExclude.bim",
         bed = "{DataOut}/{sample}_HetExclude.bed",
         fam = "{DataOut}/{sample}_HetExclude.fam",
-        fasta = "data/hg19fa"
+        fasta = "data/hg19.fa"
     output:
         temp(expand("{{DataOut}}/{{sample}}_HetExclude_flipped.{ext}",
                     ext=BPLINK))
     shell:
         """
-/Users/sheaandrews/Programs/flippyr/flippyr.py -p {input.fasta} {input.bim}"""
+{commands[flippyr]} -p {input.fasta} {input.bim}"""
 
 rule Sample_ChromPosRefAlt:
     input: "{DataOut}/{sample}_HetExclude_flipped.bim"
@@ -296,7 +304,7 @@ rule Reference_flip:
     output:
         temp(expand("data/1000genomes_allChr_flipped.{ext}", ext=BPLINK))
     shell:
-        "flippyr -p {input.fasta} {input.bim}"
+        "{commands[flippyr]} -p {input.fasta} {input.bim}"
 
 rule Reference_ChromPosRefAlt:
     input: "data/1000genomes_allChr_flipped.bim"
