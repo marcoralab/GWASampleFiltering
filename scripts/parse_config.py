@@ -4,6 +4,7 @@ import shutil
 import os
 from snakemake.io import *
 
+
 def fix_path(path):
     path = os.path.abspath(path)
     assert os.path.isdir(path), "Path not found: {}".format(path)
@@ -18,7 +19,7 @@ def build_samp(in_path, extension='bim', flat=True, excl=None, incl=None):
         rm = len(extension) + 1
         samples = [os.path.basename(x)[:-rm] for x in files]
     else:
-        p = [directory for directory,y,files in os.walk(p)
+        p = [directory for directory, y, files in os.walk(p)
              if any('.' + extension in f for f in files)]
         samples = [os.path.basename(x) for x in p]
     if excl:
@@ -26,6 +27,7 @@ def build_samp(in_path, extension='bim', flat=True, excl=None, incl=None):
     if incl:
         samples = [x for x in samples if incl in x]
     return samples
+
 
 def parser(config):
     BPLINK = ["bed", "bim", "fam"]
@@ -41,7 +43,7 @@ def parser(config):
         SEXIN = config['SexIn']
         sex_dir = False
 
-    flat = len(build_samp(DATAIN,'bim')) > 0
+    flat = len(build_samp(DATAIN, 'bim')) > 0
 
     if config['SexIn']:
         SAMPLE = build_samp(DATAIN, 'bim', flat, config['SexIn'])
@@ -61,7 +63,8 @@ def parser(config):
     start = {}
 
     if flat:
-        start['files'] = expand("{DataIn}/{{sample}}.{ext}", ext=BPLINK, DataIn=DATAIN)
+        start['files'] = expand("{DataIn}/{{sample}}.{ext}",
+                                ext=BPLINK, DataIn=DATAIN)
         start['stem'] = expand("{DataIn}/{{sample}}", DataIn=DATAIN)[0]
         if config['SexIn']:
             assert sex_dir ^ sex_stem, "SexIn must be EITHER a stem OR dir"
@@ -80,7 +83,7 @@ def parser(config):
             start['sex_stem'] = start['stem']
     else:
         start['files'] = expand("{DataIn}/{{sample}}/{{sample}}.{ext}",
-                               ext=BPLINK, DataIn=DATAIN)
+                                ext=BPLINK, DataIn=DATAIN)
         start['stem'] = expand("{DataIn}/{{sample}}/{{sample}}",
                                DataIn=DATAIN)[0]
         if config['SexIn']:

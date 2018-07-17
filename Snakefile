@@ -22,6 +22,7 @@ loads = {'flippyr': '', 'plink': 'module load plink/1.90',
          'bcftools': 'module load bcftools/1.7',
          'R': 'module load R/3.4.3'}
 
+
 def decorate(text):
     return expand("{DataOut}/{sample}_" + text,
                   sample=SAMPLE, DataOut=DATAOUT)
@@ -50,8 +51,6 @@ rule snp_qc:
         "{DataOut}/{sample}_SnpQc.frq",
         "{DataOut}/{sample}_SnpQc.frqx",
     params:
-        #indir = DATAIN
-        #dat = expand("{DataIn}/{{sample}}", DataIn=DATAIN),
         stem = start['stem'],
         out = "{DataOut}/{sample}_SnpQc",
         miss = config['QC']['GenoMiss'],
@@ -260,8 +259,6 @@ rule heterozigosity_exclude_failed:
 {com[plink]} --bfile {params.indat_plink} --remove {input.exclude} \
 --make-bed --out {params.out}"""
 
-#print(os.getcwd())
-
 # align sample to fasta refrence
 rule Sample_Flip:
     input:
@@ -284,7 +281,8 @@ rule Sample_ChromPosRefAlt:
         snplist = temp("{DataOut}/{sample}_thinned_snplist")
     shell:
         """
-{loads[R]}; {com[R]}  scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"""
+{loads[R]}
+{com[R]} scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"""
 
 # Recode sample plink file to vcf
 rule Sample_Plink2Bcf:
@@ -448,7 +446,8 @@ rule ExcludePopulationOutliers:
         out = "{DataOut}/{sample}_exclude.pca"
     shell:
         """
-{loads[R]}; {com[R]}  scripts/PCA_QC.R {input.indat_eigenvec} {input.indat_1kgped} \
+{loads[R]}
+{com[R]} scripts/PCA_QC.R {input.indat_eigenvec} {input.indat_1kgped} \
 {input.indat_fam} {input.indat_eigenval} {output.out}
 """
 
@@ -485,8 +484,10 @@ rule SampleExclusion:
 {loads[R]}; {com[R]}  scripts/sample_QC.R {input.SampCallRate} {input.het} \
 {input.sex} {input.pca} {input.relat} {output.out}'"""
 
+
 def decorate2(text):
     return expand("{DataOut}/{{sample}}_" + text, DataOut=DATAOUT)
+
 
 rule GWAS_QC_Report:
     input:
