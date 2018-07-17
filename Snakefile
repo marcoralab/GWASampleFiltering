@@ -480,8 +480,9 @@ rule SampleExclusion:
         out = "{DataOut}/{sample}_exclude.samples"
     shell:
         """
-{loads[R]}; {com[R]}  scripts/sample_QC.R {input.SampCallRate} {input.het} \
-{input.sex} {input.pca} {input.relat} {output.out}'"""
+{loads[R]}
+{com[R]}  scripts/sample_QC.R {input.SampCallRate} {input.het} \
+{input.sex} {input.pca} {input.relat} {output.out}"""
 
 
 def decorate2(text):

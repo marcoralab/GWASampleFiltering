@@ -25,6 +25,7 @@ library(tidyverse)
 library(Hmisc)
 library(ggplot2)
 library(ggforce)
+library(Ternary)
 #library(ggtern)
 ```
 
@@ -58,7 +59,7 @@ plink_1.9 --bfile raw-GWA-data \
 ```
 <br>
 
-```{r snp_qc, echo=F, cache=T}
+```{r snp_qc, echo=F, cache=F}
 ## ==== SNP Level Filtering ====
 
 # ---- SNP level statisitcs ----
@@ -74,7 +75,7 @@ snps <- freq.raw %>%
 ```
 
 Figure 1 shows the SNP call rate versus minor allele frequncy across all typed SNPs in the study. The dashed lines denote the MAF and call rate QC thresholds. `r nrow(filter(snps, call == T))` SNPs will be removed due to low call rate and `r nrow(filter(snps, call.maf == T))` SNPs will be removed due to low minor allele frequency.
-```{r MAF by call rate, cache=T, echo=F, warning=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Fig. 1: Call rate by minor allele frequency '}
+```{r MAF by call rate, cache=F, echo=F, warning=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Fig. 1: Call rate by minor allele frequency '}
 ggplot(data = snps, aes(x = MAF, y = Call.rate)) +
   geom_point(alpha = 0.3, size = 0.5) +
   geom_hline(yintercept = 0.05, linetype = 2, colour = 'red') +
@@ -101,7 +102,20 @@ plink_1.9 --bfile raw-GWA-data  \
 
 Figure 2 displays a ternary plot for the genotype frequency of all typed SNPs, with `r nrow(filter(snps, hwe == F))` SNPs that are violating HWE coloured red.
 ```{r hwe plot, echo=F, warning=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Fig. 2: SNPs that are in Hardy Weinberg Equilibrium'}
-#ggtern::ggtern(data=hwe.dat,aes(AA,AB,BB, colour = hwe)) +
+coords_t <- snps %>% filter(hwe & !is.na(AA+AB+BB)) %>% select(AB, BB, AA)
+coords_f <- snps %>% filter(!hwe & !is.na(AA+AB+BB)) %>% select(AB, BB, AA)
+
+par(mar=c(0,0,0,0))
+TernaryPlot('AB', 'BB', 'AA', grid.minor.lty=0)
+
+legend("topleft", legend=c('Pass', 'Fail'), bty="n",
+       col=c(adjustcolor("blue", alpha.f = 0.3),
+             adjustcolor("red", alpha.f = 0.3)),
+       pch=16, horiz=F, title="HWE Test:", cex=0.8)
+
+AddToTernary(points, coords_t, col=adjustcolor("blue", alpha.f = 0.3), pch=16, cex=0.3)
+AddToTernary(points, coords_f, col=adjustcolor("red", alpha.f = 0.3), pch=16, cex=0.3)
+#ggtern::ggtern(data=snps, aes(AA,AB,BB, colour = hwe)) +
 #  geom_point(size = 0.5, aes(alpha = hwe))  +
 #  scale_colour_manual(name= 'Hardy Weinberg \n Equilibrium', values = c( "#E41A1C", "#377EB8")) +
 #  scale_alpha_discrete(name= 'Hardy Weinberg \n Equilibrium', range = c(0.8, 0.2)) +
