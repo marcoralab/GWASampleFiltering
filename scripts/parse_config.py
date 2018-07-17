@@ -2,6 +2,7 @@ import re
 import glob
 import shutil
 import os
+from snakemake.io import *
 
 def fix_path(path):
     path = os.path.abspath(path)
@@ -27,6 +28,7 @@ def build_samp(in_path, extension='bim', flat=True, excl=None, incl=None):
     return samples
 
 def parser(config):
+    BPLINK = ["bed", "bim", "fam"]
     DATAIN = fix_path(config['DataIn'])
     DATAOUT = fix_path(config['DataOut'])
     sample_conf = config['sample']
@@ -35,7 +37,7 @@ def parser(config):
     try:
         SEXIN = fix_path(config['SexIn'])
         sex_dir = True
-    except AssertionError:
+    except:
         SEXIN = config['SexIn']
         sex_dir = False
 
@@ -56,41 +58,47 @@ def parser(config):
         assert len(diff) == 0, errstr.format(diff)
         SAMPLE = list(set(sample_conf) & set(SAMPLE))
 
-    if config['flatIn']:
-        start['file'] = expand("{DataIn}/{{sample}}.{ext}", ext=BPLINK, DataIn=DATAIN)
-        start['stem'] = expand("{DataIn}/{{sample}}", DataIn=DATAIN)
+    start = {}
+
+    if flat:
+        start['files'] = expand("{DataIn}/{{sample}}.{ext}", ext=BPLINK, DataIn=DATAIN)
+        start['stem'] = expand("{DataIn}/{{sample}}", DataIn=DATAIN)[0]
         if config['SexIn']:
             assert sex_dir ^ sex_stem, "SexIn must be EITHER a stem OR dir"
             if sex_stem:
                 start['sex'] = expand("{DataIn}/{{sample}}{SexIn}.{ext}",
-                                   ext=BPLINK, DataIn=DATAIN, SexIn=SEXIN)
+                                      ext=BPLINK, DataIn=DATAIN, SexIn=SEXIN)
+                start['sex_stem'] = expand("{DataIn}/{{sample}}{SexIn}",
+                                           DataIn=DATAIN, SexIn=SEXIN)[0]
             elif sex_dir:
                 start['sex'] = expand("{SexIn}/{{sample}}.{ext}",
-                                   ext=BPLINK, SexIn=SEXIN)
+                                      ext=BPLINK, SexIn=SEXIN)
+                start['sex_stem'] = expand("{SexIn}/{{sample}}",
+                                           SexIn=SEXIN)[0]
         else:
-            start['sex'] = start
+            start['sex'] = start['files']
             start['sex_stem'] = start['stem']
     else:
-        start['file'] = expand("{DataIn}/{{sample}}/{{sample}}.{ext}",
+        start['files'] = expand("{DataIn}/{{sample}}/{{sample}}.{ext}",
                                ext=BPLINK, DataIn=DATAIN)
         start['stem'] = expand("{DataIn}/{{sample}}/{{sample}}",
-                               DataIn=DATAIN)
+                               DataIn=DATAIN)[0]
         if config['SexIn']:
             assert sex_dir ^ sex_stem, "SexIn must be EITHER a stem OR dir"
             if sex_dir:
                 start['sex'] = expand("{SexIn}/{{sample}}/{{sample}}.{ext}",
                                       ext=BPLINK, SexIn=SEXIN)
                 start['sex_stem'] = expand("{SexIn}/{{sample}}/{{sample}}",
-                                           SexIn=SEXIN)
+                                           SexIn=SEXIN)[0]
             elif sex_stem:
                 start['sex'] = expand(
                     "{DataIn}/{{sample}}/{{sample}}{SexIn}.{ext}",
                     ext=BPLINK, DataIn=DATAIN, SexIn=SEXIN)
                 start['sex_stem'] = expand(
                     "{DataIn}/{{sample}}/{{sample}}{SexIn}",
-                    DataIn=DATAIN, SexIn=SEXIN)
+                    DataIn=DATAIN, SexIn=SEXIN)[0]
         else:
-            start['sex'] = start
+            start['sex'] = start['files']
             start['sex_stem'] = start['stem']
 
     return start, FAMILY, SAMPLE, DATAOUT
