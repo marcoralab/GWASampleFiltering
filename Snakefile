@@ -1,6 +1,7 @@
 '''Snakefile for GWAS Variant and Sample QC Version 0.2'''
 
 from scripts.parse_config import parser
+shell.executable("/bin/bash")
 configfile: "config.yaml"
 BPLINK = ["bed", "bim", "fam"]
 RWD = os.getcwd()
@@ -9,7 +10,7 @@ start, FAMILY, SAMPLE, DATAOUT = parser(config)
 # QC Steps:
 QC_snp = True
 QC_callRate = True
-QC_sex = True
+QC_sex = False
 
 # com = {'flippyr': '/Users/sheaandrews/Programs/flippyr/flippyr.py',
 #        'plink': 'plink --keep-allele-order', 'plink2': 'plink',
@@ -20,7 +21,8 @@ com = {'flippyr': 'flippyr', 'plink': 'plink --keep-allele-order',
        'plink2': 'plink', 'bcftools': 'bcftools', 'R': 'Rscript', 'R2': 'R'}
 loads = {'flippyr': '', 'plink': 'module load plink/1.90',
          'bcftools': 'module load bcftools/1.7',
-         'R': 'module load R/3.4.3'}
+         'R': ('module load R/3.4.3 pandoc/2.1.3; ',
+               'RSTUDIO_PANDOC=$(which pandoc)')}
 
 
 def decorate(text):
@@ -28,20 +30,24 @@ def decorate(text):
                   sample=SAMPLE, DataOut=DATAOUT)
 
 
+if QC_sex:
+    QCd_plink = expand("{DataOut}/{sample}_SexExclude.{ext}",
+                       ext=BPLINK, sample=SAMPLE, DataOut=DATAOUT)
+elif QC_callRate:
+    QCd_plink = expand("{DataOut}/{sample}_callRate.{ext}",
+                       ext=BPLINK, sample=SAMPLE, DataOut=DATAOUT)
+elif QC_snp:
+    QCd_plink = expand("{DataOut}/{sample}_SnpQc.{ext}",
+                       ext=BPLINK, sample=SAMPLE, DataOut=DATAOUT)
+else:
+    QCd_plink = start['files']
+
 rule all:
     input:
-        expand("stats/{sample}_GWAS_QC.html", sample=SAMPLE)
-#        expand("{DataOut}/{sample}_filtered_PCA.{ext}",
-#               ext=['eigenval', 'eigenvec'],
-#               sample=SAMPLE, DataOut=DATAOUT),
-#        decorate("exclude.samples"),
-#        # snp_qc:
-#        decorate("SnpQc.hwe"),  # hwe file
-#        decorate("SnpQc.frq"),  # plink frequency file
-#        decorate("SnpQc.frqx"),  #
-#        decorate("exclude.sexcheck")  # exclusion file for sex discordance
+        expand("{DataOut}/stats/{sample}_GWAS_QC.html",
+               sample=SAMPLE, DataOut=DATAOUT),
+        QCd_plink
 
-print(start['files'])
 # ---- Exlude SNPs with a high missing rate and low MAF----
 rule snp_qc:
     input: start['files']
@@ -116,7 +122,7 @@ else:
 
 rule sex_exclude_failed:
     input:
-        plink = rules.sample_callRate.output[0],
+        plink = sexcheck_in_plink,
         indat_exclude = rules.sex_sample_fail.output
     output:
         temp(expand("{{DataOut}}/{{sample}}_SexExclude.{ext}", ext=BPLINK))
@@ -133,27 +139,14 @@ rule sex_exclude_failed:
 # ---- Prune SNPs, autosome only ----
 #  Pruned SNP list is used for IBD, PCA and heterozigosity calculations
 
-if QC_sex:
-    QCd_plink = rules.sex_exclude_failed.output
-    QCd_plink_stem = rules.sex_exclude_failed.params.out
-elif QC_callRate:
-    QCd_plink = rules.sample_callRate.output[0]
-    QCd_plink_stem = rules.sample_callRate.params.out
-elif QC_snp:
-    QCd_plink = rules.snp_qc.output
-    QCd_plink_stem = rules.snp_qc.params.out
-else:
-    QCd_plink = start['files']
-    QCd_plink_stem = start['stem']
-
 rule PruneDupvar_snps:
-    input: QCd_plink
+    input: sexcheck_in_plink
     output:
         expand("{{DataOut}}/{{sample}}_thinned.{ext}",
                ext=['prune.in', 'prune.out']),
         "{DataOut}/{sample}_thinned.dupvar.delete"
     params:
-        indat = QCd_plink_stem,
+        indat = sexcheck_in_plink_stem,
         dupvar = "{DataOut}/{sample}_thinned.dupvar",
         out = "{DataOut}/{sample}_thinned"
     shell:
@@ -167,13 +160,13 @@ rule PruneDupvar_snps:
 # Prune sample dataset
 rule sample_prune:
     input:
-        expand("{{DataOut}}/{{sample}}_SexExclude.{ext}", ext=BPLINK),
+        sexcheck_in_plink,
         prune = "{DataOut}/{sample}_thinned.prune.in",
         dupvar = "{DataOut}/{sample}_thinned.dupvar.delete"
     output:
         temp(expand("{{DataOut}}/{{sample}}_samp_thinned.{ext}", ext=BPLINK))
     params:
-        indat_plink = "{DataOut}/{sample}_SexExclude",
+        indat_plink = sexcheck_in_plink_stem,
         out = "{DataOut}/{sample}_samp_thinned"
     shell:
         """
@@ -298,8 +291,8 @@ rule Sample_Plink2Bcf:
     shell:
         """
 {loads[plink]}
-{com[plink]} --bfile {params.indat} --bim {params.bim} --recode vcf bgz \
---keep-allele-order --real-ref-alleles --out {params.out}"""
+{com[plink2]} --bfile {params.indat} --bim {params.bim} --recode vcf bgz \
+--real-ref-alleles --out {params.out}"""
 
 # Index bcf
 rule Sample_IndexBcf:
@@ -326,7 +319,13 @@ rule Reference_flip:
     output:
         temp(expand("data/1000genomes_allChr_flipped.{ext}", ext=BPLINK))
     shell:
-        "{loads[flippyr]}; {com[flippyr]} -p {input.fasta} {input.bim}"
+        """
+{loads[flippyr]}
+{com[flippyr]} {input.fasta} {input.bim}
+sed 's/--memory 256/--memory 2048/' data/1000genomes_allChr.runPlink > \
+data/1000genomes_allChr.moremem.runPlink
+bash data/1000genomes_allChr_flipped.moremem.runPlink
+"""
 
 rule Reference_ChromPosRefAlt:
     input: "data/1000genomes_allChr_flipped.bim"
@@ -353,7 +352,7 @@ rule Reference_prune:
         """
 {loads[plink]}
 {com[plink]} --bfile {params.indat_plink} --bim {input.bim} --filter-founders \
---extract {input.prune} --keep-allele-order --make-bed --out {params.out}"""
+--extract {input.prune} --make-bed --out {params.out}"""
 
 
 # Recode 1kg to vcf
@@ -506,11 +505,11 @@ rule GWAS_QC_Report:
         PopStrat_eigenval = decorate2("filtered_PCA.eigenval"),
         PopStrat_eigenvec = decorate2("filtered_PCA.eigenvec")
     output:
-        "stats/{sample}_GWAS_QC.html"
+        "{DataOut}/stats/{sample}_GWAS_QC.html"
     params:
         rwd = RWD,
         Family = FAMILY,
-        output_dir = "stats"
+        output_dir = "{DataOut}/stats"
     shell:
         """
 {loads[R]}

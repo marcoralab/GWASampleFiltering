@@ -6,13 +6,13 @@ output:
   html_document:
     df_print: paged
 params:
-    rwd: 
+    rwd:
     Path_hwe: /Users/sheaandrews/Documents/Test/temp/201711_CoreExome-DIAN_SnpQc.hwe
-    Path_frq: /Users/sheaandrews/Documents/Test2/DianTest_geno.frq 
+    Path_frq: /Users/sheaandrews/Documents/Test2/DianTest_geno.frq
     Path_frqx: /Users/sheaandrews/Documents/Test2/DianTest_geno.frqx
     Path_imiss: /Users/sheaandrews/Documents/Test2/DianTest_geno.imiss
     Sample: 201711_CoreExome-DIAN
-editor_options: 
+editor_options:
   chunk_output_type: console
 ---
 
@@ -25,7 +25,7 @@ library(tidyverse)
 library(Hmisc)
 library(ggplot2)
 library(ggforce)
-library(ggtern)
+#library(ggtern)
 ```
 
 ```{r read in call rate, echo=F, cache=T, warning=F, message=F}
@@ -47,7 +47,7 @@ hwe.raw <- read_table(params$Path_hwe, col_names = T)
 ```
 
 ## SNP QC
-SNP level QC consists of removing markers that with excessive level missing genotypes and removal of markers with a low allele frequency. The presence of suboptimal makers can increases false positives and reduce the power to identify true associations correlated with disease risk. Standard thresholds for SNPs call rate and MAF are < 95% and < 1% respectivly. 
+SNP level QC consists of removing markers that with excessive level missing genotypes and removal of markers with a low allele frequency. The presence of suboptimal makers can increases false positives and reduce the power to identify true associations correlated with disease risk. Standard thresholds for SNPs call rate and MAF are < 95% and < 1% respectivly.
 <br>
 
 Filtering SNPs on MAF and call rate can be done in PLINK by typing the following at the shell prompt:
@@ -56,36 +56,36 @@ plink_1.9 --bfile raw-GWA-data \
   --geno 0.05 --maf 0.01 \
   --make-bed --out filtered-GWA-data
 ```
-<br> 
+<br>
 
 ```{r snp_qc, echo=F, cache=T}
 ## ==== SNP Level Filtering ====
 
 # ---- SNP level statisitcs ----
-snps <- freq.raw %>% 
-  bind_cols(select(freqx.raw, -c('CHR', 'SNP', 'A1', 'A2'))) %>% 
-  bind_cols(select(hwe.raw, -c('CHR', 'SNP', 'A1', 'A2'))) %>% 
-  rename(AA = `C(HOM A1)`, AB = `C(HET)`, BB = `C(HOM A2)`, missing = `C(MISSING)`) %>% 
+snps <- freq.raw %>%
+  full_join(freqx.raw) %>%
+  full_join(hwe.raw) %>%
+  rename(AA = `C(HOM A1)`, AB = `C(HET)`, BB = `C(HOM A2)`, missing = `C(MISSING)`) %>%
   mutate(Call.rate = 1 - (missing / c(AA + AB + BB + missing))) %>%
-  mutate(call = Call.rate <= 0.95) %>% 
-  mutate(call.maf = MAF <= 0.01) %>% 
+  mutate(call = Call.rate <= 0.95) %>%
+  mutate(call.maf = MAF <= 0.01) %>%
   mutate(hwe = P > 10^-6) %>%
   as.tibble()
 ```
 
 Figure 1 shows the SNP call rate versus minor allele frequncy across all typed SNPs in the study. The dashed lines denote the MAF and call rate QC thresholds. `r nrow(filter(snps, call == T))` SNPs will be removed due to low call rate and `r nrow(filter(snps, call.maf == T))` SNPs will be removed due to low minor allele frequency.
 ```{r MAF by call rate, cache=T, echo=F, warning=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Fig. 1: Call rate by minor allele frequency '}
-ggplot(data = snps, aes(x = MAF, y = Call.rate)) + 
-  geom_point(alpha = 0.3, size = 0.5) + 
-  geom_hline(yintercept = 0.05, linetype = 2, colour = 'red') + 
+ggplot(data = snps, aes(x = MAF, y = Call.rate)) +
+  geom_point(alpha = 0.3, size = 0.5) +
+  geom_hline(yintercept = 0.05, linetype = 2, colour = 'red') +
   geom_vline(xintercept = 0.01, linetype = 2, colour = 'red') +
-  scale_y_log10(breaks = scales::trans_breaks("log10", function(x) round(10^x, 3))) + 
+  scale_y_log10(breaks = scales::trans_breaks("log10", function(x) round(10^x, 3))) +
   scale_x_log10(breaks = scales::trans_breaks("log10", function(x) round(10^x, 3))) +
-  labs(y = 'Proportion of missing genotypes (log)', x = 'Minor Allele Frequency (log)') + 
+  labs(y = 'Proportion of missing genotypes (log)', x = 'Minor Allele Frequency (log)') +
   theme_bw() + annotation_logticks()
 ```
 
-## Hardy Weinberg Equilibrium 
+## Hardy Weinberg Equilibrium
 Violations of Hardy Weinberg Equilibrium can indicate either the presence of population substructure, or the occurence of genotyping error. It is common practice to assume that violoations are indicative of genotyping error and remove SNPs in which the HWE test statistic has a corresponding p-value of less then 1x10-6.
 <br>
 
@@ -97,21 +97,21 @@ plink_1.9 --bfile raw-GWA-data  \
   --hwe 0.000001 \
   --make-bed --out filtered-GWA-data
 ```
-<br> 
+<br>
 
-Figure 2 displays a ternary plot for the genotype frequency of all typed SNPs, with `r nrow(filter(snps, hwe == F))` SNPs that are violating HWE coloured red. 
+Figure 2 displays a ternary plot for the genotype frequency of all typed SNPs, with `r nrow(filter(snps, hwe == F))` SNPs that are violating HWE coloured red.
 ```{r hwe plot, echo=F, warning=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Fig. 2: SNPs that are in Hardy Weinberg Equilibrium'}
-#ggtern::ggtern(data=hwe.dat,aes(AA,AB,BB, colour = hwe)) + 
-#  geom_point(size = 0.5, aes(alpha = hwe))  + 
-#  scale_colour_manual(name= 'Hardy Weinberg \n Equilibrium', values = c( "#E41A1C", "#377EB8")) + 
+#ggtern::ggtern(data=hwe.dat,aes(AA,AB,BB, colour = hwe)) +
+#  geom_point(size = 0.5, aes(alpha = hwe))  +
+#  scale_colour_manual(name= 'Hardy Weinberg \n Equilibrium', values = c( "#E41A1C", "#377EB8")) +
 #  scale_alpha_discrete(name= 'Hardy Weinberg \n Equilibrium', range = c(0.8, 0.2)) +
-#  theme_bw() + theme(legend.position = 'bottom') 
+#  theme_bw() + theme(legend.position = 'bottom')
 
 ```
 
 
 ##  Sample Call Rate
-A low genotyping call rate in a sample can be indicative of poor DNA sample quality and samples with a call rate < 0.95 are excluded from further analysis. 
+A low genotyping call rate in a sample can be indicative of poor DNA sample quality and samples with a call rate < 0.95 are excluded from further analysis.
 <br>
 
 Filtering samples on call rate can be done in PLINK by typing the following at the shell prompt:
@@ -120,73 +120,39 @@ plink_1.9 --bfile raw-GWA-data  \
   --mind 0.05 \
   --make-bed --out filtered-GWA-data
 ```
-<br> 
+<br>
 
 ```{r, echo=FALSE}
-imiss <- imiss.raw %>% 
-  mutate(call = F_MISS >= 0.05) %>% 
+imiss <- imiss.raw %>%
+  mutate(call = F_MISS >= 0.05) %>%
   as.tibble()
 
 ```
 
 Figure 3 shows the distribution of sample call rates across all individules in the study, with the dashed line denoting the call rate QC threshold (typicaly <= 95%). Table 1 lists the samples that were excluded based on call rate.
 ```{r sample call rate plot, echo=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Fig. 3: Sample call rate distribution'}
-ggplot(data = imiss, aes(x = as.factor(1), y = F_MISS, colour = call, shape = call)) + 
-  geom_sina(size = 1.5) + 
-  geom_hline(yintercept = 0.05, linetype = 2, colour = 'red') + 
-  scale_colour_manual(name= 'Missing >= 0.05', values = c("#377EB8", "#E41A1C")) + 
+ggplot(data = imiss, aes(x = as.factor(1), y = F_MISS, colour = call, shape = call)) +
+  geom_sina(size = 1.5) +
+  geom_hline(yintercept = 0.05, linetype = 2, colour = 'red') +
+  scale_colour_manual(name= 'Missing >= 0.05', values = c("#377EB8", "#E41A1C")) +
   scale_shape_manual(name= 'Missing >= 0.05',values = c(19,17)) +
-  scale_y_log10(breaks = scales::trans_breaks("log10", function(x) round(10^x, 3)), limits = c(0.0001,1)) + 
-  labs(y = 'Proportion of missing genotypes (log)') + 
-  theme_bw() + coord_flip() + 
-  theme(legend.position = 'bottom', axis.title.x = element_text(""), 
-        axis.title.y = element_blank(), axis.ticks.y = element_blank(), axis.text.y = element_blank()) 
+  scale_y_log10(breaks = scales::trans_breaks("log10", function(x) round(10^x, 3)), limits = c(0.0001,1)) +
+  labs(y = 'Proportion of missing genotypes (log)') +
+  theme_bw() + coord_flip() +
+  theme(legend.position = 'bottom', axis.title.x = element_text(""),
+        axis.title.y = element_blank(), axis.ticks.y = element_blank())
+        #axis.text.y = element_blank())
 ```
 <br>
 
 ***Table 1:*** Samples with a call rate <= 95%
 ```{r sample excluded table, echo=F}
-imiss %>% 
-  filter(call == T) %>% 
-  select(FID, IID, N_MISS, N_GENO, F_MISS) 
-  
+imiss %>%
+  filter(call == T) %>%
+  select(FID, IID, N_MISS, N_GENO, F_MISS)
+
 ```
 
-```{r unload packages, echo=F}
-detach("package:ggtern", unload=TRUE)
+```{r unload packages, echo=F, eval=F}
+#detach("package:ggtern", unload=TRUE)
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
