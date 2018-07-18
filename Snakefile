@@ -324,7 +324,7 @@ rule Reference_flip:
 {com[flippyr]} {input.fasta} {input.bim}
 sed 's/--memory 256/--memory 2048/' data/1000genomes_allChr.runPlink > \
 data/1000genomes_allChr.moremem.runPlink
-bash data/1000genomes_allChr_flipped.moremem.runPlink
+bash data/1000genomes_allChr.moremem.runPlink
 """
 
 rule Reference_ChromPosRefAlt:
