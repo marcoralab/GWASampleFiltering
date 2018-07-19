@@ -1,9 +1,10 @@
 #!/bin/bash
 ##	R script for concating sample exlusion lists from PLINK GWAS QC.
 
-require(tidyverse, quietly = T)
+require(dplyr, quietly = T, warn.conflicts = F)
+require(readr, quietly = T, warn.conflicts = F)
 
-##  Arguments: 
+##  Arguments:
 # 1: call rate fail sample list
 # 2: heterozygocity fail sample list
 # 3: discordent sex sample list
@@ -17,38 +18,50 @@ sex.file = commandArgs(TRUE)[3]
 pca.file = commandArgs(TRUE)[4]
 rel.file = commandArgs(TRUE)[5]
 outfile = commandArgs(TRUE)[6]
+outfile_d = commandArgs(TRUE)[7]
 
 ##  ---- Read in sample exclusion files files ---- ##
-irem.raw <- read_tsv(irem.file, col_names = F)
-het.raw <- read_tsv(het.file, col_names = T, col_types = c('cc'))
-sex.raw <- read_tsv(sex.file, col_names = T, col_types = c('cc'))
-pca.raw <- read_tsv(pca.file, col_names = F, col_types = c('cc'))
-rel.raw <- read_tsv(rel.file, col_names = T, col_types = c('cc'))
+irem.raw <- read_tsv(irem.file, col_names = F) %>% mutate(why = 'mis')
+het.raw <- read_tsv(het.file, col_names = T, col_types = c('cc')) %>%
+  mutate(why = 'het')
+sex.raw <- read_tsv(sex.file, col_names = T, col_types = c('cc')) %>%
+  mutate(why = 'sex')
+pca.raw <- read_tsv(pca.file, col_names = F, col_types = c('cc')) %>%
+  mutate(why = 'pca')
+rel.raw <- read_tsv(rel.file, col_names = T, col_types = c('cc')) %>%
+  mutate(why = 'rel')
 
 ##  ---- Data wrangling ---- ##
 
 ## IF .irem file is empty, make empty tibble
 if(nrow(irem.raw) == 0){
-  irem <- tibble(FID = 'NA', IID = 'NA')
+  irem <- tibble(FID = NA, IID = NA)
   } else {
-    irem <- irem.raw %>% 
-      rename(FID = X1, IID = X2) 
+    irem <- irem.raw %>%
+      rename(FID = X1, IID = X2)
   }
 
-het <- het.raw  
-  
-sex <- sex.raw 
+het <- het.raw
 
-pca <- pca.raw %>% 
-  rename(FID = X1, IID = X2) 
-  
-rel <- rel.raw 
+sex <- sex.raw
 
-excluded <- het %>% 
-  full_join(irem, by = c('FID', 'IID')) %>%
-  full_join(sex, by = c('FID', 'IID')) %>% 
-  full_join(pca, by = c('FID', 'IID')) %>%
-  full_join(rel, by = c('FID', 'IID'))
+pca <- pca.raw %>%
+  rename(FID = X1, IID = X2)
+
+rel <- rel.raw
+
+excluded <- het %>%
+  bind_rows(irem) %>%
+  bind_rows(sex) %>%
+  bind_rows(pca) %>%
+  bind_rows(rel) %>%
+  filter(!is.na(FID))
+message("Excluded:")
+print(data.frame(excluded))
 
 ##  write out samples to be excluded
 write_tsv(excluded, outfile, col_names = T)
+
+excluded %>%
+  distinct %>%
+  write_tsv(outfile_d, col_names = T)

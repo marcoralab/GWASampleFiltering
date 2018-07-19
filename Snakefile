@@ -10,7 +10,6 @@ start, FAMILY, SAMPLE, DATAOUT = parser(config)
 # QC Steps:
 QC_snp = True
 QC_callRate = True
-QC_sex = False
 
 # com = {'flippyr': '/Users/sheaandrews/Programs/flippyr/flippyr.py',
 #        'plink': 'plink --keep-allele-order', 'plink2': 'plink',
@@ -30,23 +29,15 @@ def decorate(text):
                   sample=SAMPLE, DataOut=DATAOUT)
 
 
-if QC_sex:
-    QCd_plink = expand("{DataOut}/{sample}_SexExclude.{ext}",
-                       ext=BPLINK, sample=SAMPLE, DataOut=DATAOUT)
-elif QC_callRate:
-    QCd_plink = expand("{DataOut}/{sample}_callRate.{ext}",
-                       ext=BPLINK, sample=SAMPLE, DataOut=DATAOUT)
-elif QC_snp:
-    QCd_plink = expand("{DataOut}/{sample}_SnpQc.{ext}",
-                       ext=BPLINK, sample=SAMPLE, DataOut=DATAOUT)
-else:
-    QCd_plink = start['files']
-
 rule all:
     input:
         expand("{DataOut}/stats/{sample}_GWAS_QC.html",
                sample=SAMPLE, DataOut=DATAOUT),
-        QCd_plink
+        # expand("{DataOut}/{sample}_exclude.samples",
+        #        sample=SAMPLE, DataOut=DATAOUT),
+        expand("{DataOut}/{sample}_Excluded.{ext}",
+               sample=SAMPLE, DataOut=DATAOUT, ext=BPLINK)
+
 
 # ---- Exlude SNPs with a high missing rate and low MAF----
 rule snp_qc:
@@ -120,22 +111,6 @@ else:
     sexcheck_in_plink = start['files']
     sexcheck_in_plink_stem = start['stem']
 
-rule sex_exclude_failed:
-    input:
-        plink = sexcheck_in_plink,
-        indat_exclude = rules.sex_sample_fail.output
-    output:
-        temp(expand("{{DataOut}}/{{sample}}_SexExclude.{ext}", ext=BPLINK))
-    params:
-        indat_plink = sexcheck_in_plink_stem,
-        out = "{DataOut}/{sample}_SexExclude"
-    shell:
-        """
-{loads[plink]}
-{com[plink]} --bfile {params.indat_plink} \
---remove {input.indat_exclude} \
---make-bed --out {params.out}"""
-
 # ---- Prune SNPs, autosome only ----
 #  Pruned SNP list is used for IBD, PCA and heterozigosity calculations
 
@@ -176,8 +151,7 @@ rule sample_prune:
 
 # ---- Exclude Samples with interealtedness ----
 rule relatedness_QC:
-    input:
-        expand("{{DataOut}}/{{sample}}_samp_thinned.{ext}", ext=BPLINK),
+    input: rules.sample_prune.output
     output:
         "{DataOut}/{sample}_IBDQC.genome"
     params:
@@ -202,26 +176,9 @@ rule relatedness_sample_fail:
 {loads[R]}; {com[R]}  scripts/relatedness_QC.R {input.genome} {input.fam} \
 {params.Family} {output.out}"""
 
-rule relatedness_exclude_failed:
-    input:
-        exclude = "{DataOut}/{sample}_exclude.relatedness",
-        plink = expand("{{DataOut}}/{{sample}}_samp_thinned.{ext}", ext=BPLINK)
-    output:
-        temp(expand("{{DataOut}}/{{sample}}_RelatednessExclude.{ext}",
-                    ext=BPLINK))
-    params:
-        indat_plink = "{DataOut}/{sample}_samp_thinned",
-        out = "{DataOut}/{sample}_RelatednessExclude"
-    shell:
-        """
-{loads[plink]}
-{com[plink]} --bfile {params.indat_plink} --remove {input.exclude} \
---make-bed --out {params.out}"""
-
 # ---- Exclude Samples with outlying heterozigosity ----
 rule heterozigosity_QC:
-    input:
-        expand("{{DataOut}}/{{sample}}_RelatednessExclude.{ext}", ext=BPLINK)
+    input: rules.sample_prune.output
     output: "{DataOut}/{sample}_HetQC.het"
     params:
         indat_plink = "{DataOut}/{sample}_RelatednessExclude",
@@ -236,31 +193,15 @@ rule heterozigosity_sample_fail:
     output: "{DataOut}/{sample}_exclude.heterozigosity"
     shell: '{loads[R]}; {com[R]}  scripts/heterozygosity_QC.R {input} {output}'
 
-rule heterozigosity_exclude_failed:
-    input:
-        exclude = "{DataOut}/{sample}_exclude.heterozigosity",
-        plink = expand("{{DataOut}}/{{sample}}_RelatednessExclude.{ext}",
-                       ext=BPLINK)
-    output:
-        temp(expand("{{DataOut}}/{{sample}}_HetExclude.{ext}", ext=BPLINK))
-    params:
-        indat_plink = "{DataOut}/{sample}_RelatednessExclude",
-        out = "{DataOut}/{sample}_HetExclude"
-    shell:
-        """
-{loads[plink]}
-{com[plink]} --bfile {params.indat_plink} --remove {input.exclude} \
---make-bed --out {params.out}"""
-
 # align sample to fasta refrence
 rule Sample_Flip:
     input:
-        bim = "{DataOut}/{sample}_HetExclude.bim",
-        bed = "{DataOut}/{sample}_HetExclude.bed",
-        fam = "{DataOut}/{sample}_HetExclude.fam",
+        bim = "{DataOut}/{sample}_samp_thinned.bim",
+        bed = "{DataOut}/{sample}_samp_thinned.bed",
+        fam = "{DataOut}/{sample}_samp_thinned.fam",
         fasta = "data/hg19.fa"
     output:
-        temp(expand("{{DataOut}}/{{sample}}_HetExclude_flipped.{ext}",
+        temp(expand("{{DataOut}}/{{sample}}_flipped.{ext}",
                     ext=BPLINK))
     shell:
         """
@@ -268,9 +209,9 @@ rule Sample_Flip:
 {com[flippyr]} -p {input.fasta} {input.bim}"""
 
 rule Sample_ChromPosRefAlt:
-    input: "{DataOut}/{sample}_HetExclude_flipped.bim"
+    input: "{DataOut}/{sample}_flipped.bim"
     output:
-        bim = temp("{DataOut}/{sample}_HetExclude_flipped_ChromPos.bim"),
+        bim = temp("{DataOut}/{sample}_flipped_ChromPos.bim"),
         snplist = temp("{DataOut}/{sample}_thinned_snplist")
     shell:
         """
@@ -280,13 +221,13 @@ rule Sample_ChromPosRefAlt:
 # Recode sample plink file to vcf
 rule Sample_Plink2Bcf:
     input:
-        expand("{{DataOut}}/{{sample}}_HetExclude_flipped.{ext}", ext=BPLINK),
-        "{DataOut}/{sample}_HetExclude_flipped_ChromPos.bim"
+        expand("{{DataOut}}/{{sample}}_flipped.{ext}", ext=BPLINK),
+        "{DataOut}/{sample}_flipped_ChromPos.bim"
     output:
         "{DataOut}/{sample}_samp_thinned_flipped.vcf.gz"
     params:
-        indat = "{DataOut}/{sample}_HetExclude_flipped",
-        bim = "{DataOut}/{sample}_HetExclude_flipped_ChromPos.bim",
+        indat = "{DataOut}/{sample}_flipped",
+        bim = "{DataOut}/{sample}_flipped_ChromPos.bim",
         out = "{DataOut}/{sample}_samp_thinned_flipped"
     shell:
         """
@@ -477,12 +418,31 @@ rule SampleExclusion:
         pca = "{DataOut}/{sample}_exclude.pca",
         relat = "{DataOut}/{sample}_exclude.relatedness"
     output:
-        out = "{DataOut}/{sample}_exclude.samples"
+        out = "{DataOut}/{sample}_exclude.samples",
+        out_distinct = "{DataOut}/{sample}_exclude.distinct_samples"
     shell:
         """
 {loads[R]}
-{com[R]}  scripts/sample_QC.R {input.SampCallRate} {input.het} \
-{input.sex} {input.pca} {input.relat} {output.out}"""
+{com[R]} scripts/sample_QC.R {input.SampCallRate} {input.het} \
+{input.sex} {input.pca} {input.relat} {output.out} {output.out_distinct}
+"""
+
+rule Exclude_failed:
+    input:
+        plink = sexcheck_in_plink,
+        indat_exclude = rules.SampleExclusion.output.out_distinct
+    output:
+        temp(expand("{{DataOut}}/{{sample}}_Excluded.{ext}", ext=BPLINK)),
+        excl = temp('{DataOut}/{sample}_exclude.plink')
+    params:
+        indat_plink = sexcheck_in_plink_stem,
+        out = "{DataOut}/{sample}_Excluded"
+    shell:
+        """
+cat {input.indat_exclude} | sed '1d' | cut -f' ' -d1,2 > {output.excl}
+{loads[plink]}
+{com[plink]} --bfile {params.indat_plink} --remove {output.excl} \
+--make-bed --out {params.out}"""
 
 
 def decorate2(text):
