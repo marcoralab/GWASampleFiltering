@@ -64,8 +64,8 @@ plink_1.9 --bfile raw-GWA-data \
 
 # ---- SNP level statisitcs ----
 snps <- freq.raw %>%
-  full_join(freqx.raw) %>%
-  full_join(hwe.raw) %>%
+  full_join(freqx.raw, by = c("CHR", "SNP", "A1", "A2")) %>%
+  full_join(hwe.raw, by = c("CHR", "SNP", "A1", "A2")) %>%
   rename(AA = `C(HOM A1)`, AB = `C(HET)`, BB = `C(HOM A2)`, missing = `C(MISSING)`) %>%
   mutate(Call.rate = 1 - (missing / c(AA + AB + BB + missing))) %>%
   mutate(call = Call.rate <= 0.95) %>%

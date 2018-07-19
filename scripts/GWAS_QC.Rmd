@@ -1,12 +1,11 @@
 ---
-title: "GWAS QC"
 author: "Shea Andrews"
 date: "`r Sys.Date()`"
-editor_options: 
+editor_options:
   chunk_output_type: console
 output:
   html_document:
-    self_contained: no
+    self_contained: yes
     df_print: paged
     toc: true
     number_sections: true
@@ -32,6 +31,7 @@ params:
     PATH_BasePops:  PATH_BasePops
     Path_PopStrat_eigenvec: Path_PopStrat_eigenvec
     Path_PopStrat_eigenval: Path_PopStrat_eigenval
+title: "GWAS QC: `r params$Sample`"
 ---
 
 ```{r setup, include=FALSE, echo=F, message=F, warning=F}
@@ -56,15 +56,3 @@ knitr::opts_knit$set(root.dir = paste0(params$rwd, '/scripts'))
 
 ```{r child = 'population_stratification_QC.Rmd'}
 ```
-
-
-
-
-
-
-
-
-
-
-
-
