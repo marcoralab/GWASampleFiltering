@@ -24,4 +24,8 @@ QC:
   MAF: 0.02
   HWE: 10e-6
 
+<<<<<<< Updated upstream
 anaconda: /sc/orga/projects/LOAD/Brian/anaconda3/bin
+=======
+anaconda: "" #/sc/orga/projects/LOAD/Brian/anaconda3/bin
+>>>>>>> Stashed changes

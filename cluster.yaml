@@ -2,11 +2,9 @@ __default__:
   project: acc_LOAD
   partition: bode
   queue: premium
-  cores: 2
-  mem: 3000
-  time: '0:01'
-check_vcf:
-  time: '0:04'
-flippyr:
   cores: 1
-  mem: 6000
+  mem: 10000
+  time: '0:25'
+GWAS_QC_Report:
+  partition: mothra
+  mem: 20000
