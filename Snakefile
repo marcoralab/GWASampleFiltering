@@ -1,8 +1,12 @@
 '''Snakefile for GWAS Variant and Sample QC Version 0.2'''
 
 from scripts.parse_config import parser
-shell.executable("/bin/bash")
+
 configfile: "config.yaml"
+
+shell.executable("/bin/bash")
+shell.prefix("PATH=" + config["anaconda"] + ":$PATH; ")
+
 BPLINK = ["bed", "bim", "fam"]
 RWD = os.getcwd()
 start, FAMILY, SAMPLE, DATAOUT = parser(config)
@@ -14,7 +18,7 @@ QC_callRate = True
 # com = {'flippyr': '/Users/sheaandrews/Programs/flippyr/flippyr.py',
 #        'plink': 'plink --keep-allele-order', 'plink2': 'plink',
 #        'bcftools': 'bcftools', 'R': 'Rscript', 'R2': 'R'}
-# loads = {'flippyr': '', 'plink': '', 'bcftools': '',  'R': ''}
+#loads = {'flippyr': '', 'plink': '', 'bcftools': '',  'R': ''}
 
 com = {'flippyr': 'flippyr', 'plink': 'plink --keep-allele-order',
        'plink2': 'plink', 'bcftools': 'bcftools', 'R': 'Rscript', 'R2': 'R'}

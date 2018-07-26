@@ -170,7 +170,7 @@ plot_ly(pca, x = ~PC2, y = ~PC1, z = ~PC3, color = ~SuperPopulation, type = 'sca
 ### Population Outliers
 Individules of non-European ancestry were identified by determining the mean and standard deviation of the 10 principal components scores for the EUR super population (Table 1). Participants in `r params$Sample` who were \pm 6 SD from the EUR population mean were determined to be of non-European ancestry (Table 2).
 
-```{r population outliers, echo=F}
+```{r population outliers, message=F, echo=F}
 ## ---- Population Outliers ---- ##
 ##  For 1000 Genomes EUR population, calculate the mean and +- 6 standard dPCiations for each prinicipal compoent
 EurPca <- pca %>%
@@ -198,12 +198,19 @@ sample.pca <- pca %>%
   mutate(PC9.outliers = PC9 < EurPca[EurPca$PC == 'PC9', 'lower'] | PC9 > EurPca[EurPca$PC == 'PC9', 'upper']) %>%
   mutate(PC10.outliers = PC10 < EurPca[EurPca$PC == 'PC10', 'lower'] | PC10 > EurPca[EurPca$PC == 'PC10', 'upper']) %>%
   mutate(pop.outliers =  PC1.outliers == T | PC2.outliers == TRUE | PC3.outliers == TRUE | PC4.outliers == TRUE | PC5.outliers == TRUE | PC6.outliers == TRUE | PC7.outliers == TRUE | PC8.outliers == TRUE | PC9.outliers == TRUE  | PC10.outliers == TRUE)
+n_outliers <- sum(sample.pca$pop.outliers)
+no_outliers <- n_outliers == 0
 ```
 \
 
 ***Table 1:*** Mean and SD of PC in EUR population
 ```{r eur pca table, echo=F}
 EurPca
+```
+
+```{r early_exit, echo=F, results='asis', eval=no_outliers}
+cat('Figures 6 & 7 and Table 2 are omitted because there are no outliers.')
+knitr::knit_exit()
 ```
 
 Fig. 6 and Fig. 7 display the population structure of `r params$Sample` with EUR population outliers highlighted in red.

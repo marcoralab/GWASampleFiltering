@@ -21,34 +21,36 @@ outfile = commandArgs(TRUE)[6]
 outfile_d = commandArgs(TRUE)[7]
 
 ##  ---- Read in sample exclusion files files ---- ##
-irem.raw <- read_tsv(irem.file, col_names = F) %>% mutate(why = 'mis')
-het.raw <- read_tsv(het.file, col_names = T, col_types = c('cc')) %>%
+irem.raw <- read_tsv(irem.file, col_names = F, col_types = 'cc') %>%
+  mutate(why = 'mis')
+het.raw <- read_tsv(het.file, col_names = T, col_types = 'cc') %>%
   mutate(why = 'het')
-sex.raw <- read_tsv(sex.file, col_names = T, col_types = c('cc')) %>%
+sex.raw <- read_tsv(sex.file, col_names = T, col_types = 'cc') %>%
   mutate(why = 'sex')
-pca.raw <- read_tsv(pca.file, col_names = F, col_types = c('cc')) %>%
+pca.raw <- read_tsv(pca.file, col_names = F, col_types = 'cc') %>%
   mutate(why = 'pca')
-rel.raw <- read_tsv(rel.file, col_names = T, col_types = c('cc')) %>%
+rel.raw <- read_tsv(rel.file, col_names = T, col_types = 'cc') %>%
   mutate(why = 'rel')
 
 ##  ---- Data wrangling ---- ##
-
 ## IF .irem file is empty, make empty tibble
-if(nrow(irem.raw) == 0){
-  irem <- tibble(FID = NA, IID = NA)
-  } else {
-    irem <- irem.raw %>%
+fill_blanks <- function (df) {
+  if (nrow(df) == 0) {
+    out <- tibble(FID = NA, IID = NA)
+  } else if ('X1' %in% names(df)) {
+    out <- df %>%
       rename(FID = X1, IID = X2)
+  } else {
+    out <- df
   }
+  return(out)
+}
 
-het <- het.raw
-
-sex <- sex.raw
-
-pca <- pca.raw %>%
-  rename(FID = X1, IID = X2)
-
-rel <- rel.raw
+irem <- fill_blanks(irem.raw)
+het <- fill_blanks(het.raw)
+sex <- fill_blanks(sex.raw)
+pca <- fill_blanks(pca.raw)
+rel <- fill_blanks(rel.raw)
 
 excluded <- het %>%
   bind_rows(irem) %>%

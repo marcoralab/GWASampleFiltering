@@ -10,10 +10,10 @@ sample: false
 SexIn: false
 
 # This is the directory with the input files:
-DataIn:
+DataIn: /sc/orga/projects/LOAD/Brian/projects/ADGC/data/raw
 
 # This is the directory with the output files:
-DataOut:
+DataOut: /sc/orga/projects/LOAD/Brian/projects/ADGC/sampleQC
 
 #Do the samples contain families (true/false):
 family: false
@@ -23,3 +23,5 @@ QC:
   SampMiss: 0.05
   MAF: 0.02
   HWE: 10e-6
+
+anaconda: /sc/orga/projects/LOAD/Brian/anaconda3/bin
