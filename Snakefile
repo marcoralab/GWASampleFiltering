@@ -353,11 +353,14 @@ rule Plink_RefenceSample:
 
 rule fix_fam:
     input:
-        fam = "{DataOut}/{sample}_1kg_merged.fam"
+        oldfam = "{DataOut}/{sample}_pruned.fam",
+        newfam = "{DataOut}/{sample}_1kg_merged.fam"
     output:
         out = "{DataOut}/{sample}_1kg_merged_fixed.fam"
     shell:
-        'scripts/fix_fam.py {input.fam} {output.out}'
+        """
+{loads[R]}
+{com[R]} scripts/fix_fam.R {input.oldfam} {input.newfam} {output.out}"""
 
 # PCA analysis to identify population outliers
 rule PcaPopulationOutliers:
