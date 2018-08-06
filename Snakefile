@@ -29,17 +29,17 @@ loads = {'flippyr': '', 'plink': 'module load plink/1.90',
 
 
 def decorate(text):
-    return expand("{DataOut}/{sample}_" + text,
+    return expand(DATAOUT + "/{sample}_" + text,
                   sample=SAMPLE, DataOut=DATAOUT)
 
 
 rule all:
     input:
-        expand("{DataOut}/stats/{sample}_GWAS_QC.html",
+        expand(DATAOUT + "/stats/{sample}_GWAS_QC.html",
                sample=SAMPLE, DataOut=DATAOUT),
-        # expand("{DataOut}/{sample}_exclude.samples",
+        # expand(DATAOUT + "/{sample}_exclude.samples",
         #        sample=SAMPLE, DataOut=DATAOUT),
-        expand("{DataOut}/{sample}_Excluded.{ext}",
+        expand(DATAOUT + "/{sample}_Excluded.{ext}",
                sample=SAMPLE, DataOut=DATAOUT, ext=BPLINK)
 
 
@@ -47,13 +47,13 @@ rule all:
 rule snp_qc:
     input: start['files']
     output:
-        temp(expand("{{DataOut}}/{{sample}}_SnpQc.{ext}", ext=BPLINK)),
-        "{DataOut}/{sample}_SnpQc.hwe",
-        "{DataOut}/{sample}_SnpQc.frq",
-        "{DataOut}/{sample}_SnpQc.frqx",
+        temp(expand(DATAOUT + "/{{sample}}_SnpQc.{ext}", ext=BPLINK)),
+        DATAOUT + "/{sample}_SnpQc.hwe",
+        DATAOUT + "/{sample}_SnpQc.frq",
+        DATAOUT + "/{sample}_SnpQc.frqx",
     params:
         stem = start['stem'],
-        out = "{DataOut}/{sample}_SnpQc",
+        out = DATAOUT + "/{sample}_SnpQc",
         miss = config['QC']['GenoMiss'],
         MAF = config['QC']['MAF']
     shell:
@@ -68,12 +68,12 @@ rule snp_qc:
 rule sample_callRate:
     input: rules.snp_qc.output if QC_snp else start['files']
     output:
-        expand("{{DataOut}}/{{sample}}_callRate.{ext}", ext=BPLINK),
-        "{DataOut}/{sample}_callRate.imiss",
-        touch("{DataOut}/{sample}_callRate.irem")
+        expand(DATAOUT + "/{{sample}}_callRate.{ext}", ext=BPLINK),
+        DATAOUT + "/{sample}_callRate.imiss",
+        touch(DATAOUT + "/{sample}_callRate.irem")
     params:
         indat = rules.snp_qc.params.out if QC_snp else start['stem'],
-        out = "{DataOut}/{sample}_callRate"
+        out = DATAOUT + "/{sample}_callRate"
     shell:
         """
 {loads[plink]}
@@ -87,10 +87,10 @@ rule sample_callRate:
 rule sexcheck_QC:
     input: start['sex']
     output:
-        "{DataOut}/{sample}_SexQC.sexcheck"
+        DATAOUT + "/{sample}_SexQC.sexcheck"
     params:
         indat = start['sex_stem'],
-        out = "{DataOut}/{sample}_SexQC",
+        out = DATAOUT + "/{sample}_SexQC",
     shell:
         '''
 {loads[plink]}
@@ -101,7 +101,7 @@ rule sex_sample_fail:
     input:
         rules.sexcheck_QC.output
     output:
-        "{DataOut}/{sample}_exclude.sexcheck",
+        DATAOUT + "/{sample}_exclude.sexcheck",
     shell:
         '{loads[R]}; {com[R]} scripts/sexcheck_QC.R {input} {output}'
 
@@ -121,13 +121,13 @@ else:
 rule PruneDupvar_snps:
     input: sexcheck_in_plink
     output:
-        expand("{{DataOut}}/{{sample}}_nodup.{ext}",
+        expand(DATAOUT + "/{{sample}}_nodup.{ext}",
                ext=['prune.in', 'prune.out']),
-        "{DataOut}/{sample}_nodup.dupvar.delete"
+        DATAOUT + "/{sample}_nodup.dupvar.delete"
     params:
         indat = sexcheck_in_plink_stem,
-        dupvar = "{DataOut}/{sample}_nodup.dupvar",
-        out = "{DataOut}/{sample}_nodup"
+        dupvar = DATAOUT + "/{sample}_nodup.dupvar",
+        out = DATAOUT + "/{sample}_nodup"
     shell:
         """
 {loads[plink]}
@@ -140,13 +140,13 @@ rule PruneDupvar_snps:
 rule sample_prune:
     input:
         sexcheck_in_plink,
-        prune = "{DataOut}/{sample}_nodup.prune.in",
-        dupvar = "{DataOut}/{sample}_nodup.dupvar.delete"
+        prune = DATAOUT + "/{sample}_nodup.prune.in",
+        dupvar = DATAOUT + "/{sample}_nodup.dupvar.delete"
     output:
-        temp(expand("{{DataOut}}/{{sample}}_pruned.{ext}", ext=BPLINK))
+        temp(expand(DATAOUT + "/{{sample}}_pruned.{ext}", ext=BPLINK))
     params:
         indat_plink = sexcheck_in_plink_stem,
-        out = "{DataOut}/{sample}_pruned"
+        out = DATAOUT + "/{sample}_pruned"
     shell:
         """
 {loads[plink]}
@@ -157,10 +157,10 @@ rule sample_prune:
 rule relatedness_QC:
     input: rules.sample_prune.output
     output:
-        "{DataOut}/{sample}_IBDQC.genome"
+        DATAOUT + "/{sample}_IBDQC.genome"
     params:
-        indat_plink = "{DataOut}/{sample}_pruned",
-        out = "{DataOut}/{sample}_IBDQC"
+        indat_plink = DATAOUT + "/{sample}_pruned",
+        out = DATAOUT + "/{sample}_IBDQC"
     shell:
         """
 {loads[plink]}
@@ -169,26 +169,24 @@ rule relatedness_QC:
 
 rule relatedness_sample_fail:
     input:
-        genome = "{DataOut}/{sample}_IBDQC.genome",
+        genome = DATAOUT + "/{sample}_IBDQC.genome",
         fam = sexcheck_in_plink_stem + ".fam"
     params:
-        Family = FAMILY,
-        threshold = 0.1875
+        Family = FAMILY
     output:
-        out = "{DataOut}/{sample}_exclude.relatedness",
-        rdat = "{DataOut}/{sample}_IBDQC.Rdata"
+        out = DATAOUT + "/{sample}_exclude.relatedness"
     shell:
         """
-{loads[R]}; {com[R]}  scripts/relatedness_QC.R {input.genome} {params.threshold} \
-{params.Family} {output.out} {output.rdat}"""
+{loads[R]}; {com[R]}  scripts/relatedness_QC.R {input.genome} {input.fam} \
+{params.Family} {output.out}"""
 
 # ---- Exclude Samples with outlying heterozigosity ----
 rule heterozygosity_QC:
     input: rules.sample_prune.output
-    output: "{DataOut}/{sample}_HetQC.het"
+    output: DATAOUT + "/{sample}_HetQC.het"
     params:
         indat_plink = rules.sample_prune.params.out,
-        out = "{DataOut}/{sample}_HetQC"
+        out = DATAOUT + "/{sample}_HetQC"
     shell:
         '''
 {loads[plink]}
@@ -196,18 +194,18 @@ rule heterozygosity_QC:
 
 rule heterozygosity_sample_fail:
     input: rules.heterozygosity_QC.output
-    output: "{DataOut}/{sample}_exclude.heterozigosity"
+    output: DATAOUT + "/{sample}_exclude.heterozigosity"
     shell: '{loads[R]}; {com[R]}  scripts/heterozygosity_QC.R {input} {output}'
 
 # align sample to fasta refrence
 rule Sample_Flip:
     input:
-        bim = "{DataOut}/{sample}_pruned.bim",
-        bed = "{DataOut}/{sample}_pruned.bed",
-        fam = "{DataOut}/{sample}_pruned.fam",
+        bim = DATAOUT + "/{sample}_pruned.bim",
+        bed = DATAOUT + "/{sample}_pruned.bed",
+        fam = DATAOUT + "/{sample}_pruned.fam",
         fasta = "data/hg19.fa"
     output:
-        temp(expand("{{DataOut}}/{{sample}}_pruned_flipped.{ext}",
+        temp(expand(DATAOUT + "/{{sample}}_pruned_flipped.{ext}",
                     ext=BPLINK))
     shell:
         """
@@ -215,10 +213,10 @@ rule Sample_Flip:
 {com[flippyr]} -p {input.fasta} {input.bim}"""
 
 rule Sample_ChromPosRefAlt:
-    input: "{DataOut}/{sample}_pruned_flipped.bim"
+    input: DATAOUT + "/{sample}_pruned_flipped.bim"
     output:
-        bim = temp("{DataOut}/{sample}_flipped_ChromPos.bim"),
-        snplist = temp("{DataOut}/{sample}_pruned_snplist")
+        bim = temp(DATAOUT + "/{sample}_flipped_ChromPos.bim"),
+        snplist = temp(DATAOUT + "/{sample}_pruned_snplist")
     shell:
         """
 {loads[R]}
@@ -227,14 +225,14 @@ rule Sample_ChromPosRefAlt:
 # Recode sample plink file to vcf
 rule Sample_Plink2Bcf:
     input:
-        expand("{{DataOut}}/{{sample}}_pruned_flipped.{ext}", ext=BPLINK),
-        "{DataOut}/{sample}_flipped_ChromPos.bim"
+        expand(DATAOUT + "/{{sample}}_pruned_flipped.{ext}", ext=BPLINK),
+        DATAOUT + "/{sample}_flipped_ChromPos.bim"
     output:
-        "{DataOut}/{sample}_pruned_flipped.vcf.gz"
+        DATAOUT + "/{sample}_pruned_flipped.vcf.gz"
     params:
-        indat = "{DataOut}/{sample}_pruned_flipped",
-        bim = "{DataOut}/{sample}_flipped_ChromPos.bim",
-        out = "{DataOut}/{sample}_pruned_flipped"
+        indat = DATAOUT + "/{sample}_pruned_flipped",
+        bim = DATAOUT + "/{sample}_flipped_ChromPos.bim",
+        out = DATAOUT + "/{sample}_pruned_flipped"
     shell:
         """
 {loads[plink]}
@@ -244,9 +242,9 @@ rule Sample_Plink2Bcf:
 # Index bcf
 rule Sample_IndexBcf:
     input:
-        bcf = "{DataOut}/{sample}_pruned_flipped.vcf.gz"
+        bcf = DATAOUT + "/{sample}_pruned_flipped.vcf.gz"
     output:
-        "{DataOut}/{sample}_pruned_flipped.vcf.gz.csi"
+        DATAOUT + "/{sample}_pruned_flipped.vcf.gz.csi"
     shell:
         '{loads[bcftools]}; {com[bcftools]} index -f {input.bcf}'
 
@@ -289,12 +287,12 @@ rule Reference_prune:
     input:
         plink = expand("data/1000genomes_allChr_flipped.{ext}", ext=BPLINK),
         bim = "data/1000genomes_allChr_flipped_CPRA.bim",
-        prune = "{DataOut}/{sample}_pruned_snplist"
+        prune = DATAOUT + "/{sample}_pruned_snplist"
     output:
-        expand("{{DataOut}}/{{sample}}_1kgpruned_flipped.{ext}", ext=BPLINK)
+        expand(DATAOUT + "/{{sample}}_1kgpruned_flipped.{ext}", ext=BPLINK)
     params:
         indat_plink = "data/1000genomes_allChr_flipped",
-        out = "{DataOut}/{sample}_1kgpruned_flipped"
+        out = DATAOUT + "/{sample}_1kgpruned_flipped"
     shell:
         """
 {loads[plink]}
@@ -305,11 +303,11 @@ rule Reference_prune:
 # Recode 1kg to vcf
 rule Reference_Plink2Bcf:
     input:
-        expand("{{DataOut}}/{{sample}}_1kgpruned_flipped.{ext}", ext=BPLINK)
-    output: "{DataOut}/{sample}_1kgpruned_flipped.vcf.gz"
+        expand(DATAOUT + "/{{sample}}_1kgpruned_flipped.{ext}", ext=BPLINK)
+    output: DATAOUT + "/{sample}_1kgpruned_flipped.vcf.gz"
     params:
-        indat = "{DataOut}/{sample}_1kgpruned_flipped",
-        out = "{DataOut}/{sample}_1kgpruned_flipped"
+        indat = DATAOUT + "/{sample}_1kgpruned_flipped",
+        out = DATAOUT + "/{sample}_1kgpruned_flipped"
     shell:
         """
 {loads[plink]}
@@ -319,21 +317,21 @@ rule Reference_Plink2Bcf:
 # Index bcf
 rule Reference_IndexBcf:
     input:
-        bcf = "{DataOut}/{sample}_1kgpruned_flipped.vcf.gz"
+        bcf = DATAOUT + "/{sample}_1kgpruned_flipped.vcf.gz"
     output:
-        "{DataOut}/{sample}_1kgpruned_flipped.vcf.gz.csi"
+        DATAOUT + "/{sample}_1kgpruned_flipped.vcf.gz.csi"
     shell:
         '{loads[bcftools]}; {com[bcftools]} index -f {input.bcf}'
 
 # Merge ref and sample
 rule Merge_RefenceSample:
     input:
-        bcf_1kg = "{DataOut}/{sample}_1kgpruned_flipped.vcf.gz",
-        csi_1kg = "{DataOut}/{sample}_1kgpruned_flipped.vcf.gz.csi",
-        bcf_samp = "{DataOut}/{sample}_pruned_flipped.vcf.gz",
-        csi_samp = "{DataOut}/{sample}_pruned_flipped.vcf.gz.csi",
+        bcf_1kg = DATAOUT + "/{sample}_1kgpruned_flipped.vcf.gz",
+        csi_1kg = DATAOUT + "/{sample}_1kgpruned_flipped.vcf.gz.csi",
+        bcf_samp = DATAOUT + "/{sample}_pruned_flipped.vcf.gz",
+        csi_samp = DATAOUT + "/{sample}_pruned_flipped.vcf.gz.csi",
     output:
-        out = "{DataOut}/{sample}_1kg_merged.vcf"
+        out = DATAOUT + "/{sample}_1kg_merged.vcf"
     shell:
         r"""
 {loads[bcftools]}
@@ -343,11 +341,11 @@ rule Merge_RefenceSample:
 # recode merged sample to plink
 rule Plink_RefenceSample:
     input:
-        vcf = "{DataOut}/{sample}_1kg_merged.vcf"
+        vcf = DATAOUT + "/{sample}_1kg_merged.vcf"
     output:
-        expand("{{DataOut}}/{{sample}}_1kg_merged.{ext}", ext=BPLINK)
+        expand(DATAOUT + "/{{sample}}_1kg_merged.{ext}", ext=BPLINK)
     params:
-        out = "{DataOut}/{sample}_1kg_merged"
+        out = DATAOUT + "/{sample}_1kg_merged"
     shell:
         '''
 {loads[plink]}
@@ -355,28 +353,25 @@ rule Plink_RefenceSample:
 
 rule fix_fam:
     input:
-        oldfam = "{DataOut}/{sample}_pruned.fam",
-        newfam = "{DataOut}/{sample}_1kg_merged.fam"
+        fam = DATAOUT + "/{sample}_1kg_merged.fam"
     output:
-        out = "{DataOut}/{sample}_1kg_merged_fixed.fam"
+        out = DATAOUT + "/{sample}_1kg_merged_fixed.fam"
     shell:
-        """
-{loads[R]}
-{com[R]} scripts/fix_fam.R {input.oldfam} {input.newfam} {output.out}"""
+        'scripts/fix_fam.py {input.fam} {output.out}'
 
 # PCA analysis to identify population outliers
 rule PcaPopulationOutliers:
     input:
-        plink = expand("{{DataOut}}/{{sample}}_1kg_merged.{ext}", ext=BPLINK),
-        fam = "{DataOut}/{sample}_1kg_merged_fixed.fam",
+        plink = expand(DATAOUT + "/{{sample}}_1kg_merged.{ext}", ext=BPLINK),
+        fam = DATAOUT + "/{sample}_1kg_merged_fixed.fam",
         pop = "data/1000genomes_pops.txt",
         clust = "data/pops.txt"
     output:
-        expand("{{DataOut}}/{{sample}}_1kg_merged.{ext}",
+        expand(DATAOUT + "/{{sample}}_1kg_merged.{ext}",
                ext=['eigenval', 'eigenvec'])
     params:
-        indat_plink = "{DataOut}/{sample}_1kg_merged",
-        out = "{DataOut}/{sample}_1kg_merged"
+        indat_plink = DATAOUT + "/{sample}_1kg_merged",
+        out = DATAOUT + "/{sample}_1kg_merged"
     shell:
         """
 {loads[plink]}
@@ -387,12 +382,12 @@ rule PcaPopulationOutliers:
 # Rscript to identify EUR population outliers
 rule ExcludePopulationOutliers:
     input:
-        indat_eigenval = "{DataOut}/{sample}_1kg_merged.eigenval",
-        indat_eigenvec = "{DataOut}/{sample}_1kg_merged.eigenvec",
-        indat_fam = "{DataOut}/{sample}_pruned.fam",
+        indat_eigenval = DATAOUT + "/{sample}_1kg_merged.eigenval",
+        indat_eigenvec = DATAOUT + "/{sample}_1kg_merged.eigenvec",
+        indat_fam = DATAOUT + "/{sample}_pruned.fam",
         indat_1kgped = "data/20130606_g1k.ped"
     output:
-        out = "{DataOut}/{sample}_exclude.pca"
+        out = DATAOUT + "/{sample}_exclude.pca"
     shell:
         """
 {loads[R]}
@@ -403,15 +398,15 @@ rule ExcludePopulationOutliers:
 # Run PCA to for population stratification
 rule PopulationStratification:
     input:
-        plink = expand("{{DataOut}}/{{sample}}_pruned.{ext}",
+        plink = expand(DATAOUT + "/{{sample}}_pruned.{ext}",
                        ext=BPLINK),
-        exclude = "{DataOut}/{sample}_exclude.pca"
+        exclude = DATAOUT + "/{sample}_exclude.pca"
     output:
-        expand("{{DataOut}}/{{sample}}_filtered_PCA.{ext}",
+        expand(DATAOUT + "/{{sample}}_filtered_PCA.{ext}",
                ext=['eigenval', 'eigenvec'])
     params:
-        indat = "{DataOut}/{sample}_pruned",
-        out = "{DataOut}/{sample}_filtered_PCA"
+        indat = DATAOUT + "/{sample}_pruned",
+        out = DATAOUT + "/{sample}_filtered_PCA"
     shell:
         """
 {loads[plink]}
@@ -421,14 +416,14 @@ rule PopulationStratification:
 
 rule SampleExclusion:
     input:
-        SampCallRate = "{DataOut}/{sample}_callRate.irem",
-        het = "{DataOut}/{sample}_exclude.heterozigosity",
-        sex = "{DataOut}/{sample}_exclude.sexcheck",
-        pca = "{DataOut}/{sample}_exclude.pca",
-        relat = "{DataOut}/{sample}_exclude.relatedness"
+        SampCallRate = DATAOUT + "/{sample}_callRate.irem",
+        het = DATAOUT + "/{sample}_exclude.heterozigosity",
+        sex = DATAOUT + "/{sample}_exclude.sexcheck",
+        pca = DATAOUT + "/{sample}_exclude.pca",
+        relat = DATAOUT + "/{sample}_exclude.relatedness"
     output:
-        out = "{DataOut}/{sample}_exclude.samples",
-        out_distinct = "{DataOut}/{sample}_exclude.distinct_samples"
+        out = DATAOUT + "/{sample}_exclude.samples",
+        out_distinct = DATAOUT + "/{sample}_exclude.distinct_samples"
     shell:
         """
 {loads[R]}
@@ -441,11 +436,11 @@ rule Exclude_failed:
         plink = sexcheck_in_plink,
         indat_exclude = rules.SampleExclusion.output.out_distinct
     output:
-        temp(expand("{{DataOut}}/{{sample}}_Excluded.{ext}", ext=BPLINK)),
+        temp(expand(DATAOUT + "/{{sample}}_Excluded.{ext}", ext=BPLINK)),
         excl = temp('{DataOut}/{sample}_exclude.plink')
     params:
         indat_plink = sexcheck_in_plink_stem,
-        out = "{DataOut}/{sample}_Excluded"
+        out = DATAOUT + "/{sample}_Excluded"
     shell:
         """
 cat {input.indat_exclude} | sed '1d' | cut -d' ' -f1,2 > {output.excl}
@@ -455,7 +450,7 @@ cat {input.indat_exclude} | sed '1d' | cut -d' ' -f1,2 > {output.excl}
 
 
 def decorate2(text):
-    return expand("{DataOut}/{{sample}}_" + text, DataOut=DATAOUT)
+    return expand(DATAOUT + "/{{sample}}_" + text, DataOut=DATAOUT)
 
 
 rule GWAS_QC_Report:
@@ -467,7 +462,7 @@ rule GWAS_QC_Report:
         frqx = decorate2("SnpQc.frqx"),
         imiss = decorate2("callRate.imiss"),
         HetFile = decorate2("HetQC.het"),
-        IBD_stats = decorate2("IBDQC.Rdata"),
+        GenomeFile = decorate2("IBDQC.genome"),
         eigenval = decorate2("1kg_merged.eigenval"),
         eigenvec = decorate2("1kg_merged.eigenvec"),
         TargetPops = decorate2("pruned.fam"),
@@ -475,12 +470,11 @@ rule GWAS_QC_Report:
         PopStrat_eigenval = decorate2("filtered_PCA.eigenval"),
         PopStrat_eigenvec = decorate2("filtered_PCA.eigenvec")
     output:
-        "{DataOut}/stats/{sample}_GWAS_QC.html"
+        DATAOUT + "/stats/{sample}_GWAS_QC.html"
     params:
         rwd = RWD,
         Family = FAMILY,
-        output_dir = "{DataOut}/stats",
-        pi_threshold = 0.1875
+        output_dir = DATAOUT + "/stats"
     shell:
         """
 {loads[R]}
@@ -490,8 +484,8 @@ params = list(rwd = "{params.rwd}", Sample = "{wildcards.sample}", \
 Path_SexFile = "{input.SexFile}", Path_hwe = "{input.hwe}", \
 Path_frq = "{input.frq}", Path_frqx = "{input.frqx}", \
 Path_imiss = "{input.imiss}", Path_HetFile = "{input.HetFile}", \
-pi_threshold = {params.pi_threshold}, Family = {params.Family}, \
-Path_IBD_stats = "{input.IBD_stats}", Path_eigenval = "{input.eigenval}", \
+Path_GenomeFile = "{input.GenomeFile}", Family = {params.Family}, \
+Path_eigenval = "{input.eigenval}", \
 Path_eigenvec = "{input.eigenvec}", \
 Path_TargetPops = "{input.TargetPops}", \
 PATH_BasePops = "{input.BasePops}", \
