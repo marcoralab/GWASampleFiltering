@@ -12,8 +12,8 @@ suppressMessages(require(magrittr))
 # 3: Family based study, T/F
 # 4: .tsv file to be outputed
 genome.file <- commandArgs(TRUE)[1]
-threshold <- commandArgs(TRUE)[2]
-Family <- commandArgs(TRUE)[3]
+threshold <- as.numeric(commandArgs(TRUE)[2])
+Family <- as.logical(commandArgs(TRUE)[3])
 outfile <- commandArgs(TRUE)[4]
 rdat <- commandArgs(TRUE)[5]
 
@@ -78,7 +78,7 @@ dat.inter %<>%
 # select samples with kinship cofficents > 0.1875
 # https://link.springer.com/protocol/10.1007/978-1-60327-367-1_19
 
-if (Family == F){
+if (Family == F | Family == "F"){
   ibdcoeff <- dat.inter %>%
     filter(PI_HAT > 0.1) %>%
     select(FID1, IID1, FID2, IID2, Z0, Z1, Z2, PI_HAT, relationship)
@@ -91,7 +91,8 @@ if (Family == F){
 # Iterativly remove subjects with the highest number of pairwise kinship cofficents > threshold
 # see http://www.stat-gen.org/tut/tut_preproc.html
 
-if (Family == F) {
+if (Family == F | Family == "F") {
+  message("Working with unrelated samples.")
   ibdcoeff %<>%
     mutate(FI1 = paste0(FID1, "🤣", IID1), FI2 = paste0(FID2, "🤣", IID2))
   related.samples <- NULL
@@ -108,11 +109,13 @@ if (Family == F) {
     related.samples <- c(as.character(rm.sample), related.samples)
   }
   fam_table <- as.data.frame(do.call(rbind, excluded))
-  exclude.samples <- tibble(FI = related.samples) %>%
+  exclude.samples <- tibble(FI = as.character(related.samples)) %>%
     separate(FI, c("FID", "IID"), sep = "🤣")
 } else {
+  message("Working with related samples.")
   fam_table <- as.data.frame(ibdcoeff)
   related.samples <- c(ibdcoeff$IID1, ibdcoeff$IID2)
+  exclude.samples <- tibble(FID = character(), IID = character())
 }
 
 ##  write out samples to be excluded

@@ -172,8 +172,8 @@ rule relatedness_sample_fail:
         genome = "{DataOut}/{sample}_IBDQC.genome",
         fam = sexcheck_in_plink_stem + ".fam"
     params:
-        Family = FAMILY
-        threshhold = 0.1875
+        Family = FAMILY,
+        threshold = 0.1875
     output:
         out = "{DataOut}/{sample}_exclude.relatedness",
         rdat = "{DataOut}/{sample}_IBDQC.Rdata"
@@ -467,7 +467,7 @@ rule GWAS_QC_Report:
         frqx = decorate2("SnpQc.frqx"),
         imiss = decorate2("callRate.imiss"),
         HetFile = decorate2("HetQC.het"),
-        IBD_stats = decorate2("IBDQC.Rdata")
+        IBD_stats = decorate2("IBDQC.Rdata"),
         eigenval = decorate2("1kg_merged.eigenval"),
         eigenvec = decorate2("1kg_merged.eigenvec"),
         TargetPops = decorate2("pruned.fam"),
