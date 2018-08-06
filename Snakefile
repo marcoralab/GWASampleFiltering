@@ -30,17 +30,17 @@ loads = {'flippyr': '', 'plink': 'module load plink/1.90',
 
 def decorate(text):
     return expand(DATAOUT + "/{sample}_" + text,
-                  sample=SAMPLE, DataOut=DATAOUT)
+                  sample=SAMPLE)
 
 
 rule all:
     input:
         expand(DATAOUT + "/stats/{sample}_GWAS_QC.html",
-               sample=SAMPLE, DataOut=DATAOUT),
+               sample=SAMPLE),
         # expand(DATAOUT + "/{sample}_exclude.samples",
-        #        sample=SAMPLE, DataOut=DATAOUT),
+        #        sample=SAMPLE),
         expand(DATAOUT + "/{sample}_Excluded.{ext}",
-               sample=SAMPLE, DataOut=DATAOUT, ext=BPLINK)
+               sample=SAMPLE, ext=BPLINK)
 
 
 # ---- Exlude SNPs with a high missing rate and low MAF----
@@ -437,7 +437,7 @@ rule Exclude_failed:
         indat_exclude = rules.SampleExclusion.output.out_distinct
     output:
         temp(expand(DATAOUT + "/{{sample}}_Excluded.{ext}", ext=BPLINK)),
-        excl = temp('{DataOut}/{sample}_exclude.plink')
+        excl = temp(DATAOUT + '/{sample}_exclude.plink')
     params:
         indat_plink = sexcheck_in_plink_stem,
         out = DATAOUT + "/{sample}_Excluded"
@@ -450,7 +450,7 @@ cat {input.indat_exclude} | sed '1d' | cut -d' ' -f1,2 > {output.excl}
 
 
 def decorate2(text):
-    return expand(DATAOUT + "/{{sample}}_" + text, DataOut=DATAOUT)
+    return DATAOUT + "/{sample}_" + text
 
 
 rule GWAS_QC_Report:
@@ -462,7 +462,7 @@ rule GWAS_QC_Report:
         frqx = decorate2("SnpQc.frqx"),
         imiss = decorate2("callRate.imiss"),
         HetFile = decorate2("HetQC.het"),
-        GenomeFile = decorate2("IBDQC.genome"),
+        #GenomeFile = decorate2("IBDQC.genome"),
         eigenval = decorate2("1kg_merged.eigenval"),
         eigenvec = decorate2("1kg_merged.eigenvec"),
         TargetPops = decorate2("pruned.fam"),
@@ -484,7 +484,7 @@ params = list(rwd = "{params.rwd}", Sample = "{wildcards.sample}", \
 Path_SexFile = "{input.SexFile}", Path_hwe = "{input.hwe}", \
 Path_frq = "{input.frq}", Path_frqx = "{input.frqx}", \
 Path_imiss = "{input.imiss}", Path_HetFile = "{input.HetFile}", \
-Path_GenomeFile = "{input.GenomeFile}", Family = {params.Family}, \
+Family = {params.Family}, \
 Path_eigenval = "{input.eigenval}", \
 Path_eigenvec = "{input.eigenvec}", \
 Path_TargetPops = "{input.TargetPops}", \
@@ -492,3 +492,5 @@ PATH_BasePops = "{input.BasePops}", \
 Path_PopStrat_eigenval = "{input.PopStrat_eigenval}", \
 Path_PopStrat_eigenvec = "{input.PopStrat_eigenvec}"))' --slave
 """
+
+#Path_GenomeFile = "{input.GenomeFile}", 
