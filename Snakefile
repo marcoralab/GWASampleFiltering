@@ -172,13 +172,15 @@ rule relatedness_sample_fail:
         genome = DATAOUT + "/{sample}_IBDQC.genome",
         fam = sexcheck_in_plink_stem + ".fam"
     params:
-        Family = FAMILY
+        Family = FAMILY,
+        threshold = 0.1875
     output:
-        out = DATAOUT + "/{sample}_exclude.relatedness"
+        out = DATAOUT + "/{sample}_exclude.relatedness",
+        rdat = DATAOUT + "/{sample}_IBDQC.Rdata"
     shell:
         """
-{loads[R]}; {com[R]}  scripts/relatedness_QC.R {input.genome} {input.fam} \
-{params.Family} {output.out}"""
+{loads[R]}; {com[R]}  scripts/relatedness_QC.R {input.genome} {params.threshold} \
+{params.Family} {output.out} {output.rdat}"""
 
 # ---- Exclude Samples with outlying heterozigosity ----
 rule heterozygosity_QC:
@@ -353,11 +355,14 @@ rule Plink_RefenceSample:
 
 rule fix_fam:
     input:
-        fam = DATAOUT + "/{sample}_1kg_merged.fam"
+        oldfam = DATAOUT + "/{sample}_pruned.fam",
+        newfam = DATAOUT + "/{sample}_1kg_merged.fam"
     output:
         out = DATAOUT + "/{sample}_1kg_merged_fixed.fam"
     shell:
-        'scripts/fix_fam.py {input.fam} {output.out}'
+        """
+{loads[R]}
+{com[R]} scripts/fix_fam.R {input.oldfam} {input.newfam} {output.out}"""
 
 # PCA analysis to identify population outliers
 rule PcaPopulationOutliers:
@@ -462,7 +467,7 @@ rule GWAS_QC_Report:
         frqx = decorate2("SnpQc.frqx"),
         imiss = decorate2("callRate.imiss"),
         HetFile = decorate2("HetQC.het"),
-        #GenomeFile = decorate2("IBDQC.genome"),
+        IBD_stats = decorate2("IBDQC.Rdata"),
         eigenval = decorate2("1kg_merged.eigenval"),
         eigenvec = decorate2("1kg_merged.eigenvec"),
         TargetPops = decorate2("pruned.fam"),
@@ -474,23 +479,24 @@ rule GWAS_QC_Report:
     params:
         rwd = RWD,
         Family = FAMILY,
-        output_dir = DATAOUT + "/stats"
+        pi_threshold = 0.1875,
+        output_dir = DATAOUT + "/stats",
+        idir = DATAOUT + "/stats/md/{sample}"
     shell:
         """
 {loads[R]}
 {com[R2]} -e 'rmarkdown::render("{input.script}", \
 output_file = "{output}", output_dir = "{params.output_dir}", \
+intermediates_dir = "{params.idir}", \
 params = list(rwd = "{params.rwd}", Sample = "{wildcards.sample}", \
 Path_SexFile = "{input.SexFile}", Path_hwe = "{input.hwe}", \
 Path_frq = "{input.frq}", Path_frqx = "{input.frqx}", \
 Path_imiss = "{input.imiss}", Path_HetFile = "{input.HetFile}", \
-Family = {params.Family}, \
-Path_eigenval = "{input.eigenval}", \
+pi_threshold = {params.pi_threshold}, Family = {params.Family}, \
+Path_IBD_stats = "{input.IBD_stats}", Path_eigenval = "{input.eigenval}", \
 Path_eigenvec = "{input.eigenvec}", \
 Path_TargetPops = "{input.TargetPops}", \
 PATH_BasePops = "{input.BasePops}", \
 Path_PopStrat_eigenval = "{input.PopStrat_eigenval}", \
 Path_PopStrat_eigenvec = "{input.PopStrat_eigenvec}"))' --slave
 """
-
-#Path_GenomeFile = "{input.GenomeFile}", 

@@ -5,6 +5,7 @@ editor_options:
   chunk_output_type: console
 output:
   html_document:
+    keep_md: yes
     self_contained: yes
     df_print: paged
     toc: true

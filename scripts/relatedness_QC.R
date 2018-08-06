@@ -80,13 +80,15 @@ dat.inter %<>%
 
 if (Family == F | Family == "F"){
   ibdcoeff <- dat.inter %>%
-    filter(PI_HAT > 0.1) %>%
+    filter(PI_HAT > threshold) %>%
     select(FID1, IID1, FID2, IID2, Z0, Z1, Z2, PI_HAT, relationship)
 } else {
   ibdcoeff <- dat.inter %>%
         filter(relationship == "identicial-twins") %>%
         select(FID1, IID1, FID2, IID2, Z0, Z1, Z2, PI_HAT, relationship)
 }
+
+ibd_tab <- ibdcoeff
 
 # Iterativly remove subjects with the highest number of pairwise kinship cofficents > threshold
 # see http://www.stat-gen.org/tut/tut_preproc.html
@@ -120,4 +122,4 @@ if (Family == F | Family == "F") {
 
 ##  write out samples to be excluded
 write_tsv(exclude.samples, outfile, col_names = T)
-save(dat.inter, rel_tab, fam_table, ibdcoeff, file = rdat)
+save(dat.inter, rel_tab, fam_table, ibd_tab, file = rdat)

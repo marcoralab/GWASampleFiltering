@@ -39,7 +39,7 @@ library(knitr)
 
 ```{r readData, echo=F, warning=F, message=F}
 ## ---- Read in Data ----##
-
+message(params$Path_IBD_stats)
 Pi_threshold <- params$pi_threshold
 dat.inter.raw <- load(params$Path_IBD_stats)
 ```
@@ -61,15 +61,15 @@ Relationship between pairs of indiviudules is based on the following value IBD v
 as.data.frame(rel_tab)
 ```
 
-The following plot (Fig. 2) shows the proportion loci sharing one allele IBD (Z1) by the proportion of loci where individules share zero alleles (Z0), where the kinship coefficent is greater than 0.05. In family based studies, pairs are coloured by IBD relationship. Table 2 displays the individules where the kinship coefficent was greather than `Pi_threshold` in population based studies OR how were duplicates in family based studies.
+The following plot (Fig. 2) shows the proportion loci sharing one allele IBD (Z1) by the proportion of loci where individules share zero alleles (Z0), where the kinship coefficent is greater than 0.05. In family based studies, pairs are coloured by IBD relationship. Table 2 displays the individules where the kinship coefficent was greather than `r Pi_threshold` in population based studies OR how were duplicates in family based studies.
 ```{r relatdness plot, echo=FALSE, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Fig. 2: Pairs of individules plotted by their degree of relatedness'}
 
 if(params$Family == F){
-  ggplot(dat.inter, aes(x = Z0, y = Z1, colour = PI_HAT > 0.1)) +
+  ggplot(dat.inter, aes(x = Z0, y = Z1, colour = PI_HAT > Pi_threshold)) +
   #geom_label_repel(data = filter(dat.inter, PI_HAT > 0.1), aes(x = Z0, y = Z1, label = paste(IID1, '-', IID2))) +
   geom_point() + lims(x = 0:1, y = 0:1) +
-  scale_colour_manual(name = sprint("PI HAT > %d", Pi_threshold),
-  values = c("#E41A1C", "#377EB8")) +
+  scale_colour_manual(name = sprintf("PI HAT > %f", Pi_threshold),
+  values = c("#377EB8", "#E41A1C")) +
   labs(x = 'IBD Z0', y = 'IBD Z1') +
   coord_fixed() + theme_bw() + theme(legend.position="bottom")
 } else {
@@ -80,12 +80,12 @@ if(params$Family == F){
 }
 ```
 
-***Table 2:*** Samples with a kinship coefficent > 0.1
+***Table 2:*** Samples with a kinship coefficent > `r Pi_threshold`
 ```{r table ibd, echo=FALSE}
-as.data.frame(ibdcoeff)
+as.data.frame(ibd_tab)
 ```
 
-To construct a sample of unrelated individules, participants with the highest number of pairwise kinship coefficents > `Pi_threshold` can be iterativly removed.
+To construct a sample of unrelated individules, participants with the highest number of pairwise kinship coefficents > `r Pi_threshold` can be iterativly removed.
 
 The following samples were excluded due to relatdness:
 ```{r pressure, echo=FALSE, warning=FALSE}
