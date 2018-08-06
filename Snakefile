@@ -173,12 +173,14 @@ rule relatedness_sample_fail:
         fam = sexcheck_in_plink_stem + ".fam"
     params:
         Family = FAMILY
+        threshhold = 0.1875
     output:
-        out = "{DataOut}/{sample}_exclude.relatedness"
+        out = "{DataOut}/{sample}_exclude.relatedness",
+        rdat = "{DataOut}/{sample}_IBDQC.Rdata"
     shell:
         """
-{loads[R]}; {com[R]}  scripts/relatedness_QC.R {input.genome} {input.fam} \
-{params.Family} {output.out}"""
+{loads[R]}; {com[R]}  scripts/relatedness_QC.R {input.genome} {params.threshold} \
+{params.Family} {output.out} {output.rdat}"""
 
 # ---- Exclude Samples with outlying heterozigosity ----
 rule heterozygosity_QC:
@@ -465,7 +467,7 @@ rule GWAS_QC_Report:
         frqx = decorate2("SnpQc.frqx"),
         imiss = decorate2("callRate.imiss"),
         HetFile = decorate2("HetQC.het"),
-        GenomeFile = decorate2("IBDQC.genome"),
+        IBD_stats = decorate2("IBDQC.Rdata")
         eigenval = decorate2("1kg_merged.eigenval"),
         eigenvec = decorate2("1kg_merged.eigenvec"),
         TargetPops = decorate2("pruned.fam"),
@@ -477,7 +479,8 @@ rule GWAS_QC_Report:
     params:
         rwd = RWD,
         Family = FAMILY,
-        output_dir = "{DataOut}/stats"
+        output_dir = "{DataOut}/stats",
+        pi_threshold = 0.1875
     shell:
         """
 {loads[R]}
@@ -487,8 +490,8 @@ params = list(rwd = "{params.rwd}", Sample = "{wildcards.sample}", \
 Path_SexFile = "{input.SexFile}", Path_hwe = "{input.hwe}", \
 Path_frq = "{input.frq}", Path_frqx = "{input.frqx}", \
 Path_imiss = "{input.imiss}", Path_HetFile = "{input.HetFile}", \
-Path_GenomeFile = "{input.GenomeFile}", Family = {params.Family}, \
-Path_eigenval = "{input.eigenval}", \
+pi_threshold = {params.pi_threshold}, Family = {params.Family}, \
+Path_IBD_stats = "{input.IBD_stats}", Path_eigenval = "{input.eigenval}", \
 Path_eigenvec = "{input.eigenvec}", \
 Path_TargetPops = "{input.TargetPops}", \
 PATH_BasePops = "{input.BasePops}", \

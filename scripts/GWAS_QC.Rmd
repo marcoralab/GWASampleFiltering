@@ -23,8 +23,9 @@ params:
     Path_imiss: Path_imiss
     Path_SexFile: Path_SexFile
     Path_HetFile: Path_HetFile
-    Path_GenomeFile: Path_GenomeFile
     Family: Family
+    Path_IBD_stats:
+    pi_threshold: 0.1875
     Path_eigenval: Path_eigenval
     Path_eigenvec: Path_eigenvec
     Path_TargetPops: Path_TargetPops
