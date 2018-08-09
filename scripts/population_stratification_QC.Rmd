@@ -11,7 +11,7 @@ params:
 editor_options:
   chunk_output_type: console
 ---
-##  Population Substructure
+## Population Substructure
 
 After excluding population outliers from the dataset, population substructure will remain due to the presence of genetic diverstiy within apparently homogenous populations. Within a single ethnic population, even subtle degrees of population stratification can bia results due to differences in allele frequncies between subpopulations. Pricipal componets based on the observed genotypes in the dataset of interest can be used to capture information on substructure and be included as covarites in downstream analysis.
 <br>
@@ -41,32 +41,33 @@ library(gridExtra)
 zscore = function(x){(x - mean(x)) / sd(x)}
 ```
 
-```{r read pca data in, echo=F, message=F, warning=F}
+```{r read wrangle pca data, echo=F, message=F, warning=F}
 ##---- Read in Data ----##
 # PCA file from plink
-pca.raw <- read_delim(params$Path_PopStrat_eigenvec, delim = " ", col_names = F)
 
-# egien values
-eigenval.raw <- read_table(params$Path_PopStrat_eigenval, col_names = F)
+# count colums and PCs
+n_cols <- count_fields(params$Path_PopStrat_eigenvec,
+                       tokenizer_delim(delim = " "), n_max = 1)
+n_eig <- n_cols - 2
+
+# Generate colnames
+pc_names <- paste0("PC", 1:n_eig)
+names_col <- c("FID", "IID", pc_names)
+
+# Read in eigenvectors and z-score transform
+pca <- read_delim(params$Path_PopStrat_eigenvec,
+                  delim = " ", col_names = names_col,
+                  col_types = cols(.default = "d", FID = "c", IID = "c")) %>%
+         mutate_at(pc_names, zscore)
+
+# read in egienvalues
+eigenval.raw <- parse_number(read_lines(params$Path_PopStrat_eigenval))
+eigenval <- tibble(eigenval = eigenval.raw,
+                   PC = factor(pc_names, levels = pc_names)) %>%
+              mutate(PVE = round(eigenval / sum(eigenval), 3)) %>%
+              select(PC, eigenval, PVE)
 
 ```
-
-```{r wrangle data, include=F}
-##---- Data wrangling ----##
-##  rename column names in PCA file
-colnames(pca.raw) <- c('FID', 'IID', paste0('PC', seq(1, ncol(pca.raw)-2, 1)))
-##  standardize PC to a z-score
-pca <- mutate_at(pca.raw, c('PC1', 'PC2', 'PC3', 'PC4', 'PC5', 'PC6', 'PC7', 'PC8', 'PC9', 'PC10'), zscore)
-
-##  Proportion of variance explained by each PC in PCA
-eigenval <- eigenval.raw %>%
-  mutate(PC = paste0('PC', 1:10)) %>%
-  rename(eigenval = X1) %>%
-  mutate(PC = factor(PC, levels = paste0('PC', 1:10))) %>%
-  mutate(PVE = round(eigenval / sum(eigenval), 3))
-
-```
-
 
 ### Scree Plot
 The below scree plot shows the amount of variation retained by each principal component (Fig. 1) and the cumualtive proportion of variance explained by each principal compoent (Fig. 2).

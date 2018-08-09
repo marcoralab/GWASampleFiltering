@@ -1,11 +1,17 @@
 '''Snakefile for GWAS Variant and Sample QC Version 0.2'''
 
 from scripts.parse_config import parser
+import socket
+import getpass
+
+isMinerva = "hpc.mssm.edu" in socket.getfqdn()
 
 configfile: "config.yaml"
 
 shell.executable("/bin/bash")
-shell.prefix("PATH=" + config["anaconda"] + ":$PATH; ")
+
+if isMinerva:
+    shell.prefix("PATH=" + config["anaconda"] + ":$PATH; ")
 
 BPLINK = ["bed", "bim", "fam"]
 RWD = os.getcwd()
@@ -15,17 +21,22 @@ start, FAMILY, SAMPLE, DATAOUT = parser(config)
 QC_snp = True
 QC_callRate = True
 
-# com = {'flippyr': '/Users/sheaandrews/Programs/flippyr/flippyr.py',
-#        'plink': 'plink --keep-allele-order', 'plink2': 'plink',
-#        'bcftools': 'bcftools', 'R': 'Rscript', 'R2': 'R'}
-#loads = {'flippyr': '', 'plink': '', 'bcftools': '',  'R': ''}
+if isMinerva:
+    com = {'flippyr': 'flippyr', 'plink': 'plink --keep-allele-order',
+           'plink2': 'plink', 'bcftools': 'bcftools', 'R': 'Rscript', 'R2': 'R'}
+    loads = {'flippyr': '', 'plink': 'module load plink/1.90',
+             'bcftools': 'module load bcftools/1.7',
+             'R': ('module load R/3.4.3 pandoc/2.1.3 udunits/2.2.26; ',
+                   'RSTUDIO_PANDOC=$(which pandoc)')}
+else:
+    com = {'flippyr': 'flippyr',
+           'plink': 'plink --keep-allele-order', 'plink2': 'plink',
+           'bcftools': 'bcftools', 'R': 'Rscript', 'R2': 'R'}
+    loads = {'flippyr': 'echo running flippyr', 'plink': 'echo running plink',
+             'bcftools': 'echo running bcftools',  'R': 'echo running R'}
 
-com = {'flippyr': 'flippyr', 'plink': 'plink --keep-allele-order',
-       'plink2': 'plink', 'bcftools': 'bcftools', 'R': 'Rscript', 'R2': 'R'}
-loads = {'flippyr': '', 'plink': 'module load plink/1.90',
-         'bcftools': 'module load bcftools/1.7',
-         'R': ('module load R/3.4.3 pandoc/2.1.3 udunits/2.2.26; ',
-               'RSTUDIO_PANDOC=$(which pandoc)')}
+if getpass.getuser() == "sheaandrews":
+    com["flippyr"] = '/Users/sheaandrews/Programs/flippyr/flippyr.py'
 
 
 def decorate(text):
@@ -357,18 +368,17 @@ rule fix_fam:
     input:
         oldfam = DATAOUT + "/{sample}_pruned.fam",
         newfam = DATAOUT + "/{sample}_1kg_merged.fam"
-    output:
-        out = DATAOUT + "/{sample}_1kg_merged_fixed.fam"
+    output: DATAOUT + "/{sample}_1kg_merged_fixed.fam"
     shell:
         """
 {loads[R]}
-{com[R]} scripts/fix_fam.R {input.oldfam} {input.newfam} {output.out}"""
+{com[R]} scripts/fix_fam.R {input.oldfam} {input.newfam} {output}"""
 
 # PCA analysis to identify population outliers
 rule PcaPopulationOutliers:
     input:
         plink = expand(DATAOUT + "/{{sample}}_1kg_merged.{ext}", ext=BPLINK),
-        fam = DATAOUT + "/{sample}_1kg_merged_fixed.fam",
+        fam = rules.fix_fam.output,
         pop = "data/1000genomes_pops.txt",
         clust = "data/pops.txt"
     output:
@@ -387,17 +397,21 @@ rule PcaPopulationOutliers:
 # Rscript to identify EUR population outliers
 rule ExcludePopulationOutliers:
     input:
-        indat_eigenval = DATAOUT + "/{sample}_1kg_merged.eigenval",
-        indat_eigenvec = DATAOUT + "/{sample}_1kg_merged.eigenvec",
-        indat_fam = DATAOUT + "/{sample}_pruned.fam",
-        indat_1kgped = "data/20130606_g1k.ped"
+        eigenval = DATAOUT + "/{sample}_1kg_merged.eigenval",
+        eigenvec = DATAOUT + "/{sample}_1kg_merged.eigenvec",
+        fam = DATAOUT + "/{sample}_pruned.fam",
+        tgped = "data/20130606_g1k.ped"
     output:
-        out = DATAOUT + "/{sample}_exclude.pca"
+        excl = DATAOUT + "/{sample}_exclude.pca",
+        rmd = temp(DATAOUT + "/{sample}_pca.Rdata")
+    params:
+        samp = "{sample}"
     shell:
         """
 {loads[R]}
-{com[R]} scripts/PCA_QC.R {input.indat_eigenvec} {input.indat_1kgped} \
-{input.indat_fam} {input.indat_eigenval} {output.out}
+scripts/PCA_QC.R -s {params.samp} \
+--vec {input.eigenvec} --val {input.eigenval} \
+-b {input.tgped} -t {input.fam} -o {output.excl} -R {output.rmd}
 """
 
 # Run PCA to for population stratification
@@ -468,10 +482,7 @@ rule GWAS_QC_Report:
         imiss = decorate2("callRate.imiss"),
         HetFile = decorate2("HetQC.het"),
         IBD_stats = decorate2("IBDQC.Rdata"),
-        eigenval = decorate2("1kg_merged.eigenval"),
-        eigenvec = decorate2("1kg_merged.eigenvec"),
-        TargetPops = decorate2("pruned.fam"),
-        BasePops = "data/20130606_g1k.ped",
+        PCA_rdat = decorate2("pca.Rdata"),
         PopStrat_eigenval = decorate2("filtered_PCA.eigenval"),
         PopStrat_eigenvec = decorate2("filtered_PCA.eigenvec")
     output:
@@ -485,18 +496,16 @@ rule GWAS_QC_Report:
     shell:
         """
 {loads[R]}
-{com[R2]} -e 'rmarkdown::render("{input.script}", \
-output_file = "{output}", output_dir = "{params.output_dir}", \
-intermediates_dir = "{params.idir}", \
+{com[R2]} -e 'nm <- sample(c("Shea J. Andrews", "Brian Fulton-Howard"), \
+replace=F); nm <- paste(nm[1], "and", nm[2]); \
+rmarkdown::render("{input.script}", output_dir = "{params.output_dir}", \
+output_file = "{output}", intermediates_dir = "{params.idir}", \
 params = list(rwd = "{params.rwd}", Sample = "{wildcards.sample}", \
-Path_SexFile = "{input.SexFile}", Path_hwe = "{input.hwe}", \
+auth = nm, Path_SexFile = "{input.SexFile}", Path_hwe = "{input.hwe}", \
 Path_frq = "{input.frq}", Path_frqx = "{input.frqx}", \
 Path_imiss = "{input.imiss}", Path_HetFile = "{input.HetFile}", \
 pi_threshold = {params.pi_threshold}, Family = {params.Family}, \
-Path_IBD_stats = "{input.IBD_stats}", Path_eigenval = "{input.eigenval}", \
-Path_eigenvec = "{input.eigenvec}", \
-Path_TargetPops = "{input.TargetPops}", \
-PATH_BasePops = "{input.BasePops}", \
+Path_IBD_stats = "{input.IBD_stats}", Path_PCA_rdat = "{input.PCA_rdat}", \
 Path_PopStrat_eigenval = "{input.PopStrat_eigenval}", \
 Path_PopStrat_eigenvec = "{input.PopStrat_eigenvec}"))' --slave
 """

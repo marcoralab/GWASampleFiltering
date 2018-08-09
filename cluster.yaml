@@ -6,5 +6,5 @@ __default__:
   mem: 10000
   time: '0:25'
 GWAS_QC_Report:
-  partition: mothra
+  partition: manda
   mem: 20000

@@ -1,5 +1,4 @@
 ---
-author: "Shea Andrews"
 date: "`r Sys.Date()`"
 editor_options:
   chunk_output_type: console
@@ -27,13 +26,12 @@ params:
     Family: Family
     Path_IBD_stats:
     pi_threshold: 0.1875
-    Path_eigenval: Path_eigenval
-    Path_eigenvec: Path_eigenvec
-    Path_TargetPops: Path_TargetPops
-    PATH_BasePops:  PATH_BasePops
+    Path_PCA_rdat:
     Path_PopStrat_eigenvec: Path_PopStrat_eigenvec
     Path_PopStrat_eigenval: Path_PopStrat_eigenval
+    auth: "Shea J. Andrews and Brian Fulton-Howard"
 title: "GWAS QC: `r params$Sample`"
+author: "`r params$auth`"
 ---
 
 ```{r setup, include=FALSE, echo=F, message=F, warning=F}
