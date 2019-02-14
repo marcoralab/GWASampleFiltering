@@ -8,3 +8,23 @@ __default__:
 GWAS_QC_Report:
   partition: manda
   mem: 20000
+Reference_prep:
+  cores: 8
+  mem: 4000
+  time: '4:00'
+Reference_cat:
+  cores: 2
+  mem: 4000
+  time: '4:00'
+Reference_prune:
+  cores: 4
+  mem: 4000
+  time: '4:00'
+Merge_RefenceSample:
+  cores: 4
+  mem: 4000
+  time: '4:00'
+relatedness_QC:
+  cores: 8
+  mem: 5200
+  time: '24:00'

@@ -11,12 +11,11 @@ editor_options:
   chunk_output_type: console
 ---
 
-## Heterozygosity check
+# Heterozygosity check
 
-Samples with defficint heterozygosity can indicate inbreeding or other substructures in that person individule, while samples with excessive heterozyosity may indicate poor sample quality. Samples that are either ± 3 sd from the group mean are excluded.
+Insufficient heterozygosity can indicate inbreeding or other family substructures, while excessive heterozygosity may indicate poor sample quality.
 
-
-Identifing individules with outlying heterozygocity rates can be done in PLINK by typing the following command at the shell prompt. This produce a file containing the Method-of-moments F coefficient estimates, which can be used to calculate the observed heterozygosity rate in each individule. Analysis should be performed using an LD pruned snplist.
+Individuals with outlying heterozygosity rates can be identified in PLINK 1.9 by typing the following command at the shell prompt:
 
 ```{bash, eval=F}
 plink_1.9 --bfile raw-GWA-data \
@@ -24,6 +23,9 @@ plink_1.9 --bfile raw-GWA-data \
   --het --out output.het
 ```
 
+This produces a file containing Method-of-moments F coefficient estimates, which can be used to calculate the observed heterozygosity rate in each individual. Analysis is performed using an LD pruned snplist.
+
+We calculate a heterozygocity similarly using observed and expected counts from the PLINK output [(Observed - Expected)/N) and exclude samples that are ± 3 sd from the cohort mean.
 <br>
 
 ```{r setup heterozygosity, include=FALSE}
@@ -34,7 +36,18 @@ knitr::opts_knit$set(root.dir = params$rwd)
 library(tidyverse)
 library(ggplot2)
 library(knitr)
-
+library(DT)
+tabcap <- function (name, caption) {
+    sprintf("<table width=\"100%%\"><caption>(#tab:%s) %s </caption></table>", name, caption)
+}
+disptab <- function(x) {
+    if (knitr::opts_knit$get("rmarkdown.pandoc.to") == "html") {
+          dtopts <- list(dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel', 'pdf', 'print'))
+    return(datatable(x, extensions = 'Buttons', options = dtopts))
+      } else {
+            return(kable(x))
+      }
+}
 ```
 
 ```{r read_data heterozygosity, echo=F, cache=T}
@@ -43,7 +56,7 @@ library(knitr)
 het.raw <- as.tibble(read.table(params$Path_HetFile, header = TRUE, check.names = FALSE, as.is = TRUE))
 ```
 
-```{r data_wrangling heterozygositcy, echo=F}
+```{r data_wrangling heterozygosity, echo=F}
 ## caluclate heterozygosity
 het <- het.raw %>%
   rename(O = `O(HOM)`, E = `E(HOM)`, N = `N(NM)`) %>%
@@ -60,8 +73,8 @@ het <- het %>%
 exclude.samples <- het %>% filter(exclude == TRUE)
 ```
 
-Figure 1 displays the distrubution of heterozygocity in `r params$Sample`. Samples with excessive (Het > `r upper.het`) or deficient (Het < `r lower.het`) Heterozygocity are colour red. Table 1 displays the sample that are to be excluded.
-```{r plot heterozygocity, echo=FALSE, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Fig. 1: Distribution of heterozygocity'}
+Figure \@ref(fig:plothet) displays the distrubution of heterozygosity in `r params$Sample`. Samples with excessive (Het > `r upper.het`) or deficient (Het < `r lower.het`) heterozygosity are colored red. Table \@ref(tab:het) displays samples that are to be excluded.
+```{r plothet, echo=FALSE, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Distribution of heterozygosity'}
 ggplot(het, aes(x = Het, fill = exclude)) + geom_histogram(binwidth = 0.001) +
   geom_vline(xintercept = upper.het, colour = 'red', linetype = 2) +
   geom_vline(xintercept = lower.het, colour = 'red', linetype = 2) +
@@ -71,11 +84,10 @@ ggplot(het, aes(x = Het, fill = exclude)) + geom_histogram(binwidth = 0.001) +
 ```
 \
 
-***Table 1:*** Samples with outlying heterozygocity rates
+`r tabcap("het", "Samples with outlying heterozygosity rates")`
 ```{r table heterozygosity, echo=FALSE}
-##  Print samples with sex inconsistencies
-as.data.frame(exclude.samples)
+##  Print samples with outlying heterozygosity
+exclude.samples %>% disptab
 ```
 
 
-<br>

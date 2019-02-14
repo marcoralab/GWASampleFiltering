@@ -6,23 +6,26 @@ output:
   html_document:
     df_print: paged
 params:
-  Path_SexFile: 
+  Path_SexFile:
   rwd:
-editor_options: 
+editor_options:
   chunk_output_type: console
 ---
 
-## Sex Discordance 
+# Sex Discordance
 
-Samples with discrpencies between self-reported sex and predicted sex based on genetic data are likely indicative of errors in sample handling. Predicted sex can be determined by calculating the X chromosome heterozygosity rates (F, --check-sex option in PLINK), with a value of ~0.99 in reported females indicating the sample is genetilcy male; a valule of ~0.03 in reported males indicating that sample is geneticly female. Furthermore, checking X chromosome heterozygosity may revel sex chromosome anomalies (~0.28 in reported females; ~0.35 in males).  
-<br> 
+Samples with discordance between self-reported and genetically predicted sex likely have errors in sample handling, such as sample swaps. Predicted sex can be determined by calculating X chromosome heterozygosity using an F test, because biological men have one X chromosome and women have two. An F value of ~0.99 indicates males, and an F value of ~0.03 indicates females. Furthermore, checking X chromosome heterozygosity may reveal sex chromosome anomalies (~0.28 in reported females; ~0.35 in males).
 
-Identification of individules with discordent sex information can be done in PLINK by typing the following at the shell prompt, which will produce a list of individules with discordent sex data.
+Since sex discordance may be due to sample swaps or to incorrect phenotyping, sex discordant samples should generally be removed unless a swap can be reliably resolved.
+
+Identification of individuals with discordent sex can be done in PLINK 1.9 by typing the following at the shell prompt, which will produce a list of individuals with discordent sex data.
+
+
 ```{bash, eval=F}
 plink_1.9 --bfile raw-GWA-data  \
   --check-sex --out --out output.sexcheck
 ```
-<br> 
+<br>
 
 ```{r setup sexcheck, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -32,6 +35,18 @@ knitr::opts_knit$set(root.dir = params$rwd)
 library(tidyverse)
 library(ggplot2)
 library(knitr)
+library(DT)
+tabcap <- function (name, caption) {
+  sprintf("<table width=\"100%%\"><caption>(#tab:%s) %s </caption></table>", name, caption)
+}
+disptab <- function(x) {
+  if (knitr::opts_knit$get("rmarkdown.pandoc.to") == "html") {
+    dtopts <- list(dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel', 'pdf', 'print'))
+    return(datatable(x, extensions = 'Buttons', options = dtopts))
+  } else {
+    return(kable(x))
+  }
+}
 ```
 
 ```{r read in sex check data, echo=F, message=F, warning=F}
@@ -44,24 +59,25 @@ sexcheck <- sexcheck.raw %>%
   mutate(PEDSEX = recode(PEDSEX, '2' = 'Female', '1' = 'Male'))
 
 ##  Exclude samples with no sex inconsistencies
-exclude.samples <- sexcheck %>% 
-  filter(STATUS == 'PROBLEM') %>% 
+exclude.samples <- sexcheck %>%
+  filter(STATUS == 'PROBLEM') %>%
   mutate(PEDSEX = recode(PEDSEX, '2' = 'Female', '1' = 'Male'))
 ```
 
-The following plot (Fig. 1) displays the X Chromosome heterozygosity for self reported sex, with samples with problems highlighted in red. Table 1 displays the individule records that should be excluded from further downstream analysis.
-```{r plot, echo=FALSE, fig.width=5.5, fig.height=4.7, fig.align='center', fig.cap='X chromosome heterozygosity in self repoted males & femalse'}
-ggplot(data = sexcheck, aes(x = as.factor(PEDSEX), y = F, colour = STATUS, shape = STATUS)) + 
-  geom_jitter() + 
-  scale_color_manual(values = c( "#377EB8", "#E41A1C")) + 
+The following plot (Fig. \@ref(fig:sexplot)) displays the X Chromosome heterozygosity for self reported sex, with samples with problems highlighted in red. Table \@ref(tab:sextab) displays the individule records that should be excluded from further downstream analysis.
+```{r sexplot, echo=FALSE, fig.width=5.5, fig.height=4.7, fig.align='center', fig.cap='X chromosome heterozygosity in self reported males & females'}
+ggplot(data = sexcheck, aes(x = as.factor(PEDSEX), y = F, colour = STATUS, shape = STATUS)) +
+  geom_jitter() +
+  scale_color_manual(values = c( "#377EB8", "#E41A1C")) +
   theme_bw() + labs(x = 'Self reported sex', y = 'X CHR Heterozygocity (F)') + theme(legend.position="bottom")
 ```
 <br>
 
-***Table 1:*** Samples with sex discordance
-```{r table, echo=FALSE}
+`r tabcap("sextab", "Samples with sex discordance")`
+
+```{r sextab, echo=FALSE}
 ##  Print samples with sex inconsistencies
-as.data.frame(exclude.samples) 
+exclude.samples %>% disptab
 
 ```
 

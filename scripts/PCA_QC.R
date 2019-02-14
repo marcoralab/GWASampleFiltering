@@ -26,6 +26,8 @@ parser$add_argument("-t", "--target",
   help = "Fam file for sample. Can include 1kgp.", required = T)
 parser$add_argument("-s", "--sample", help = "Sample name", required = T)
 parser$add_argument("-o", "--output", help = "Sample exclusion file")
+parser$add_argument("-p", "--population", default = "EUR",
+  help = "Superpop [Default: EUR; Options: EUR, AMR, AFR, EAS, SAS]")
 parser$add_argument("-R", "--rmd", help = "Rdata file for RMD report")
 
 params <- parser$parse_args()
@@ -133,25 +135,25 @@ pca_col <- pca %>%
 # ---- Population Outliers ---- #
 # Calculate the mean and ± 6 sd for each PC of 1000 Genomes EUR population
 
-eur_pca <- pca %>%
+chosen_pca <- pca %>%
   gather(key = "PC", value = "eigenvalue", !!paste0("PC", 1:n_eig)) %>%
-  filter(superpop == "EUR") %>%
+  filter(superpop == params$population) %>%
   group_by(superpop, PC) %>%
   dplyr::summarize(mean = mean(eigenvalue), sd = sd(eigenvalue)) %>%
   mutate(lower = mean - sd * 6, upper = mean + sd*6) %>%
   mutate(PC = factor(PC, levels = paste0("PC", 1:n_eig))) %>%
   arrange(PC)
 
-#***Table 1:*** Mean and SD of PC in EUR population
-tab_1 <- as.data.frame(eur_pca)
+#***Table 1:*** Mean and SD of PC in chosen population
+tab_1 <- as.data.frame(chosen_pca)
 
-# For each individual in the sample, determine if ±6SD from the EUR population
+# For each individual in the sample, determine if ±6SD from the chosen population
 # for each principal component
 
 pca_range <- function(PC, vals) {
-  lower <- eur_pca[eur_pca$PC == PC, "lower"] %>% unlist %>% unname
-  upper <- eur_pca[eur_pca$PC == PC, "upper"] %>% unlist %>% unname
-  sapply( vals, function(x) {x < lower | x > upper} )
+  lower <- chosen_pca[chosen_pca$PC == PC, "lower"] %>% unlist %>% unname
+  upper <- chosen_pca[chosen_pca$PC == PC, "upper"] %>% unlist %>% unname
+  sapply( vals, function(x) {x < lower | x > upper} ) %>% as.logical
 }
 
 mut_pca <- function(df, PC, PC_use) {
@@ -170,7 +172,7 @@ sample.pca <- pca %>%
 n_outliers <- sum(sample.pca$pop.outliers)
 no_outliers <- n_outliers == 0
 
-# ***Table 2:*** EUR Population Outliers for each PC
+# ***Table 2:*** Population Outliers for each PC
 
 outlier_cols <- paste0("PC", 1:n_eig, ".outliers")
 outlier_cols_rename <- outlier_cols
@@ -180,7 +182,7 @@ tab_2 <- as.data.frame(
   sample.pca %>%
   select(FID, IID, !!outlier_cols, pop.outliers) %>%
   filter(pop.outliers == T) %>%
-  dplyr::rename(!!!outlier_cols_rename, "EUR Outlier" = pop.outliers)
+  dplyr::rename(!!!outlier_cols_rename, Outlier = pop.outliers)
 )
 
 #	---- Write out outliers ---- #

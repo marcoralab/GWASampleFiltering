@@ -8,22 +8,23 @@ params:
    Path_PopStrat_eigenval:
    Sample:
    rwd:
+   partmethod:
 editor_options:
   chunk_output_type: console
 ---
 ## Population Substructure
 
-After excluding population outliers from the dataset, population substructure will remain due to the presence of genetic diverstiy within apparently homogenous populations. Within a single ethnic population, even subtle degrees of population stratification can bia results due to differences in allele frequncies between subpopulations. Pricipal componets based on the observed genotypes in the dataset of interest can be used to capture information on substructure and be included as covarites in downstream analysis.
-<br>
+After excluding population outliers from the dataset, population substructure will remain due to the presence of genetic diversity within apparently homogenous populations. Within a single ethnic population, even subtle degrees of population stratification can bias results due to differences in allele frequencies between subpopulations. Principal components based on the observed genotypes in the dataset of interest can be used to capture information on substructure and be included as covariates in downstream analysis.
 
-To obtain the principal components for for the sample dataset after population outliers have been removed, type the following PLINK commands at the shell prompt to generate the principal component eigenvalue and eigenvector files.
+To obtain the principal components for the sample dataset after population outliers have been removed, type the following PLINK 1.9 commands at the shell prompt to generate the principal component eigenvalue and eigenvector files.
+
 ```{bash, eval=F}
-plink_1.9 --bfile raw-GWA-data \
+plink --bfile raw-GWA-data \
   --remove fail-ancestry-QC.txt \
   --pca 10 \
   --out filter-GWA-data
 ```
-<br>
+
 
 ```{r setup population stratification, include=FALSE, echo=F, message=F, warning=F}
 knitr::opts_chunk$set(echo = TRUE)
@@ -67,12 +68,34 @@ eigenval <- tibble(eigenval = eigenval.raw,
               mutate(PVE = round(eigenval / sum(eigenval), 3)) %>%
               select(PC, eigenval, PVE)
 
+# read in partitioning method
+if ( params$partmethod != "none" ) {
+  partitioning <- "on"
+  partinfo <- read_lines(params$partmethod)
+  partmethod <- partinfo[1]
+  if ( partmethod == "PC-AiR" ) {
+    partmethod = "As is the default, PC-AiR was used for partitioning."
+  } else {
+    reason <- ifelse(grepl("IIDs", partinfo[2]), "there are non-unique IIDs, and PC-AiR is not equiped for that.", partinfo[2])
+    partmethod = sprintf("The default PC-AiR partitioning could not be used because %s. Instead, the iterative method from relatedness QC was used. Please ensure the PCAs are as expected.", reason)
+  }
+  part2 <- sprintf("First, we partition the samples into related and unrelated sets. %s\n\nAfter partitioning, allele frequencies were calculated in PLINK 1.9 for PCA weighting in the unrelated sample only. \n\n Finally, PCs were generated in PLINK 1.9 with that weighting, projecting the related samples onto the PCA transform for the unrelated samples.", partmethod)
+
+} else {
+  partitioning <- "off"
+  part2 <- "This process is highly reccomended, though slower, so please enable it, calculate PCs after removal of related individuals or ensure there are no related individuals."
+}
+
+partitiontext <- sprintf("However, ancestry can bias the dimensionality reduction, and PC's may represent relatedness as well as gross population structure. To account for this, we have an option in the configuration (%s in this case) to use a similar algorithm to PC-AiR, from the GENESIS R package. \n\nThis allows the experimenter to choose which QC filters to use and still have access to PCs for stratification.\n\n%s", partitioning, part2)
 ```
 
-### Scree Plot
-The below scree plot shows the amount of variation retained by each principal component (Fig. 1) and the cumualtive proportion of variance explained by each principal compoent (Fig. 2).
+`r partitiontext`
 
-```{r Scree_plot PS, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Fig. 1: Scree Plot of PVE for 10 Principal components (left) and cumaltive PVE for 10 Principal Components (right)'}
+
+### Scree Plot
+The below scree plot (Fig. \@ref(fig:ScreePlotStrat)) shows the amount of variation retained by each principal component (Left) and the cumualtive proportion of variance explained by each principal compoent (Right).
+
+```{r Screeplotstrat PS, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Scree Plot of PVE for 10 Principal components (left) and cumaltive PVE for 10 Principal Components (right)'}
 #Include the number of PC for where the cumualtive PVE is 95%
 PC.inc <-  findInterval(0.95, cumsum(eigenval$PVE)) + 1
 
@@ -92,25 +115,25 @@ grid.arrange(p1, p2, ncol = 2)
 ```
 
 ### `r params$Sample` Pairs Plot
-The following pairs plot displays the population structure after removing outliers across the first 4 principal components for `r params$Sample` based on refernce populations from 1000 genomes.
+The following pairs plot (Fig. \@ref(fig:pairsPlotStrat)) displays the population structure after removing population outliers for `r params$Sample` based on refernce populations from 1000 genomes.
 
-```{r PAIRS plot PS, echo=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Fig. 3: Population Structure Pairs Plots '}
+```{r pairsPlotStrat, echo=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Population Structure Pairs Plots '}
 ##---- Plot pairs plots ----##
 
 ggpairs(pca, columns = paste0('PC', 1:4)) + theme_bw()
 ```
 
 ### Population substructure
-The following plots show the population structure of `r params$Sample` ( based on the first two (Fig. 4) and three (Fig. 5) principal components compared with the reference populations from 1000 Genomes.
+The following plots show the population structure of `r params$Sample` based on the first two (Fig. \@ref(fig:2PCstrat)) and three (Fig. \@ref(fig:3PCstrat))) principal components compared with the reference populations from 1000 Genomes.
 
-```{r 2PC PS plot, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Fig. 4: Population substructure clustering for PC 1 & 2'}
+```{r 2PCstrat, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Population substructure clustering for PC 1 & 2'}
 ##  Plot Superpopulations, PC1 + PC2
 ggplot(pca, aes(x = PC2, y = PC1)) +
   geom_point(colour = "#377EB8") +
   theme_bw() + theme(legend.position = 'right')
 ```
 
-```{r 3PC PS plot, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Fig. 5: Population substructure clustering for PC 1, 2 & 3'}
+```{r 3PCstrat, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Population substructure clustering for PC 1, 2 & 3'}
 ##  Plot Superpopulations, PC1 + PC2 + PC3
 plot_ly(pca, x = ~PC2, y = ~PC1, z = ~PC3, type = 'scatter3d', mode = 'markers', marker = list(size = 3),
         hoverinfo = 'text', text = ~paste('</br> ID: ', IID,

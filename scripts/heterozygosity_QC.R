@@ -3,7 +3,9 @@
 
 ## ---- Load Pacakges ---- ##
 library(tidyverse)
-library(ggplot2)
+library(dplyr)
+library(tibble)
+library(readr)
 
 het.file = commandArgs(TRUE)[1]
 outfile = commandArgs(TRUE)[2]
@@ -11,7 +13,7 @@ outfile = commandArgs(TRUE)[2]
 het.raw <- as.tibble(read.table(het.file, header = TRUE, check.names = FALSE, as.is = TRUE, colClasses = c("character","character","numeric","numeric","numeric","numeric")))
 
 ## caluclate heterozygosity
-het <- het.raw %>% 
+het <- het.raw %>%
   rename(O = `O(HOM)`, E = `E(HOM)`, N = `N(NM)`) %>%
   mutate(Het = (N - O) / N)
 
@@ -19,13 +21,13 @@ het <- het.raw %>%
 upper.het <- mean(het$Het) + sd(het$Het)*3
 lower.het <- mean(het$Het) - sd(het$Het)*3
 
-##  Exclusion of samples  
-het <- het %>%  
+##  Exclusion of samples
+het <- het %>%
   mutate(exclude = ifelse(Het >= upper.het | Het <= lower.het, TRUE, FALSE))
 
 exclude.samples <- het %>% filter(exclude == TRUE)
 
-sample.out <- exclude.samples %>% 
+sample.out <- exclude.samples %>%
   select(FID, IID)
 
 cat("Removing sample", as.character(exclude.samples$IID), 'due to outlying heterozygosity. \n')

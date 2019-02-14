@@ -10,13 +10,17 @@ sample: false
 SexIn: false
 
 # This is the directory with the input files:
-DataIn: /sc/orga/projects/LOAD/Brian/projects/ADGC/data/raw
+DataIn: ../data/raw_newID
 
 # This is the directory with the output files:
-DataOut: /sc/orga/projects/LOAD/Brian/projects/ADGC/sampleQC
+DataOut: output
 
 #Do the samples contain families (true/false):
 family: false
+
+superpop: EUR
+king: true
+pcair: true
 
 QC:
   GenoMiss: 0.05

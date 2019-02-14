@@ -12,6 +12,10 @@ params:
     Path_frqx: /Users/sheaandrews/Documents/Test2/DianTest_geno.frqx
     Path_imiss: /Users/sheaandrews/Documents/Test2/DianTest_geno.imiss
     Sample: 201711_CoreExome-DIAN
+    maf: 0.01
+    missing_geno: 0.05
+    missing_sample: 0.05
+    hwe: 1e-6
 editor_options:
   chunk_output_type: console
 ---
@@ -27,16 +31,28 @@ library(ggplot2)
 library(ggforce)
 library(Ternary)
 #library(ggtern)
+library(DT)
+tabcap <- function (name, caption) {
+  sprintf("<table width=\"100%%\"><caption>(#tab:%s) %s </caption></table>", name, caption)
+}
+disptab <- function(x) {
+  if (knitr::opts_knit$get("rmarkdown.pandoc.to") == "html") {
+    dtopts <- list(dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel', 'pdf', 'print'))
+    return(datatable(x, extensions = 'Buttons', options = dtopts))
+  } else {
+    return(kable(x))
+  }
+}
 ```
 
-```{r read in call rate, echo=F, cache=T, warning=F, message=F}
+```{r read in call rate, echo=F, cache=F, warning=F, message=F}
 # ---- Global ----
 ##  set working directory
 
-# ---- readin plink .feq ---- ##
+# ---- readin plink .frq ---- ##
 freq.raw <- read_table(params$Path_frq, col_names = T)
 
-# ---- readin plink .feqx ---- ##
+# ---- readin plink .frqx ---- ##
 freqx.raw <- read_tsv(params$Path_frqx, col_names = T)
 
 # ---- readin plink .imiss ---- ##
@@ -45,13 +61,27 @@ imiss.raw <- read_table(params$Path_imiss, col_names = T)
 # ---- readin plink .hwe ---- ##
 hwe.raw <- read_table(params$Path_hwe, col_names = T)
 
+if ( nrow(hwe.raw) > 2*nrow(freq.raw) ) {
+  CC_read <- paste("Please ensure that the phenotypes are correct, because",
+    "phenotypes are present and HWE is calculated only in controls.")
+  hwe <- hwe.raw %>%
+    filter(TEST == "UNAFF")
+} else {
+  CC_read <- paste("With quantitative phenotypes or where the phenotype is",
+    "unknown, HWE is calculated on all samples. Here, HWE is calculated on all",
+    "samples. Please ensure that is correct and provide phenotypes if the data",
+    "are Case-Control.")
+  hwe <- hwe.raw
+}
+
 ```
 
-## SNP QC
-SNP level QC consists of removing markers that with excessive level missing genotypes and removal of markers with a low allele frequency. The presence of suboptimal makers can increases false positives and reduce the power to identify true associations correlated with disease risk. Standard thresholds for SNPs call rate and MAF are < 95% and < 1% respectivly.
+# SNP QC
+SNP level QC consists of removing markers with excessive missingness or low allele frequency. This QC increases the power to identify true associations with disease risk by removing suboptimal markers that can increase false positives. `r round((1 - params$missing_geno)*100)`% was used as the SNP call rate threshhold (usually ≥ 95% or higher), and `r params$maf*100`% was used as the MAF threshold (usually ≥ 1% or higher).
 <br>
 
-Filtering SNPs on MAF and call rate can be done in PLINK by typing the following at the shell prompt:
+Filtering SNPs on MAF and call rate can be done in `PLINK 1.9` by typing the following (or similar) at the shell prompt. This uses 95% and 1% for the call-rate and MAF, respectively:
+
 ```{bash, eval=F}
 plink_1.9 --bfile raw-GWA-data \
   --geno 0.05 --maf 0.01 \
@@ -65,43 +95,47 @@ plink_1.9 --bfile raw-GWA-data \
 # ---- SNP level statisitcs ----
 snps <- freq.raw %>%
   full_join(freqx.raw, by = c("CHR", "SNP", "A1", "A2")) %>%
-  full_join(hwe.raw, by = c("CHR", "SNP", "A1", "A2")) %>%
+  full_join(hwe, by = c("CHR", "SNP", "A1", "A2")) %>%
   rename(AA = `C(HOM A1)`, AB = `C(HET)`, BB = `C(HOM A2)`, missing = `C(MISSING)`) %>%
   mutate(Call.rate = 1 - (missing / c(AA + AB + BB + missing))) %>%
-  mutate(call = Call.rate <= 0.95) %>%
-  mutate(call.maf = MAF <= 0.01) %>%
-  mutate(hwe = P > 10^-6) %>%
+  mutate(Call = Call.rate >= 1 - as.numeric(params$missing_geno)) %>%
+  mutate(Call.maf = MAF < params$maf) %>%
+  mutate(hwe = P > params$hwe) %>%
   as.tibble()
 ```
 
-Figure 1 shows the SNP call rate versus minor allele frequncy across all typed SNPs in the study. The dashed lines denote the MAF and call rate QC thresholds. `r nrow(filter(snps, call == T))` SNPs will be removed due to low call rate and `r nrow(filter(snps, call.maf == T))` SNPs will be removed due to low minor allele frequency.
-```{r MAF by call rate, cache=F, echo=F, warning=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Fig. 1: Call rate by minor allele frequency '}
+Figure \@ref(fig:MAFxcallrate) shows the SNP call rate versus minor allele frequncy across all typed SNPs in the study. The dashed lines denote the MAF and call rate QC thresholds. `r nrow(filter(snps, Call == F))` SNPs were removed due to low call rate and `r nrow(filter(snps, Call.maf == T))` SNPs were removed due to low minor allele frequency.
+```{r MAFxcallrate, cache=F, echo=F, warning=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Call rate by minor allele frequency '}
 ggplot(data = snps, aes(x = MAF, y = Call.rate)) +
   geom_point(alpha = 0.3, size = 0.5) +
-  geom_hline(yintercept = 0.05, linetype = 2, colour = 'red') +
-  geom_vline(xintercept = 0.01, linetype = 2, colour = 'red') +
-  scale_y_log10(breaks = scales::trans_breaks("log10", function(x) round(10^x, 3))) +
+  geom_hline(yintercept = 1 - params$missing_geno, linetype = 2, colour = 'red') +
+  geom_vline(xintercept = params$maf, linetype = 2, colour = 'red') +
+  #scale_y_log10(breaks = scales::trans_breaks("log10", function(x) round(10^x, 3))) +
   scale_x_log10(breaks = scales::trans_breaks("log10", function(x) round(10^x, 3))) +
-  labs(y = 'Proportion of missing genotypes (log)', x = 'Minor Allele Frequency (log)') +
+  labs(y = 'Proportion of called genotypes', x = 'Minor Allele Frequency (log)') +
   theme_bw() + annotation_logticks()
 ```
 
-## Hardy Weinberg Equilibrium
-Violations of Hardy Weinberg Equilibrium can indicate either the presence of population substructure, or the occurence of genotyping error. It is common practice to assume that violoations are indicative of genotyping error and remove SNPs in which the HWE test statistic has a corresponding p-value of less then 1x10-6.
+# Hardy Weinberg Equilibrium
+Violations of Hardy Weinberg Equilibrium can indicate either the presence of population substructure, or the occurence of genotyping error. It is common practice to assume that violoations are indicative of genotyping error and remove SNPs in which the HWE test statistic has a corresponding p-value of less then 1x10-6. A threshold of `r params$hwe` is used here.
+
+For case-control data, HWE is generally not tested in cases to not exclude real selection against a phenotype, so it is best to include case-control status in the PLINK files. `r CC_read`
 <br>
 
 Filtering SNPs on Hardy Weinberg Equilibrium for autosomes only can be done in PLINK by typing the following at the shell prompt:
 ```{bash, eval=F}
 plink_1.9 --bfile raw-GWA-data  \
   --autosome \
-  -- hardy \
+  --hardy \
   --hwe 0.000001 \
   --make-bed --out filtered-GWA-data
 ```
 <br>
 
-Figure 2 displays a ternary plot for the genotype frequency of all typed SNPs, with `r nrow(filter(snps, hwe == F))` SNPs that are violating HWE coloured red.
-```{r hwe plot, echo=F, warning=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Fig. 2: SNPs that are in Hardy Weinberg Equilibrium'}
+Figure \@ref(fig:hwe) displays a ternary plot for the genotype frequency of all typed SNPs, with `r nrow(filter(snps, hwe == F))` SNPs that are violating HWE coloured red.
+
+
+```{r hwe, echo=F, warning=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='SNPs that are in Hardy Weinberg Equilibrium'}
 
 tern_add <- function (filtsnps, col) {
   to_plot <- filtsnps %>%
@@ -134,11 +168,11 @@ snps %>% filter(!hwe) %>% tern_add("red")
 ```
 
 
-##  Sample Call Rate
-A low genotyping call rate in a sample can be indicative of poor DNA sample quality and samples with a call rate < 0.95 are excluded from further analysis.
+# Sample Call Rate
+A low genotyping call rate in a sample can be indicative of poor DNA sample quality, so samples with a call rate < `r round((1 - params$missing_sample)*100)`% are excluded from further analysis.
 <br>
 
-Filtering samples on call rate can be done in PLINK by typing the following at the shell prompt:
+Filtering samples on a call rate of 95% can be done in PLINK by typing the following at the shell prompt:
 ```{bash, eval=F}
 plink_1.9 --bfile raw-GWA-data  \
   --mind 0.05 \
@@ -148,18 +182,19 @@ plink_1.9 --bfile raw-GWA-data  \
 
 ```{r, echo=FALSE}
 imiss <- imiss.raw %>%
-  mutate(call = F_MISS >= 0.05) %>%
+  mutate(call = F_MISS > params$missing_sample) %>%
   as.tibble()
 
 ```
 
-Figure 3 shows the distribution of sample call rates across all individules in the study, with the dashed line denoting the call rate QC threshold (typicaly <= 95%). Table 1 lists the samples that were excluded based on call rate.
-```{r sample call rate plot, echo=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Fig. 3: Sample call rate distribution'}
+Figure \@ref(fig:samplecallrate) shows the distribution of sample call rates across all individules in the study, with the dashed line denoting the call rate QC threshold (typicaly ≥ 95%). Table \@ref(tab:highmiss) lists the samples that were excluded based on call rate.
+
+```{r samplecallrate, echo=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Sample call rate distribution'}
 ggplot(data = imiss, aes(x = as.factor(1), y = F_MISS, colour = call, shape = call)) +
   geom_sina(size = 1.5) +
   geom_hline(yintercept = 0.05, linetype = 2, colour = 'red') +
-  scale_colour_manual(name= 'Missing >= 0.05', values = c("#377EB8", "#E41A1C")) +
-  scale_shape_manual(name= 'Missing >= 0.05',values = c(19,17)) +
+  scale_colour_manual(name = sprintf('Missing > %.2f', params$missing_sample), values = c("#377EB8", "#E41A1C")) +
+  scale_shape_manual(name = sprintf('Missing > %.2f', params$missing_sample), values = c(19,17)) +
   scale_y_log10(breaks = scales::trans_breaks("log10", function(x) round(10^x, 3)), limits = c(0.0001,1)) +
   labs(y = 'Proportion of missing genotypes (log)') +
   theme_bw() + coord_flip() +
@@ -169,11 +204,13 @@ ggplot(data = imiss, aes(x = as.factor(1), y = F_MISS, colour = call, shape = ca
 ```
 <br>
 
-***Table 1:*** Samples with a call rate <= 95%
+`r tabcap("highmiss", sprintf("Samples with a call rate < %i%%", round((1 - params$missing_sample)*100)))`
+
 ```{r sample excluded table, echo=F}
 imiss %>%
   filter(call == T) %>%
-  select(FID, IID, N_MISS, N_GENO, F_MISS)
+  select(FID, IID, N_MISS, N_GENO, F_MISS) %>%
+  disptab
 
 ```
 

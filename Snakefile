@@ -1,12 +1,15 @@
-'''Snakefile for GWAS Variant and Sample QC Version 0.2'''
+'''Snakefile for GWAS Variant and Sample QC Version 0.3'''
 
 from scripts.parse_config import parser
+from snakemake.remote.FTP import RemoteProvider as FTPRemoteProvider
 import socket
 import getpass
 
+FTP = FTPRemoteProvider()
+
 isMinerva = "hpc.mssm.edu" in socket.getfqdn()
 
-configfile: "config.yaml"
+configfile: "../config.yaml"
 
 shell.executable("/bin/bash")
 
@@ -23,17 +26,20 @@ QC_callRate = True
 
 if isMinerva:
     com = {'flippyr': 'flippyr', 'plink': 'plink --keep-allele-order',
-           'plink2': 'plink', 'bcftools': 'bcftools', 'R': 'Rscript', 'R2': 'R'}
-    loads = {'flippyr': '', 'plink': 'module load plink/1.90',
-             'bcftools': 'module load bcftools/1.7',
+           'plink2': 'plink', 'bcftools': 'bcftools', 'R': 'Rscript', 'R2': 'R',
+           'king': 'king'}
+    loads = {'flippyr': 'module load plink/1.90', 'plink': 'module load plink/1.90',
+             'bcftools': 'module load bcftools/1.9',
+             'king': 'module unload gcc; module load king/2.1.6',
              'R': ('module load R/3.4.3 pandoc/2.1.3 udunits/2.2.26; ',
                    'RSTUDIO_PANDOC=$(which pandoc)')}
 else:
     com = {'flippyr': 'flippyr',
            'plink': 'plink --keep-allele-order', 'plink2': 'plink',
-           'bcftools': 'bcftools', 'R': 'Rscript', 'R2': 'R'}
+           'bcftools': 'bcftools', 'R': 'Rscript', 'R2': 'R', 'king': 'king'}
     loads = {'flippyr': 'echo running flippyr', 'plink': 'echo running plink',
-             'bcftools': 'echo running bcftools',  'R': 'echo running R'}
+             'bcftools': 'echo running bcftools',  'R': 'echo running R',
+             'king': 'echo running KING'}
 
 if getpass.getuser() == "sheaandrews":
     com["flippyr"] = '/Users/sheaandrews/Programs/flippyr/flippyr.py'
@@ -43,6 +49,7 @@ def decorate(text):
     return expand(DATAOUT + "/{sample}_" + text,
                   sample=SAMPLE)
 
+localrules: all, download_tg, download_tg_chrom
 
 rule all:
     input:
@@ -66,14 +73,15 @@ rule snp_qc:
         stem = start['stem'],
         out = DATAOUT + "/{sample}_SnpQc",
         miss = config['QC']['GenoMiss'],
-        MAF = config['QC']['MAF']
+        MAF = config['QC']['MAF'],
+        HWE = config['QC']['HWE']
     shell:
         """
 {loads[plink]}
 {com[plink]} --bfile {params.stem} --freq --out {params.out}
 {com[plink]} --bfile {params.stem} --freqx --out {params.out}
 {com[plink]} --bfile {params.stem} --geno {params.miss} \
---maf {params.MAF} --hardy --make-bed --out {params.out}"""
+--maf {params.MAF} --hardy --hwe {params.hwe} --make-bed --out {params.out}"""
 
 # ---- Exclude Samples with high missing rate ----
 rule sample_callRate:
@@ -84,11 +92,12 @@ rule sample_callRate:
         touch(DATAOUT + "/{sample}_callRate.irem")
     params:
         indat = rules.snp_qc.params.out if QC_snp else start['stem'],
+        miss = config['QC']['SampMiss'],
         out = DATAOUT + "/{sample}_callRate"
     shell:
         """
 {loads[plink]}
-{com[plink]} --bfile {params.indat} --mind 0.05 \
+{com[plink]} --bfile {params.indat} --mind {params.miss} \
 --missing --make-bed --out {params.out}"""
 
 # ---- Exclude Samples with discordant sex ----
@@ -165,25 +174,65 @@ rule sample_prune:
 --exclude {input.dupvar} --make-bed --out {params.out}"""
 
 # ---- Exclude Samples with interealtedness ----
-rule relatedness_QC:
-    input: rules.sample_prune.output
+rule relatedness_sample_prep:
+    input: sexcheck_in_plink
     output:
-        DATAOUT + "/{sample}_IBDQC.genome"
+        bed = temp(DATAOUT + "/{sample}_IBDQCfilt.bed"),
+        bim = temp(DATAOUT + "/{sample}_IBDQCfilt.bim"),
+        fam = temp(DATAOUT + "/{sample}_IBDQCfilt.fam")
     params:
-        indat_plink = DATAOUT + "/{sample}_pruned",
-        out = DATAOUT + "/{sample}_IBDQC"
+        indat_plink = sexcheck_in_plink_stem,
+        out = DATAOUT + "/{sample}_IBDQCfilt"
     shell:
         """
+{loads[plink]}
+{com[plink2]} --bfile {params.indat_plink} \
+  --geno 0.02 \
+  --maf 0.02 \
+  --memory 6000 \
+  --make-bed --out {params.out}"""
+
+if config['king']:
+    rule relatedness_QC:
+        input:
+            bed = rules.relatedness_sample_prep.output.bed,
+            bim = rules.relatedness_sample_prep.output.bim,
+            fam = rules.relatedness_sample_prep.output.fam
+        output:
+            genome = DATAOUT + "/{sample}_IBDQC.kin0"
+        params:
+            out = DATAOUT + "/{sample}_IBDQC"
+        shell:
+            """
+{loads[king]}
+{com[king]} -b {input.bed} --related --degree 3 --prefix {params.out}
+if [[ -f {params.out}.kin && !( -f {params.out}.kin0 ) ]]; then
+  echo .kin file exists, but .kin0 does not. This is likely because there is
+  echo only one FID. converting .kin to .kin0
+  {loads[R]}
+  {com[R]} scripts/kin2kin0.R {params.out}.kin
+fi"""
+else:
+    rule relatedness_QC:
+        input: rules.sample_prune.output
+        output:
+            genome = DATAOUT + "/{sample}_IBDQC.genome"
+        params:
+            indat_plink = DATAOUT + "/{sample}_pruned",
+            out = DATAOUT + "/{sample}_IBDQC"
+        shell:
+            """
 {loads[plink]}
 {com[plink]} --bfile {params.indat_plink} --genome --min 0.05 \
 --out {params.out}"""
 
 rule relatedness_sample_fail:
     input:
-        genome = DATAOUT + "/{sample}_IBDQC.genome",
+        genome = rules.relatedness_QC.output.genome,
         fam = sexcheck_in_plink_stem + ".fam"
     params:
         Family = FAMILY,
+        king = config['king'],
         threshold = 0.1875
     output:
         out = DATAOUT + "/{sample}_exclude.relatedness",
@@ -191,7 +240,7 @@ rule relatedness_sample_fail:
     shell:
         """
 {loads[R]}; {com[R]}  scripts/relatedness_QC.R {input.genome} {params.threshold} \
-{params.Family} {output.out} {output.rdat}"""
+{params.Family} {params.king} {output.out} {output.rdat}"""
 
 # ---- Exclude Samples with outlying heterozigosity ----
 rule heterozygosity_QC:
@@ -216,7 +265,7 @@ rule Sample_Flip:
         bim = DATAOUT + "/{sample}_pruned.bim",
         bed = DATAOUT + "/{sample}_pruned.bed",
         fam = DATAOUT + "/{sample}_pruned.fam",
-        fasta = "data/hg19.fa"
+        fasta = "data/human_g1k_v37.fasta"
     output:
         temp(expand(DATAOUT + "/{{sample}}_pruned_flipped.{ext}",
                     ext=BPLINK))
@@ -226,7 +275,8 @@ rule Sample_Flip:
 {com[flippyr]} -p {input.fasta} {input.bim}"""
 
 rule Sample_ChromPosRefAlt:
-    input: DATAOUT + "/{sample}_pruned_flipped.bim"
+    input:
+        flipped = DATAOUT + "/{sample}_pruned_flipped.bim"
     output:
         bim = temp(DATAOUT + "/{sample}_flipped_ChromPos.bim"),
         snplist = temp(DATAOUT + "/{sample}_pruned_snplist")
@@ -268,88 +318,128 @@ rule Sample_IndexBcf:
 #  Extract a pruned dataset from 1000 genomes using the same pruning SNPs
 #    from Sample
 # align 1000 genomes to fasta refrence
-rule Reference_flip:
-    input:
-        bim = "data/1000genomes_allChr.bim",
-        bed = "data/1000genomes_allChr.bed",
-        fam = "data/1000genomes_allChr.fam",
-        fasta = "data/hg19.fa"
+
+tgbase = "ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/"
+tgurl = (tgbase + "release/20130502/ALL.chr{chrom}." +
+    "phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.vcf.gz")
+tgped = tgbase + "technical/working/20130606_sample_info/20130606_g1k.ped"
+tgfa = tgbase + "technical/reference/human_g1k_v37.fasta"
+
+predownload = True
+
+rule download_tg_chrom:
+   input:
+       FTP.remote(tgurl, keep_local=True),
+       FTP.remote(tgurl + ".tbi", keep_local=True),
+   output:
+       temp("data/1000gRaw.chr{chrom}.vcf.gz"),
+       temp("data/1000gRaw.chr{chrom}.vcf.gz.tbi")
+   shell: "cp {input[0]} {output[0]}; cp {input[1]} {output[1]}"
+
+rule download_tg:
+   input:
+       FTP.remote(tgped, keep_local=True),
+       FTP.remote(tgfa + ".gz", keep_local=True),
+       FTP.remote(tgfa + ".fai", keep_local=True)
+   output:
+       "data/20130606_g1k.ped",
+       "data/human_g1k_v37.fasta",
+       "data/human_g1k_v37.fasta.fai"
+   shell: "cp {input[0]} {output[0]}; zcat {input[1]} > {output[1]}; cp {input[2]} {output[2]}"
+
+tgped = "data/20130606_g1k.ped"
+if predownload:
+    refraw = ["data/1000gRaw.chr{chrom}.vcf.gz",
+              "data/1000gRaw.chr{chrom}.vcf.gz.tbi"]
+else:
+#    tgped = FTP.remote(tgped, keep_local=True)
+    refraw = "/dev/urandom"
+
+rule makeTGpops:
+    input: tgped
     output:
-        expand("data/1000genomes_allChr_flipped.{ext}", ext=BPLINK)
+        "data/1000genomes_pops.txt",
+        "data/pops.txt
     shell:
         """
-{loads[flippyr]}
-{com[flippyr]} {input.fasta} {input.bim}
-sed 's/--memory 256/--memory 2048/' data/1000genomes_allChr.runPlink > \
-data/1000genomes_allChr.moremem.runPlink
-bash data/1000genomes_allChr.moremem.runPlink
+awk 'BEGIN {{print "FID","IID","Population"}} NR>1 {{print $1,$2,$7}}' \
+{input} > {output[0]}
+cut -f7 {input} | sed 1d | sort | uniq > {output[1]}
 """
 
-rule Reference_ChromPosRefAlt:
-    input: "data/1000genomes_allChr_flipped.bim"
-    output:
-        bim = "data/1000genomes_allChr_flipped_CPRA.bim",
-        snplist = "data/Reference_snplist"
+rule Reference_prep:
+    input: refraw
+    output: temp("data/1000Gchr{chrom}.maxmiss{miss}.vcf.gz")
+    params:
+        url = rules.download_tg_chrom.output[0] if predownload else tgurl
     shell:
         """
-{loads[R]}
-{com[R]} scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}
+{loads[bcftools]}
+{com[bcftools]} norm -m- {params.url} --threads 2 | \
+{com[bcftools]} view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
+{com[bcftools]} annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
+"""
+
+"""
+Selects everyone who is unrelated or only has third degree relatives in
+thousand genomes.
+"""
+rule Reference_foundersonly:
+    input: tgped
+    output:
+        "data/20130606_g1k.founders"
+    shell: r"""
+awk -F "\t" '!($12 != 0 || $10 != 0 || $9 != 0 || $3 != 0 || $4 != 0) {{print $2}}' \
+{input} > {output}
+"""
+
+rule Reference_cat:
+    input:
+        vcfs = expand("data/1000Gchr{chrom}.maxmiss{{miss}}.vcf.gz",
+                      chrom = list(range(1, 23)))
+    output:
+        vcf = "data/1000genomes_allChr_maxmiss{miss}.vcf.gz",
+        tbi = "data/1000genomes_allChr_maxmiss{miss}.vcf.gz.tbi"
+    shell:
+        """
+{loads[bcftools]}
+{com[bcftools]} concat {input.vcfs} -Oz -o {output.vcf} --threads 2
+{com[bcftools]} index -ft {output.vcf}
 """
 
 rule Reference_prune:
     input:
-        plink = expand("data/1000genomes_allChr_flipped.{ext}", ext=BPLINK),
-        bim = "data/1000genomes_allChr_flipped_CPRA.bim",
-        prune = DATAOUT + "/{sample}_pruned_snplist"
+        vcf = expand("data/1000genomes_allChr_maxmiss{miss}.vcf.gz",
+                     miss = config['QC']['GenoMiss']),
+        prune = DATAOUT + "/{sample}_pruned_snplist",
+        founders = "data/20130606_g1k.founders"
     output:
-        expand(DATAOUT + "/{{sample}}_1kgpruned_flipped.{ext}", ext=BPLINK)
-    params:
-        indat_plink = "data/1000genomes_allChr_flipped",
-        out = DATAOUT + "/{sample}_1kgpruned_flipped"
+        vcf = temp(DATAOUT + "/{sample}_1kgpruned.vcf.gz"),
+        tbi = temp(DATAOUT + "/{sample}_1kgpruned.vcf.gz.tbi")
     shell:
         """
-{loads[plink]}
-{com[plink]} --bfile {params.indat_plink} --bim {input.bim} --filter-founders \
---extract {input.prune} --make-bed --out {params.out}"""
-
-
-# Recode 1kg to vcf
-rule Reference_Plink2Bcf:
-    input:
-        expand(DATAOUT + "/{{sample}}_1kgpruned_flipped.{ext}", ext=BPLINK)
-    output: DATAOUT + "/{sample}_1kgpruned_flipped.vcf.gz"
-    params:
-        indat = DATAOUT + "/{sample}_1kgpruned_flipped",
-        out = DATAOUT + "/{sample}_1kgpruned_flipped"
-    shell:
-        """
-{loads[plink]}
-{com[plink2]} --bfile {params.indat} --recode vcf bgz \
---real-ref-alleles --out {params.out}"""
-
-# Index bcf
-rule Reference_IndexBcf:
-    input:
-        bcf = DATAOUT + "/{sample}_1kgpruned_flipped.vcf.gz"
-    output:
-        DATAOUT + "/{sample}_1kgpruned_flipped.vcf.gz.csi"
-    shell:
-        '{loads[bcftools]}; {com[bcftools]} index -f {input.bcf}'
+{loads[bcftools]}
+{com[bcftools]} view -i 'ID=@{input.prune}' -S {input.founders} \
+-Oz -o {output.vcf} --force-samples {input.vcf} --threads 4
+{com[bcftools]} index -ft {output.vcf}
+"""
 
 # Merge ref and sample
 rule Merge_RefenceSample:
     input:
-        bcf_1kg = DATAOUT + "/{sample}_1kgpruned_flipped.vcf.gz",
-        csi_1kg = DATAOUT + "/{sample}_1kgpruned_flipped.vcf.gz.csi",
+        bcf_1kg = DATAOUT + "/{sample}_1kgpruned.vcf.gz",
+        tbi_1kg = DATAOUT + "/{sample}_1kgpruned.vcf.gz.tbi",
         bcf_samp = DATAOUT + "/{sample}_pruned_flipped.vcf.gz",
-        csi_samp = DATAOUT + "/{sample}_pruned_flipped.vcf.gz.csi",
+        csi_samp = DATAOUT + "/{sample}_pruned_flipped.vcf.gz.csi"
+    params:
+        miss = config['QC']['GenoMiss']
     output:
         out = DATAOUT + "/{sample}_1kg_merged.vcf"
     shell:
         r"""
 {loads[bcftools]}
-{com[bcftools]} merge -m none {input.bcf_1kg} {input.bcf_samp} | \
-{com[bcftools]} view -g ^miss -Ov -o {output.out}"""
+{com[bcftools]} merge -m none --threads 2 {input.bcf_1kg} {input.bcf_samp} | \
+{com[bcftools]} view  -i 'F_MISSING <= {params.miss}' -Ov -o {output.out} --threads 2"""
 
 # recode merged sample to plink
 rule Plink_RefenceSample:
@@ -367,12 +457,13 @@ rule Plink_RefenceSample:
 rule fix_fam:
     input:
         oldfam = DATAOUT + "/{sample}_pruned.fam",
-        newfam = DATAOUT + "/{sample}_1kg_merged.fam"
+        newfam = DATAOUT + "/{sample}_1kg_merged.fam",
+        tgped = tgped
     output: DATAOUT + "/{sample}_1kg_merged_fixed.fam"
     shell:
         """
 {loads[R]}
-{com[R]} scripts/fix_fam.R {input.oldfam} {input.newfam} {output}"""
+{com[R]} scripts/fix_fam.R {input.oldfam} {input.newfam} {output} {input.tgped}"""
 
 # PCA analysis to identify population outliers
 rule PcaPopulationOutliers:
@@ -394,44 +485,134 @@ rule PcaPopulationOutliers:
 --within {input.pop} --pca-clusters {input.clust} --out {params.out}
 """
 
-# Rscript to identify EUR population outliers
+# Rscript to identify population outliers
 rule ExcludePopulationOutliers:
     input:
         eigenval = DATAOUT + "/{sample}_1kg_merged.eigenval",
         eigenvec = DATAOUT + "/{sample}_1kg_merged.eigenvec",
         fam = DATAOUT + "/{sample}_pruned.fam",
-        tgped = "data/20130606_g1k.ped"
+        tgped = tgped
     output:
         excl = DATAOUT + "/{sample}_exclude.pca",
         rmd = temp(DATAOUT + "/{sample}_pca.Rdata")
     params:
-        samp = "{sample}"
+        samp = "{sample}",
+        superpop = config['superpop']
     shell:
         """
 {loads[R]}
-scripts/PCA_QC.R -s {params.samp} \
+scripts/PCA_QC.R -s {params.samp} -p {params.superpop} \
 --vec {input.eigenvec} --val {input.eigenval} \
 -b {input.tgped} -t {input.fam} -o {output.excl} -R {output.rmd}
 """
 
-# Run PCA to for population stratification
-rule PopulationStratification:
-    input:
-        plink = expand(DATAOUT + "/{{sample}}_pruned.{ext}",
-                       ext=BPLINK),
-        exclude = DATAOUT + "/{sample}_exclude.pca"
-    output:
-        expand(DATAOUT + "/{{sample}}_filtered_PCA.{ext}",
-               ext=['eigenval', 'eigenvec'])
-    params:
-        indat = DATAOUT + "/{sample}_pruned",
-        out = DATAOUT + "/{sample}_filtered_PCA"
-    shell:
-        """
+# Run PCA to control for population stratification
+if config['pcair']:
+    assert config['king'], "You must use KING for relatedness if using PCAiR!"
+    rule ancestryFilt:
+        input:
+            plink = expand(DATAOUT + "/{{sample}}_pruned.{ext}",
+                           ext=BPLINK),
+            exclude = DATAOUT + "/{sample}_exclude.pca"
+        output:
+            temp(expand(DATAOUT + "/{{sample}}_filtered_PCApre.{ext}",
+                 ext=BPLINK)),
+        params:
+            indat = DATAOUT + "/{sample}_pruned",
+            plinkout = DATAOUT + "/{sample}_filtered_PCApre"
+        shell:
+            r"""
+{loads[plink]}
+{com[plink]} --bfile {params.indat} \
+  --remove {input.exclude} \
+  --make-bed --out {params.plinkout}
+"""
+
+    rule filterKING:
+        input:
+            king = expand(DATAOUT + "/{{sample}}_IBDQC.{ext}",
+                          ext=["kin", "kin0"]),
+            exclude = DATAOUT + "/{sample}_exclude.pca"
+        output:
+            temp(expand(DATAOUT + "/{{sample}}_IBDQC.popfilt.{ext}",
+                        ext=["kin", "kin0"]))
+        params:
+            indat = DATAOUT + "/{sample}_IBDQC",
+        shell:
+            r"""
+{loads[R]}
+{com[R]} scripts/filterKing.R {params.indat} {input.exclude}
+"""
+
+    rule PCAPartitioning:
+        input:
+            plink = rules.ancestryFilt.output,
+            king = rules.filterKING.output,
+            iterative = rules.relatedness_sample_fail.output.out
+        output:
+            expand(DATAOUT + "/{{sample}}_filtered_PCApre.{ext}",
+                   ext=['unrel', 'partition.log'])
+        params:
+            stem = rules.ancestryFilt.params.plinkout,
+            king = DATAOUT + "/{sample}_IBDQC.popfilt"
+        shell:
+            """
+{loads[R]}
+{com[R]} scripts/PartitionPCAiR.R {params.stem} {params.king} {input.iterative}
+"""
+
+    rule stratFrq:
+        input:
+            plink = rules.ancestryFilt.output,
+            unrel = rules.PCAPartitioning.output[0],
+        output: DATAOUT + "/{sample}_filtered_PCAfreq.frqx"
+        params:
+            indat = rules.ancestryFilt.params.plinkout,
+            out = DATAOUT + "/{sample}_filtered_PCAfreq"
+        shell:
+            """
+{loads[plink]}
+{com[plink]} --bfile {params.indat} --freqx \
+  --within {input.unrel} --keep-cluster-names unrelated \
+  --out {params.out}
+"""
+
+    rule PopulationStratification:
+        input:
+            plink = rules.ancestryFilt.output,
+            unrel = rules.PCAPartitioning.output[0],
+            frq = rules.stratFrq.output
+        output:
+            expand(DATAOUT + "/{{sample}}_filtered_PCA.{ext}",
+                   ext=['eigenval', 'eigenvec'])
+        params:
+            indat = rules.ancestryFilt.params.plinkout,
+            out = DATAOUT + "/{sample}_filtered_PCA"
+        shell:
+            """
+{loads[plink]}
+{com[plink]} --bfile {params.indat} --read-freq {input.frq} --pca 10 \
+  --within {input.unrel} --pca-cluster-names unrelated \
+  --out {params.out}
+"""
+else:
+    rule PopulationStratification:
+        input:
+            plink = expand(DATAOUT + "/{{sample}}_pruned.{ext}",
+                           ext=BPLINK),
+            exclude = DATAOUT + "/{sample}_exclude.pca"
+        output:
+            expand(DATAOUT + "/{{sample}}_filtered_PCA.{ext}",
+                   ext=['eigenval', 'eigenvec'])
+        params:
+            indat = DATAOUT + "/{sample}_pruned",
+            out = DATAOUT + "/{sample}_filtered_PCA"
+        shell:
+            """
 {loads[plink]}
 {com[plink]} --bfile {params.indat} --remove {input.exclude} --pca 10 \
 --out {params.out}
-        """
+"""
 
 rule SampleExclusion:
     input:
@@ -484,7 +665,8 @@ rule GWAS_QC_Report:
         IBD_stats = decorate2("IBDQC.Rdata"),
         PCA_rdat = decorate2("pca.Rdata"),
         PopStrat_eigenval = decorate2("filtered_PCA.eigenval"),
-        PopStrat_eigenvec = decorate2("filtered_PCA.eigenvec")
+        PopStrat_eigenvec = decorate2("filtered_PCA.eigenvec"),
+        partmethod = rules.PCAPartitioning.output[1] if config["pcair"] else "/dev/null"
     output:
         DATAOUT + "/stats/{sample}_GWAS_QC.html"
     params:
@@ -492,7 +674,13 @@ rule GWAS_QC_Report:
         Family = FAMILY,
         pi_threshold = 0.1875,
         output_dir = DATAOUT + "/stats",
-        idir = DATAOUT + "/stats/md/{sample}"
+        idir = DATAOUT + "/stats/md/{sample}",
+        geno_miss = config['QC']['GenoMiss'],
+        samp_miss = config['QC']['SampMiss'],
+        MAF = config['QC']['MAF'],
+        HWE = config['QC']['HWE'],
+        superpop = config['superpop'],
+        partmethod = rules.PCAPartitioning.output[1] if config["pcair"] else "none"
     shell:
         """
 {loads[R]}
@@ -507,5 +695,9 @@ Path_imiss = "{input.imiss}", Path_HetFile = "{input.HetFile}", \
 pi_threshold = {params.pi_threshold}, Family = {params.Family}, \
 Path_IBD_stats = "{input.IBD_stats}", Path_PCA_rdat = "{input.PCA_rdat}", \
 Path_PopStrat_eigenval = "{input.PopStrat_eigenval}", \
-Path_PopStrat_eigenvec = "{input.PopStrat_eigenvec}"))' --slave
+Path_PopStrat_eigenvec = "{input.PopStrat_eigenvec}", maf = {params.MAF}, \
+hwe = {params.HWE}, missing_geno = {params.geno_miss}, \
+partmethod = "{params.partmethod}", \
+missing_sample = {params.samp_miss}, superpop = "{params.superpop}"))' --slave
 """
+
