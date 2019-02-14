@@ -1,12 +1,31 @@
-#DIAN
-sample: '201711_CoreExome-DIAN'
-SampleSex:
-DataIn: '/Users/sheaandrews/Documents/0_Data/DIAN/Genetics_CoreExome'
-DataOut: '/Users/sheaandrews/Documents/Test/temp'
-family: 'T'
+# Set to 'false' for automatic scanning of plink filesets,
+#   provide single sample, or provide list
+sample: false
 
-#ADNI_1
-#sample: "ADNI_1_hg19"
-#SampleSex: 'ADNI_1_hg19_xy'
-#DataIn: '/Users/sheaandrews/Documents/Test/Data'
-#DataOut: '/Users/sheaandrews/Documents/Test/temp'
+# These are the files to be used for sex concordance QC. They must contain
+#   X chromosomes. If left blank, standard plink filesets will be used. If
+#   directory is provided, it will be scanned for plink files containing the
+#   same names. If another string is provided, it will be used at the end of
+#   the sample names.
+SexIn: false
+
+# This is the directory with the input files:
+DataIn: ../data/raw_newID
+
+# This is the directory with the output files:
+DataOut: output
+
+#Do the samples contain families (true/false):
+family: false
+
+superpop: EUR
+king: true
+pcair: true
+
+QC:
+  GenoMiss: 0.05
+  SampMiss: 0.05
+  MAF: 0.02
+  HWE: 10e-6
+
+anaconda: /sc/orga/projects/LOAD/Brian/anaconda3/bin

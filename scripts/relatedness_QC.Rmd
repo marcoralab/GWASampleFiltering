@@ -4,168 +4,133 @@ author: "Shea Andrews"
 date: "`r Sys.Date()`"
 output: html_document
 params:
-  Path_GenomeFile: 
-  Path_FamFile: 
-  Sample: 
-  Family:
-editor_options: 
+  Path_IBD_stats:
+  Sample:
+  Family: F
+  pi_threshold: 0.1875
+editor_options:
   chunk_output_type: console
 ---
 
-## Cryptic Relatdness 
-Population based cohorts are often limited to unrelated individules as associations statisitcs often assume independence across individules. Closely related samples will share more of their genome and are likely to be more phenotypically similar than than two individules chosen randomly from the population. A common measure of relatedness is identity by descent (IBD), where a kinship correlation coefficent (pi-hat) greater 0.1 suggests that samples maybe related or duplicates samples. 
-<br> 
-
-Identifing duplicated or related samples can be done in PLINK by typing the following command at the shell prompt. This produce a file containing the pariwise IBS estimates for all pairs of individules with minimum IBS of 0.05. Analysis should be performed using an LD pruned snplist. 
-```{bash, eval=F}
-plink_1.9 --bfile raw-GWA-data \
-  --extract snplist.prune.in \
-  --genome --min 0.05 --out output.het
-```
-<br> 
-
-```{r setup realatdness, include=FALSE}
+```{r setup relatedness, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(root.dir = params$rwd)
 
 ## ---- Load Pacakges ---- ##
 library(tidyverse)
 library(ggplot2)
-library(plotly)     ## For 3d interactive scatter plots
+library(magrittr)
 library(knitr)
+library(kableExtra)
+library(DT)
+tabcap <- function (name, caption) {
+  sprintf("<table width=\"100%%\"><caption>(#tab:%s) %s </caption></table>", name, caption)
+}
+disptab <- function(x) {
+  if (knitr::opts_knit$get("rmarkdown.pandoc.to") == "html") {
+    dtopts <- list(dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel', 'pdf', 'print'))
+    return(datatable(x, extensions = 'Buttons', options = dtopts))
+  } else {
+    return(kable(x))
+  }
+}
 ```
 
 ```{r readData, echo=F, warning=F, message=F}
 ## ---- Read in Data ----##
-
-##  Read in .genome file obtained from PLINK using the --genome option
-dat.inter.raw <- as.tibble(read.table(params$Path_GenomeFile, header = TRUE, check.names = FALSE, as.is = TRUE))
-dat.inter <- dat.inter.raw
-#dat.inter <- read_table(params$Path_GenomeFile, col_names = TRUE)
-
-## Assign family relationships based on IBD
-
-# IBD relationship table
-# https://github.com/WheelerLab/GWAS_QC/blob/master/example_pipelines/QC%20Analysis%20-%20Cox%20Lab%20Projects.pdf
-rel_tab <- tibble(relationship = c('unrelated', 'identicial-twins', 'parent-child', 'full-siblings', 'half-siblings', 'grandparent-grandchild', 'avuncular', 'half-avuncular', 'first-cousin', 'half-first-cousin', 'half-sibling-first-cousin'),
-       pi_hat = c(0, 1, 0.5, 0.5, 0.25, 0.25, 0.25, 0.125, 0.125, 0.0625, 0.375),
-       z0 = c(1, 0, 0, 0.25, 0.5, 0.5, 0.5, 0.75, 0.75, 0.875, 0.375),
-       z1 = c(0, 0, 1, 0.5, 0.5, 0.5, 0.5, 0.25, 0.25, 0.125, 0.5),
-       z2 = c(0, 1, 0, 0.25, 0, 0, 0, 0, 0, 0, 0.125)
-       )
-##  Remove duplicate values, assign duplicate lables to same lable
-rel_tab_filt <- filter(rel_tab, relationship %nin% c('grandparent-grandchild', 'avuncular', 'half-avuncular'))
-rel_tab_filt[rel_tab_filt$relationship == 'half-siblings', ]$relationship <- "first-degree relative"
-rel_tab_filt[rel_tab_filt$relationship == 'first-cousin', ]$relationship <- "second-degree relative"
-
-## Match Pi-Hat, Z0, Z1, Z2 to closet values in IBD relationship table
-dat.inter$pi_hat <- sapply(dat.inter$PI_HAT, function(x){
-  out <- rel_tab$pi_hat[which(abs(rel_tab$pi_hat-x)==min(abs(rel_tab$pi_hat-x)))]
-  out[1]
-})
-dat.inter$z0 <- sapply(dat.inter$Z0, function(x){
-  out <- rel_tab$z0[which(abs(rel_tab$z0-x)==min(abs(rel_tab$z0-x)))]
-  out[1]
-})
-dat.inter$z1 <- sapply(dat.inter$Z1, function(x){
-  out <- with(rel_tab, z1[which(abs(z1-x)==min(abs(z1-x)))])
-  out[1]
-})
-dat.inter$z2 <- sapply(dat.inter$Z2, function(x){
-  out <- rel_tab$z2[which(abs(rel_tab$z2-x)==min(abs(rel_tab$z2-x)))]
-  out[1]
-})
-
-## Left join 
-dat.inter <- dat.inter %>% left_join(rel_tab_filt, by = c('pi_hat', 'z0', 'z1', 'z2')) 
-dat.inter <- mutate(dat.inter, relationship = ifelse(is.na(relationship), 'OA', relationship))
-
-```
-
-The following histogram (Fig. 1) shows the distribution of pairwise kingship coefficents between all pairs. 
-```{r plot kinship, distribution of pairwise kinship coefficnts, echo=FALSE, fig.width=4.7, fig.height=4.7, fig.align='center', fig.cap='Fig. 1: Distribution of pairwise kinship coefficents'}
-ggplot(dat.inter, aes(x = PI_HAT)) + 
-  geom_histogram(binwidth = 0.01, fill = "#377EB8") + lims(x = 0:1) +
-  theme_bw() + labs(x = 'Kinship Coefficent (pi-hat)') + 
-  geom_vline(xintercept = 0.1, colour = 'red', linetype = 2)
-
-```
-\
-
-Relationship between pairs of indiviudules is based on the following value IBD values: 
-
-***Table 1:*** IBD relationships
-```{r reL_table, echo=FALSE}
-as.data.frame(rel_tab)
-
-```
-
-The following plot (Fig. 2) shows the proportion loci sharing one allele IBD (Z1) by the proportion of loci where individules share zero alleles (Z0), where the kinship coefficent is greater than 0.05. In family based studies, pairs are coloured by IBD relationship. Table 2 displays the individules where the kinship coefficent was greather than 0.1 in population based studies OR how were duplicates in family based studies.  
-```{r relatdness plot, echo=FALSE, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Fig. 2: Pairs of individules plotted by their degree of relatedness'}
-
-if(params$Family == F){
-  ggplot(dat.inter, aes(x = Z0, y = Z1, colour = PI_HAT > 0.1)) + 
-  #geom_label_repel(data = filter(dat.inter, PI_HAT > 0.1), aes(x = Z0, y = Z1, label = paste(IID1, '-', IID2))) + 
-  geom_point() + lims(x = 0:1, y = 0:1) + 
-  scale_colour_manual(name = c('PI HAT > 0.1'), values = c("#E41A1C", "#377EB8")) + 
-  labs(x = 'IBD Z0', y = 'IBD Z1') + 
-  coord_fixed() + theme_bw() + theme(legend.position="bottom")
+Pi_threshold <- params$pi_threshold
+dat.inter.raw <- load(params$Path_IBD_stats)
+if ( king ) {
+  plot2Ydesc <- "kinship coefficient"
+  plot2Y <- "Kinship Coefficient"
+  plot2Ycol <- "Kinship"
+  plot2Xcol <- "IBS0"
+  package <- "KING"
 } else {
-  ggplot(dat.inter, aes(x = Z0, y = Z1, colour = relationship)) + 
-  geom_point() + lims(x = 0:1, y = 0:1) + 
-  labs(x = 'IBD Z0', y = 'IBD Z1') +
-  coord_fixed() + theme_bw() + theme(legend.position="right") 
+  plot2Ydesc <- "proportion of loci sharing one allele IBD (Z1)"
+  plot2Y <- "IBD Z1"
+  plot2Ycol <- "Z1"
+  plot2Xcol <- "Z0"
+  package <- "PLINK"
 }
-
-
 ```
 
-***Table 2:*** Samples with a kinship coefficent > 0.1
-```{r table ibd, echo=FALSE}
-if(params$Family == F){
-  ibdcoeff <- dat.inter %>% 
-    filter(PI_HAT > 0.1) %>% 
-    select(FID1, IID1, FID2, IID2, Z0, Z1, Z2, PI_HAT, relationship)
-  as.data.frame(ibdcoeff)
-} else {
-  ibdcoeff <- dat.inter %>% 
-        filter(relationship == 'identicial-twins') %>% 
-        select(FID1, IID1, FID2, IID2, Z0, Z1, Z2, PI_HAT, relationship)
-  as.data.frame(ibdcoeff)
-}
+## Cryptic Relatedness
+Population based cohorts are often limited to unrelated individuals as associations statisitcs often assume independence across individuals. Closely related samples will share more of their genome and are likely to be more phenotypically similar than than two individules chosen randomly from the population. A common measure of relatedness is identity by descent (IBD), where a kinship correlation coefficent (pi-hat) greater 0.1 suggests that samples maybe related or duplicates samples.
 
+Identifing duplicated or related samples can be done in PLINK 1.9 by typing the following command at the shell prompt.
+
+```{bash, eval=F}
+plink_1.9 --bfile raw-GWA-data \
+  --extract snplist.prune.in \
+  --genome --min 0.05 --out output.ibd
 ```
 
-To construct a sample of unrelated individules, participants with the highest number of pairwise kinship coefficents >0.1 can be iterativly removed. 
+This produces a file containing the pariwise IBS estimates for all pairs of individuals with minimum IBS of 0.05. Analysis should be performed using an LD pruned snplist.
 
-The following samples were excluded due to relatdness:
-```{r pressure, echo=FALSE, warning=FALSE}
-##  select samples with kinship cofficents > 0.1
-##  Iterativly remove subjects with the highest number of pairwise kinship cofficents > 0.1 
-##  see http://www.stat-gen.org/tut/tut_preproc.html 
+IBD can be calculated using KING Robust by typing the following command at the shell prompt. Genotypes do not need to be pruned, but basic QC is recommended.
 
-if(params$Family == F){
-  related.samples <- NULL
-  excluded <- list()
-  while(nrow(ibdcoeff) >0 ){
-    sample.counts <- arrange(plyr:::count(c(ibdcoeff$IID1, ibdcoeff$IID2)), -freq)
-    rm.sample <- sample.counts[1,'x']
-    excluded <- c(paste("Removing sample", as.character(rm.sample), 'to closely related to', sample.counts[1, 'freq'], 'other samples.'), excluded)
-    ibdcoeff <- ibdcoeff[ibdcoeff$IID1 != rm.sample & ibdcoeff$IID2 != rm.sample,]
-    related.samples <- c(as.character(rm.sample), related.samples)
-  }
-  as.data.frame(do.call(rbind, excluded))
-} else {
-  as.data.frame(ibdcoeff)
-}
-
-
-
+```{bash, eval=F}
+king -b raw-GWA-data.bed \
+  --related \
+  --degree 3
+  --prefix output.ibd
 ```
+
+This produces a file containing the pariwise IBS estimates for all pairs of individuals, looking for pairs with at least 3rd degree relatedness.
+
+`r package` has been chosen for IBD analysis.
+
 <br>
 
+The following histogram (Fig. \@ref(fig:kinplot)) shows the distribution of proportion of IBD sharing (pi-hat in PLINK; PropIBD in KING) between all pairs.
+
+```{r kinplot, echo=FALSE, fig.width=4.7, fig.height=4.7, fig.align='center', fig.cap='Distribution of pairwise kinship coefficients'}
+ggplot(dat.inter, aes(x = PI_HAT)) +
+  geom_histogram(binwidth = 0.01, fill = "#377EB8") + lims(x = (min(dat.inter$PI_HAT) - 0.05):1) +
+  theme_bw() + labs(x = 'IBD Sharing (pi-hat in PLINK)') +
+  geom_vline(xintercept = Pi_threshold, colour = 'red', linetype = 2)
+
+```
+
+Relationship between pairs of individuals is based on the following IBD values (Table \@ref(tab:reltable)) in PLINK, and is calculated internally in KING:
 
 
+```{r reltable, echo=FALSE}
+rel_tab %>% kable(caption = "IBD relationships", booktabs = TRUE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
 
 
+The following plot (Fig. \@ref(fig:relplot)) shows the `r plot2Ydesc` by the proportion of loci where individules share zero alleles (Z0), where the proportion of IBD sharing is greater than 0.05. In family based studies, pairs are coloured by IBD relationship. Table \@ref(tab:ibdfail) displays the individules where the kinship coefficent was greather than `r Pi_threshold` in population based studies OR how were duplicates in family based studies.
+```{r relplot, echo=FALSE, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Pairs of individules plotted by their degree of relatedness'}
 
+if(params$Family == F){
+  ggplot(dat.inter, aes(colour = PI_HAT > Pi_threshold)) +
+  #geom_label_repel(data = filter(dat.inter, PI_HAT > 0.1), aes(x = Z0, y = Z1, label = paste(IID1, '-', IID2))) +
+  geom_point(aes_string(x = plot2Xcol, y = plot2Ycol)) + lims(x = 0:1, y = 0:1) +
+  scale_colour_manual(name = sprintf("IBD Sharing > %f", Pi_threshold),
+  values = c("#377EB8", "#E41A1C")) +
+  labs(x = 'IBD Z0', y = plot2Y) +
+  coord_fixed() + theme_bw() + theme(legend.position="bottom")
+} else {
+  ggplot(dat.inter, aes(colour = relationship)) +
+  geom_point(aes_string(x = plot2Xcol, y = plot2Ycol)) + lims(x = 0:1, y = 0:1) +
+  labs(x = 'IBD Z0', y = plot2Y) +
+  coord_fixed() + theme_bw() + theme(legend.position="right")
+}
+```
+
+`r tabcap("ibdfail", sprintf("Samples with a proportion of IBD sharing > %e", Pi_threshold))`
+
+```{r table ibd, echo=FALSE}
+ibd_tab %>% disptab
+```
+
+To construct a sample of unrelated individuals, participants with the highest number of proportions of IBD sharing > `r Pi_threshold` can be iterativly removed.
+
+`r tabcap("famexcluded", "The following samples were excluded due to relatedness:")`
+
+```{r pressure, echo=FALSE, warning=FALSE}
+fam_table %>% disptab
+```
