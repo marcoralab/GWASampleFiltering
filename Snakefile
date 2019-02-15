@@ -359,7 +359,7 @@ rule makeTGpops:
     input: tgped
     output:
         "data/1000genomes_pops.txt",
-        "data/pops.txt
+        "data/pops.txt"
     shell:
         """
 awk 'BEGIN {{print "FID","IID","Population"}} NR>1 {{print $1,$2,$7}}' \
