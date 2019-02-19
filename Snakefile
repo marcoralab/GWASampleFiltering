@@ -9,7 +9,7 @@ FTP = FTPRemoteProvider()
 
 isMinerva = "hpc.mssm.edu" in socket.getfqdn()
 
-configfile: "../config.yaml"
+configfile: "./config.yaml"
 
 shell.executable("/bin/bash")
 
@@ -81,7 +81,7 @@ rule snp_qc:
 {com[plink]} --bfile {params.stem} --freq --out {params.out}
 {com[plink]} --bfile {params.stem} --freqx --out {params.out}
 {com[plink]} --bfile {params.stem} --geno {params.miss} \
---maf {params.MAF} --hardy --hwe {params.hwe} --make-bed --out {params.out}"""
+--maf {params.MAF} --hardy --hwe {params.HWE} --make-bed --out {params.out}"""
 
 # ---- Exclude Samples with high missing rate ----
 rule sample_callRate:
@@ -199,7 +199,8 @@ if config['king']:
             bim = rules.relatedness_sample_prep.output.bim,
             fam = rules.relatedness_sample_prep.output.fam
         output:
-            genome = DATAOUT + "/{sample}_IBDQC.kin0"
+            genome = DATAOUT + "/{sample}_IBDQC.kin0",
+            kin = DATAOUT + "/{sample}_IBDQC.kin"
         params:
             out = DATAOUT + "/{sample}_IBDQC"
         shell:

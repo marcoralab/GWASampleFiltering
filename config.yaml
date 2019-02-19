@@ -10,10 +10,10 @@ sample: false
 SexIn: false
 
 # This is the directory with the input files:
-DataIn: ../data/raw_newID
+DataIn: /sc/orga/projects/LOAD/Data/iPSC_GWAS/HipSci/genotyped/merged_samples/PLINK/
 
 # This is the directory with the output files:
-DataOut: output
+DataOut: /sc/orga/projects/LOAD/Data/iPSC_GWAS/HipSci/genotyped/merged_samples/PLINK/GWAS_QC/
 
 #Do the samples contain families (true/false):
 family: false
@@ -26,6 +26,6 @@ QC:
   GenoMiss: 0.05
   SampMiss: 0.05
   MAF: 0.02
-  HWE: 10e-6
+  HWE: 10e-30
 
-anaconda: /sc/orga/projects/LOAD/Brian/anaconda3/bin
+anaconda: /sc/orga/work/chaom03/anaconda3/bin/
