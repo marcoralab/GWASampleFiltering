@@ -58,13 +58,13 @@ def flatten(nested):
             flat.append(el)
         else:
             flat += flatten(el)
-return flat
+    return flat
 
-outs = dict(
-    report=expand(DATAOUT + "/stats/{sample}_GWAS_QC.html", sample=SAMPLE),
-    exclusions=expand(DATAOUT + "/{sample}_exclude.samples", sample=SAMPLE),
-    filtered=expand(DATAOUT + "/{sample}_Excluded.{ext}",
-        sample=SAMPLE, ext=BPLINK)
+outs = {
+    "report": expand(DATAOUT + "/stats/{sample}_GWAS_QC.html", sample=SAMPLE),
+    "exclusions": expand(DATAOUT + "/{sample}_exclude.samples", sample=SAMPLE),
+    "filtered": expand(DATAOUT + "/{sample}_Excluded.{ext}",
+        sample=SAMPLE, ext=BPLINK)}
 
 outputs = [outs[x] for x in config["outputs"]]
 outputs = flatten(outputs)
