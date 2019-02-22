@@ -31,10 +31,16 @@ use_iterlist <- function(fam, iterlist) {
 }
 
 use_pcair <- function(fam, kingstem) {
-  KINGmat <- king2mat(file.kin0 = paste0(kingstem, ".kin0"),
-                      file.kin = paste0(kingstem, ".kin"),
-                      iids = fam$IID)
-  raws <- pcairPartition(kinMat = KINGmat, divMat = KINGmat)
+  if (exists(kingToMatrix)) {
+    KINGmat <- kingToMatrix(paste0(kingstem, c(".kin", ".kin0")),
+                            sample.include = fam$IID)
+    raws <- pcairPartition(kinobj = KINGmat, divobj = KINGmat)
+  } else {
+    KINGmat <- king2mat(file.kin0 = paste0(kingstem, ".kin0"),
+                        file.kin = paste0(kingstem, ".kin"),
+                        iids = fam$IID)
+    raws <- pcairPartition(kinMat = KINGmat, divMat = KINGmat)
+  }
   if ( length(raws$rels) + length(raws$unrels) < nrow(fam) ) {
     stop("Length mismatch between KING output and famfile.")
   }

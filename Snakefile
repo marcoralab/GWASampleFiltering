@@ -588,7 +588,7 @@ fi"""
                    ext=['unrel', 'partition.log'])
         params:
             stem = rules.ancestryFilt.params.plinkout,
-            king = rules.filterKING.params.indat
+            king = rules.filterKING.params.indat + ".popfilt"
         shell:
             """
 {loads[R]}
