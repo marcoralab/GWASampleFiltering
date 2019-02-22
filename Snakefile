@@ -1,4 +1,4 @@
-'''Snakefile for GWAS Variant and Sample QC Version 0.3'''
+'''Snakefile for GWAS Variant and Sample QC Version 0.3.1'''
 
 from scripts.parse_config import parser
 from snakemake.remote.FTP import RemoteProvider as FTPRemoteProvider
@@ -529,16 +529,37 @@ if config['pcair']:
   --make-bed --out {params.plinkout}
 """
 
+    rule pcair_king:
+        input:
+            bed = rules.relatedness_sample_prep.output.bed,
+            bim = rules.relatedness_sample_prep.output.bim,
+            fam = rules.relatedness_sample_prep.output.fam
+        output:
+            genome = DATAOUT + "/{sample}_pcairKING.kin0",
+            kin = DATAOUT + "/{sample}_pcairKING.kin"
+        params:
+            out = DATAOUT + "/{sample}_pcairKING"
+        shell:
+            """
+{loads[king]}
+{com[king]} -b {input.bed} --kinship --prefix {params.out}
+if [[ -f {params.out}.kin && !( -f {params.out}.kin0 ) ]]; then
+  echo .kin file exists, but .kin0 does not. This is likely because there is
+  echo only one FID. converting .kin to .kin0
+  {loads[R]}
+  {com[R]} scripts/kin2kin0.R {params.out}.kin
+fi"""
+
     rule filterKING:
         input:
-            king = expand(DATAOUT + "/{{sample}}_IBDQC.{ext}",
+            king = expand(DATAOUT + "/{{sample}}_pcairKING.{ext}",
                           ext=["kin", "kin0"]),
             exclude = DATAOUT + "/{sample}_exclude.pca"
         output:
-            temp(expand(DATAOUT + "/{{sample}}_IBDQC.popfilt.{ext}",
+            temp(expand(DATAOUT + "/{{sample}}_pcairKING.popfilt.{ext}",
                         ext=["kin", "kin0"]))
         params:
-            indat = DATAOUT + "/{sample}_IBDQC",
+            indat = DATAOUT + "/{sample}_pcairKING",
         shell:
             r"""
 {loads[R]}
@@ -555,7 +576,7 @@ if config['pcair']:
                    ext=['unrel', 'partition.log'])
         params:
             stem = rules.ancestryFilt.params.plinkout,
-            king = DATAOUT + "/{sample}_IBDQC.popfilt"
+            king = rules.filterKING.params.indat
         shell:
             """
 {loads[R]}
@@ -701,4 +722,3 @@ hwe = {params.HWE}, missing_geno = {params.geno_miss}, \
 partmethod = "{params.partmethod}", \
 missing_sample = {params.samp_miss}, superpop = "{params.superpop}"))' --slave
 """
-
