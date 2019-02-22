@@ -51,14 +51,26 @@ def decorate(text):
 
 localrules: all, download_tg, download_tg_chrom
 
+def flatten(nested):
+    flat = []
+    for el in nested:
+        if not isinstance(el, list):
+            flat.append(el)
+        else:
+            flat += flatten(el)
+return flat
+
+outs = dict(
+    report=expand(DATAOUT + "/stats/{sample}_GWAS_QC.html", sample=SAMPLE),
+    exclusions=expand(DATAOUT + "/{sample}_exclude.samples", sample=SAMPLE),
+    filtered=expand(DATAOUT + "/{sample}_Excluded.{ext}",
+        sample=SAMPLE, ext=BPLINK)
+
+outputs = [outs[x] for x in config["outputs"]]
+outputs = flatten(outputs)
+
 rule all:
-    input:
-        expand(DATAOUT + "/stats/{sample}_GWAS_QC.html",
-               sample=SAMPLE),
-        # expand(DATAOUT + "/{sample}_exclude.samples",
-        #        sample=SAMPLE),
-        expand(DATAOUT + "/{sample}_Excluded.{ext}",
-               sample=SAMPLE, ext=BPLINK)
+    input: outputs
 
 
 # ---- Exlude SNPs with a high missing rate and low MAF----
