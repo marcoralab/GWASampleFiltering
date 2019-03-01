@@ -12,7 +12,8 @@ status <- import(c(
   "readr",
   "magrittr",
   "argparse",
-  "tidyr"
+  "tidyr",
+  "stringr"
   ))
 
 ##--- Set Params ---##
@@ -24,6 +25,7 @@ parser$add_argument("--val", help = "Eigenvalues file", required = T)
 parser$add_argument("-b", "--base", help = "Ped file from 1kgp", required = T)
 parser$add_argument("-t", "--target",
   help = "Fam file for sample. Can include 1kgp.", required = T)
+parser$add_argument("--TGremove", action="store_true")
 parser$add_argument("-s", "--sample", help = "Sample name", required = T)
 parser$add_argument("-o", "--output", help = "Sample exclusion file")
 parser$add_argument("-p", "--population", default = "EUR",
@@ -105,9 +107,13 @@ base_pops <- base_pops.raw %>%
 ##  Munge target population dataframes
 target_pops <- target_pops.raw %>%
   select(FID, IID) %>%
-  filter(!(IID %in% base_pops$IID)) %>%
   mutate(Population = params$sample, superpop = params$sample_s,
     cohort = params$sample_s)
+
+if ( params$TGremove ) {
+  target_pops <- target_pops %>%
+    filter(!(IID %in% base_pops$IID))
+}
 
 # fix improperly split FID_IID
 pca_FIDIID <- pca_orig %>%
@@ -120,7 +126,8 @@ pca <- target_pops %>%
   ##### FIX BAD FID_IID SPLIT #####
   unite("FIDIID", FID, IID, sep = "_", remove = F) %>%
   right_join(pca_FIDIID, by = "FIDIID") %>%
-  select(-FIDIID)
+  select(-FIDIID) %>%
+  mutate(FID = str_remove(FID, "^1000g___"))
 
 ## Colours for plots
 pca_col <- pca %>%
@@ -193,3 +200,4 @@ exclude_pop_outliers <- sample.pca %>%
 write_tsv(exclude_pop_outliers, params$output, col_names = F)
 save(tab_1, tab_2, no_outliers, pca, sample.pca, eigenval, pca_col,
      file = params$rmd)
+

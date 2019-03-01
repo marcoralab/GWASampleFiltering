@@ -95,7 +95,7 @@ partitiontext <- sprintf("However, ancestry can bias the dimensionality reductio
 ### Scree Plot
 The below scree plot (Fig. \@ref(fig:ScreePlotStrat)) shows the amount of variation retained by each principal component (Left) and the cumualtive proportion of variance explained by each principal compoent (Right).
 
-```{r Screeplotstrat PS, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Scree Plot of PVE for 10 Principal components (left) and cumaltive PVE for 10 Principal Components (right)'}
+```{r ScreePlotStrat, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Scree Plot of PVE for 10 Principal components (left) and cumaltive PVE for 10 Principal Components (right)'}
 #Include the number of PC for where the cumualtive PVE is 95%
 PC.inc <-  findInterval(0.95, cumsum(eigenval$PVE)) + 1
 

@@ -1,4 +1,4 @@
-'''Snakefile for GWAS Variant and Sample QC Version 0.3'''
+'''Snakefile for GWAS Variant and Sample QC Version 0.3.1'''
 
 from scripts.parse_config import parser
 from snakemake.remote.FTP import RemoteProvider as FTPRemoteProvider
@@ -19,6 +19,8 @@ if isMinerva:
 BPLINK = ["bed", "bim", "fam"]
 RWD = os.getcwd()
 start, FAMILY, SAMPLE, DATAOUT = parser(config)
+
+istg = config['isTG'] if 'isTG' in config else False
 
 # QC Steps:
 QC_snp = True
@@ -51,14 +53,26 @@ def decorate(text):
 
 localrules: all, download_tg, download_tg_chrom
 
+def flatten(nested):
+    flat = []
+    for el in nested:
+        if not isinstance(el, list):
+            flat.append(el)
+        else:
+            flat += flatten(el)
+    return flat
+
+outs = {
+    "report": expand(DATAOUT + "/stats/{sample}_GWAS_QC.html", sample=SAMPLE),
+    "exclusions": expand(DATAOUT + "/{sample}_exclude.samples", sample=SAMPLE),
+    "filtered": expand(DATAOUT + "/{sample}_Excluded.{ext}",
+        sample=SAMPLE, ext=BPLINK)}
+
+outputs = [outs[x] for x in config["outputs"]]
+outputs = flatten(outputs)
+
 rule all:
-    input:
-        expand(DATAOUT + "/stats/{sample}_GWAS_QC.html",
-               sample=SAMPLE),
-        # expand(DATAOUT + "/{sample}_exclude.samples",
-        #        sample=SAMPLE),
-        expand(DATAOUT + "/{sample}_Excluded.{ext}",
-               sample=SAMPLE, ext=BPLINK)
+    input: outputs
 
 
 # ---- Exlude SNPs with a high missing rate and low MAF----
@@ -199,20 +213,35 @@ if config['king']:
             bim = rules.relatedness_sample_prep.output.bim,
             fam = rules.relatedness_sample_prep.output.fam
         output:
-            genome = DATAOUT + "/{sample}_IBDQC.kin0",
-            kin = DATAOUT + "/{sample}_IBDQC.kin"
+            genome = DATAOUT + "/{sample}_IBDQC.kingfiles"
         params:
             out = DATAOUT + "/{sample}_IBDQC"
         shell:
             """
 {loads[king]}
 {com[king]} -b {input.bed} --related --degree 3 --prefix {params.out}
-if [[ -f {params.out}.kin && !( -f {params.out}.kin0 ) ]]; then
-  echo .kin file exists, but .kin0 does not. This is likely because there is
-  echo only one FID. converting .kin to .kin0
-  {loads[R]}
-  {com[R]} scripts/kin2kin0.R {params.out}.kin
-fi"""
+if test -n "$(find {DATAOUT} -name "{wildcards.sample}_IBDQC.kin*")"; then
+  find {DATAOUT} -name "{wildcards.sample}_IBDQC.kin*" > {output.genome}
+fi
+"""
+
+    rule king_all:
+        input:
+            bed = rules.relatedness_sample_prep.output.bed,
+            bim = rules.relatedness_sample_prep.output.bim,
+            fam = rules.relatedness_sample_prep.output.fam
+        output:
+            genome = DATAOUT + "/{sample}_IBDQC.all.kingfiles",
+        params:
+            out = DATAOUT + "/{sample}_IBDQC.all"
+        shell:
+            """
+{loads[king]}
+{com[king]} -b {input.bed} --kinship --ibs --prefix {params.out}
+if test -n "$(find {DATAOUT} -name "{wildcards.sample}_IBDQC.all.kin*")"; then
+  find {DATAOUT} -name "{wildcards.sample}_IBDQC.all.kin*" > {output.genome}
+fi
+"""
 else:
     rule relatedness_QC:
         input: rules.sample_prune.output
@@ -230,17 +259,19 @@ else:
 rule relatedness_sample_fail:
     input:
         genome = rules.relatedness_QC.output.genome,
+        geno_all = rules.king_all.output if config['king'] else "/dev/null",
         fam = sexcheck_in_plink_stem + ".fam"
     params:
         Family = FAMILY,
         king = config['king'],
-        threshold = 0.1875
+        threshold = 0.1875,
+        geno = rules.relatedness_QC.params.out if config['king'] else rules.relatedness_QC.output.genome
     output:
         out = DATAOUT + "/{sample}_exclude.relatedness",
         rdat = DATAOUT + "/{sample}_IBDQC.Rdata"
     shell:
         """
-{loads[R]}; {com[R]}  scripts/relatedness_QC.R {input.genome} {params.threshold} \
+{loads[R]}; {com[R]}  scripts/relatedness_QC.R {params.geno} {params.threshold} \
 {params.Family} {params.king} {output.out} {output.rdat}"""
 
 # ---- Exclude Samples with outlying heterozigosity ----
@@ -286,21 +317,26 @@ rule Sample_ChromPosRefAlt:
 {loads[R]}
 {com[R]} scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"""
 
+# allow for tg sample:
+rule tgfam:
+    input: DATAOUT + "/{sample}_pruned_flipped.fam"
+    output: DATAOUT + "/{sample}_pruned_flipped_tg.fam"
+    shell: """awk '$1 = "1000g___"$1 {{print}}' {input} > {output}"""
+
 # Recode sample plink file to vcf
 rule Sample_Plink2Bcf:
     input:
-        expand(DATAOUT + "/{{sample}}_pruned_flipped.{ext}", ext=BPLINK),
-        DATAOUT + "/{sample}_flipped_ChromPos.bim"
+        bed = DATAOUT + "/{sample}_pruned_flipped.bed",
+        bim = DATAOUT + "/{sample}_flipped_ChromPos.bim",
+        fam = rules.tgfam.output if istg else rules.tgfam.input
     output:
         DATAOUT + "/{sample}_pruned_flipped.vcf.gz"
     params:
-        indat = DATAOUT + "/{sample}_pruned_flipped",
-        bim = DATAOUT + "/{sample}_flipped_ChromPos.bim",
         out = DATAOUT + "/{sample}_pruned_flipped"
     shell:
         """
 {loads[plink]}
-{com[plink2]} --bfile {params.indat} --bim {params.bim} --recode vcf bgz \
+{com[plink2]} --bed {input.bed} --bim {input.bim} --fam {input.fam} --recode vcf bgz \
 --real-ref-alleles --out {params.out}"""
 
 # Index bcf
@@ -457,7 +493,7 @@ rule Plink_RefenceSample:
 
 rule fix_fam:
     input:
-        oldfam = DATAOUT + "/{sample}_pruned.fam",
+        oldfam = rules.Sample_Plink2Bcf.input.fam,
         newfam = DATAOUT + "/{sample}_1kg_merged.fam",
         tgped = tgped
     output: DATAOUT + "/{sample}_1kg_merged_fixed.fam"
@@ -491,7 +527,7 @@ rule ExcludePopulationOutliers:
     input:
         eigenval = DATAOUT + "/{sample}_1kg_merged.eigenval",
         eigenvec = DATAOUT + "/{sample}_1kg_merged.eigenvec",
-        fam = DATAOUT + "/{sample}_pruned.fam",
+        fam = rules.Sample_Plink2Bcf.input.fam,
         tgped = tgped
     output:
         excl = DATAOUT + "/{sample}_exclude.pca",
@@ -531,18 +567,19 @@ if config['pcair']:
 
     rule filterKING:
         input:
-            king = expand(DATAOUT + "/{{sample}}_IBDQC.{ext}",
-                          ext=["kin", "kin0"]),
+            king = DATAOUT + "/{sample}_IBDQC.all.kingfiles",
             exclude = DATAOUT + "/{sample}_exclude.pca"
         output:
-            temp(expand(DATAOUT + "/{{sample}}_IBDQC.popfilt.{ext}",
-                        ext=["kin", "kin0"]))
+            DATAOUT + "/{sample}_IBDQC.all.popfilt.kingfiles"
         params:
-            indat = DATAOUT + "/{sample}_IBDQC",
+            indat = DATAOUT + "/{sample}_IBDQC.all",
         shell:
             r"""
 {loads[R]}
 {com[R]} scripts/filterKing.R {params.indat} {input.exclude}
+if test -n "$(find {DATAOUT} -name "{wildcards.sample}_IBDQC.all.popfilt.kin*")"; then
+  find {DATAOUT} -name "{wildcards.sample}_IBDQC.all.popfilt.kin*" > {output}
+fi
 """
 
     rule PCAPartitioning:
@@ -555,7 +592,7 @@ if config['pcair']:
                    ext=['unrel', 'partition.log'])
         params:
             stem = rules.ancestryFilt.params.plinkout,
-            king = DATAOUT + "/{sample}_IBDQC.popfilt"
+            king = rules.filterKING.params.indat + ".popfilt"
         shell:
             """
 {loads[R]}

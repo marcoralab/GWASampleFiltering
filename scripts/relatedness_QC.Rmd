@@ -41,12 +41,14 @@ disptab <- function(x) {
 Pi_threshold <- params$pi_threshold
 dat.inter.raw <- load(params$Path_IBD_stats)
 if ( king ) {
+  dat.forplots <- dat.inter.all
   plot2Ydesc <- "kinship coefficient"
   plot2Y <- "Kinship Coefficient"
   plot2Ycol <- "Kinship"
   plot2Xcol <- "IBS0"
   package <- "KING"
 } else {
+  dat.forplots <- dat.inter
   plot2Ydesc <- "proportion of loci sharing one allele IBD (Z1)"
   plot2Y <- "IBD Z1"
   plot2Ycol <- "Z1"
@@ -86,8 +88,8 @@ This produces a file containing the pariwise IBS estimates for all pairs of indi
 The following histogram (Fig. \@ref(fig:kinplot)) shows the distribution of proportion of IBD sharing (pi-hat in PLINK; PropIBD in KING) between all pairs.
 
 ```{r kinplot, echo=FALSE, fig.width=4.7, fig.height=4.7, fig.align='center', fig.cap='Distribution of pairwise kinship coefficients'}
-ggplot(dat.inter, aes(x = PI_HAT)) +
-  geom_histogram(binwidth = 0.01, fill = "#377EB8") + lims(x = (min(dat.inter$PI_HAT) - 0.05):1) +
+ggplot(dat.forplots, aes(x = PI_HAT)) +
+  geom_histogram(binwidth = 0.01, fill = "#377EB8") + lims(x = (min(dat.forplots$PI_HAT) - 0.05):1) +
   theme_bw() + labs(x = 'IBD Sharing (pi-hat in PLINK)') +
   geom_vline(xintercept = Pi_threshold, colour = 'red', linetype = 2)
 
@@ -106,7 +108,7 @@ The following plot (Fig. \@ref(fig:relplot)) shows the `r plot2Ydesc` by the pro
 ```{r relplot, echo=FALSE, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Pairs of individules plotted by their degree of relatedness'}
 
 if(params$Family == F){
-  ggplot(dat.inter, aes(colour = PI_HAT > Pi_threshold)) +
+  ggplot(dat.forplots, aes(colour = PI_HAT > Pi_threshold)) +
   #geom_label_repel(data = filter(dat.inter, PI_HAT > 0.1), aes(x = Z0, y = Z1, label = paste(IID1, '-', IID2))) +
   geom_point(aes_string(x = plot2Xcol, y = plot2Ycol)) + lims(x = 0:1, y = 0:1) +
   scale_colour_manual(name = sprintf("IBD Sharing > %f", Pi_threshold),

@@ -1,3 +1,6 @@
+outputs: [report, exclusions]
+#options are report, exclusions, and filtered
+
 # Set to 'false' for automatic scanning of plink filesets,
 #   provide single sample, or provide list
 sample: false
@@ -29,3 +32,4 @@ QC:
   HWE: 10e-6
 
 anaconda: /sc/orga/projects/LOAD/Brian/anaconda3/bin
+

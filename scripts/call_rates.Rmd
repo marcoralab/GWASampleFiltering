@@ -25,13 +25,17 @@ knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(root.dir = params$rwd)
 
 # ---- packages ----
-library(tidyverse)
-library(Hmisc)
+library(readr)
+library(dplyr)
+library(tibble)
+library(tidyr)
+
 library(ggplot2)
 library(ggforce)
 library(Ternary)
 #library(ggtern)
 library(DT)
+
 tabcap <- function (name, caption) {
   sprintf("<table width=\"100%%\"><caption>(#tab:%s) %s </caption></table>", name, caption)
 }
@@ -43,6 +47,7 @@ disptab <- function(x) {
     return(kable(x))
   }
 }
+`%nin%` <- Negate(`%in%`)
 ```
 
 ```{r read in call rate, echo=F, cache=F, warning=F, message=F}
@@ -50,16 +55,30 @@ disptab <- function(x) {
 ##  set working directory
 
 # ---- readin plink .frq ---- ##
+message("reading plink frq file")
 freq.raw <- read_table(params$Path_frq, col_names = T)
 
 # ---- readin plink .frqx ---- ##
+message("reading plink frqx file")
 freqx.raw <- read_tsv(params$Path_frqx, col_names = T)
 
 # ---- readin plink .imiss ---- ##
+message("reading plink individual missingness file")
 imiss.raw <- read_table(params$Path_imiss, col_names = T)
 
 # ---- readin plink .hwe ---- ##
-hwe.raw <- read_table(params$Path_hwe, col_names = T)
+message("reading plink hwe file")
+hwe.raw <- read_table(params$Path_hwe, col_types = cols(
+  CHR = col_integer(),
+  SNP = col_character(),
+  TEST = col_character(),
+  A1 = col_character(),
+  A2 = col_character(),
+  GENO = col_character(),
+  `O(HET)` = col_double(),
+  `E(HET)` = col_double(),
+  P = col_double()
+))
 
 if ( nrow(hwe.raw) > 2*nrow(freq.raw) ) {
   CC_read <- paste("Please ensure that the phenotypes are correct, because",
@@ -101,7 +120,7 @@ snps <- freq.raw %>%
   mutate(Call = Call.rate >= 1 - as.numeric(params$missing_geno)) %>%
   mutate(Call.maf = MAF < params$maf) %>%
   mutate(hwe = P > params$hwe) %>%
-  as.tibble()
+  as_tibble()
 ```
 
 Figure \@ref(fig:MAFxcallrate) shows the SNP call rate versus minor allele frequncy across all typed SNPs in the study. The dashed lines denote the MAF and call rate QC thresholds. `r nrow(filter(snps, Call == F))` SNPs were removed due to low call rate and `r nrow(filter(snps, Call.maf == T))` SNPs were removed due to low minor allele frequency.
@@ -110,7 +129,6 @@ ggplot(data = snps, aes(x = MAF, y = Call.rate)) +
   geom_point(alpha = 0.3, size = 0.5) +
   geom_hline(yintercept = 1 - params$missing_geno, linetype = 2, colour = 'red') +
   geom_vline(xintercept = params$maf, linetype = 2, colour = 'red') +
-  #scale_y_log10(breaks = scales::trans_breaks("log10", function(x) round(10^x, 3))) +
   scale_x_log10(breaks = scales::trans_breaks("log10", function(x) round(10^x, 3))) +
   labs(y = 'Proportion of called genotypes', x = 'Minor Allele Frequency (log)') +
   theme_bw() + annotation_logticks()
@@ -183,7 +201,7 @@ plink_1.9 --bfile raw-GWA-data  \
 ```{r, echo=FALSE}
 imiss <- imiss.raw %>%
   mutate(call = F_MISS > params$missing_sample) %>%
-  as.tibble()
+  as_tibble()
 
 ```
 

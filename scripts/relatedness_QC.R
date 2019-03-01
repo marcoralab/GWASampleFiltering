@@ -1,10 +1,14 @@
 #!/bin/bash
 ##	R script for identifing samples that are crypticaly related from PLINK files.
 
-suppressMessages(require(tidyverse))
-suppressMessages(require(Hmisc))
+suppressMessages(require(readr))
+suppressMessages(require(dplyr))
+suppressMessages(require(tibble))
+suppressMessages(require(stringr))
+suppressMessages(require(tidyr))
 suppressMessages(require(magrittr))
 
+`%nin%` <- Negate(`%in%`)
 
 ##  Arguments:
 # 1: .genome output file from PLINK
@@ -23,16 +27,67 @@ rdat <- commandArgs(TRUE)[6]
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
 
 if (king) {
-  dat.inter <- read_table2(genome.file, col_types = cols(
-    .default = col_double(),
-    FID1 = col_character(),
-    ID1 = col_character(),
-    FID2 = col_character(),
-    ID2 = col_character(),
-    N_SNP = col_integer(),
-    InfType = col_character()
-  )) %>%
-    rename(IID1 = ID1, IID2 = ID2, PI_HAT = PropIBD)
+  kin0 <- F
+  kin <- F
+  dat.inter.kin0 <- paste0(genome.file, ".kin0")
+  dat.inter.kin <- paste0(genome.file, ".kin")
+  if (file.exists(dat.inter.kin0)) {
+    kin0 <- T
+    dat.inter.kin0 %<>% read_table2(col_types = cols(
+      .default = col_double(),
+      FID1 = col_character(),
+      ID1 = col_character(),
+      FID2 = col_character(),
+      ID2 = col_character(),
+      N_SNP = col_integer(),
+      InfType = col_character()
+    )) %>%
+      rename(IID1 = ID1, IID2 = ID2, PI_HAT = PropIBD)
+    dat.inter.all.kin0 <- read_table2(paste0(genome.file, ".all.kin0"), col_types = cols(
+      .default = col_double(),
+      FID1 = col_character(),
+      ID1 = col_character(),
+      FID2 = col_character(),
+      ID2 = col_character(),
+      N_SNP = col_integer()
+    )) %>%
+      rename(IID1 = ID1, IID2 = ID2) %>%
+      mutate(PI_HAT = ifelse(Kinship > 0, 2*Kinship, 0))
+  }
+  if (file.exists(dat.inter.kin)) {
+    kin <- T
+    dat.inter.kin <- read_table2(paste0(genome.file, ".kin"), col_types = cols(
+      .default = col_double(),
+      FID = col_character(),
+      ID1 = col_character(),
+      ID2 = col_character(),
+      N_SNP = col_integer(),
+      InfType = col_character()
+    )) %>%
+      rename(IID1 = ID1, IID2 = ID2, FID1 = FID, PI_HAT = PropIBD) %>%
+      mutate(FID2 = FID1)
+    dat.inter.all.kin <- read_table2(paste0(genome.file, ".all.kin"), col_types = cols(
+      .default = col_double(),
+      FID = col_character(),
+      ID1 = col_character(),
+      ID2 = col_character(),
+      N_SNP = col_integer()
+    )) %>%
+      rename(IID1 = ID1, IID2 = ID2, FID1 = FID) %>%
+      mutate(FID2 = FID1, PI_HAT = ifelse(Kinship > 0, 2*Kinship, 0))
+  }
+  if (kin0 & kin) {
+    dat.inter.all <- bind_rows(dat.inter.all.kin0, dat.inter.all.kin) %>%
+      distinct(FID1, IID1, FID2, IID2, .keep_all = T)
+    dat.inter <- bind_rows(dat.inter.kin0, dat.inter.kin) %>%
+      distinct(FID1, IID1, FID2, IID2, .keep_all = T)
+  } else if (kin0) {
+    dat.inter.all <- dat.inter.all.kin0
+    dat.inter <- dat.inter.kin0
+  } else if (kin) {
+    dat.inter.all <- dat.inter.all.kin
+    dat.inter <- dat.inter.kin
+  }
 } else {
   dat.inter <- read_table2(genome.file, col_types = cols(
     .default = col_double(),
@@ -136,14 +191,14 @@ if (king) {
 if (Family == F | Family == "F") {
   message("Working with unrelated samples.")
   ibdcoeff %<>%
-    mutate(FI1 = paste0(FID1, "🤣", IID1), FI2 = paste0(FID2, "🤣", IID2))
+    mutate(FI1 = paste0(FID1, "_-_-tempsep-_-_", IID1), FI2 = paste0(FID2, "_-_-tempsep-_-_", IID2))
   related.samples <- NULL
   excluded <- c()
   fam_table <- tibble(FID = c("deleteme"), IID = c("deleteme"), Related = c("deleteme"))
   while (nrow(ibdcoeff) > 0 ) {
     sample.counts <- arrange(plyr:::count(c(ibdcoeff$FI1, ibdcoeff$FI2)), -freq)
     rm.sample <- sample.counts[1, "x"]
-    ID <- str_split(rm.sample, "🤣")[[1]]
+    ID <- str_split(rm.sample, "_-_-tempsep-_-_")[[1]]
     FID <- ID[1]
     IID <- ID[2]
     remtxt <- sprintf("closely related to %i other samples.",
@@ -160,7 +215,7 @@ if (Family == F | Family == "F") {
   fam_table <- fam_table %>%
     filter(Related != "deleteme")
   exclude.samples <- tibble(FI = as.character(related.samples)) %>%
-    separate(FI, c("FID", "IID"), sep = "🤣")
+    separate(FI, c("FID", "IID"), sep = "_-_-tempsep-_-_")
 } else {
   message("Working with related samples.")
   fam_table <- as.data.frame(ibdcoeff)
@@ -170,4 +225,8 @@ if (Family == F | Family == "F") {
 
 ##  write out samples to be excluded
 write_tsv(exclude.samples, outfile, col_names = T)
-save(dat.inter, rel_tab, fam_table, ibd_tab, king, file = rdat)
+if (king) {
+  save(dat.inter, dat.inter.all, rel_tab, fam_table, ibd_tab, king, file = rdat)
+} else {
+  save(dat.inter, rel_tab, fam_table, ibd_tab, king, file = rdat)
+}
