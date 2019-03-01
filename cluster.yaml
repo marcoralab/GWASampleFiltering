@@ -33,3 +33,7 @@ king_all:
   cores: 6
   mem: 5200
   time: '24:00'
+pcair_king:
+  cores: 8
+  mem: 5200
+  time: '24:00'
