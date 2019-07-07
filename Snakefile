@@ -116,28 +116,20 @@ rule sample_callRate:
 
 # ---- Exclude Samples with discordant sex ----
 #  Use ADNI hg18 data, as the liftover removed the x chromsome data
-
+#  Modified rule sexcheck_QC to output empty file to conform with input for rule SampleExclusion
+#  Removed rule sex_sample_fail
 
 rule sexcheck_QC:
     input: start['sex']
     output:
-        DATAOUT + "/{sample}_SexQC.sexcheck"
+        DATAOUT + "/{sample}_exclude.sexcheck"
     params:
         indat = start['sex_stem'],
-        out = DATAOUT + "/{sample}_SexQC",
+        out = DATAOUT + "/{sample}_SexQC"
     shell:
         '''
-{loads[plink]}
-{com[plink]} --bfile {params.indat} --check-sex --out {params.out}
+touch {output}
 '''
-
-rule sex_sample_fail:
-    input:
-        rules.sexcheck_QC.output
-    output:
-        DATAOUT + "/{sample}_exclude.sexcheck",
-    shell:
-        '{loads[R]}; {com[R]} scripts/sexcheck_QC.R {input} {output}'
 
 if QC_callRate:
     sexcheck_in_plink = rules.sample_callRate.output[0]
@@ -690,11 +682,11 @@ cat {input.indat_exclude} | sed '1d' | cut -d' ' -f1,2 > {output.excl}
 def decorate2(text):
     return DATAOUT + "/{sample}_" + text
 
+# Modified rule GWAS_QC_Report input and shell to remove sex concordance QC components
 
 rule GWAS_QC_Report:
     input:
         script = "scripts/GWAS_QC.Rmd",
-        SexFile = decorate2("SexQC.sexcheck"),
         hwe = decorate2("SnpQc.hwe"),
         frq = decorate2("SnpQc.frq"),
         frqx = decorate2("SnpQc.frqx"),
@@ -727,7 +719,7 @@ replace=F); nm <- paste(nm[1], "and", nm[2]); \
 rmarkdown::render("{input.script}", output_dir = "{params.output_dir}", \
 output_file = "{output}", intermediates_dir = "{params.idir}", \
 params = list(rwd = "{params.rwd}", Sample = "{wildcards.sample}", \
-auth = nm, Path_SexFile = "{input.SexFile}", Path_hwe = "{input.hwe}", \
+auth = nm, Path_hwe = "{input.hwe}", \
 Path_frq = "{input.frq}", Path_frqx = "{input.frqx}", \
 Path_imiss = "{input.imiss}", Path_HetFile = "{input.HetFile}", \
 pi_threshold = {params.pi_threshold}, Family = {params.Family}, \
