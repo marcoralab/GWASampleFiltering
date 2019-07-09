@@ -103,11 +103,16 @@ rel_tab %>% kable(caption = "IBD relationships", booktabs = TRUE) %>%
   kable_styling(bootstrap_options = c("striped", "hover"))
 ```
 
+The following plot (Fig. \@ref(fig:relplot)) shows the `r plot2Ydesc` by the proportion of loci where individules share zero alleles (Z0), where the proportion of IBD sharing is greater than 0.05. In family based studies, pairs are coloured by IBD relationship.
 
-The following plot (Fig. \@ref(fig:relplot)) shows the `r plot2Ydesc` by the proportion of loci where individules share zero alleles (Z0), where the proportion of IBD sharing is greater than 0.05. In family based studies, pairs are coloured by IBD relationship. Table \@ref(tab:ibdfail) displays the individules where the kinship coefficent was greather than `r Pi_threshold` in population based studies OR how were duplicates in family based studies.
 ```{r relplot, echo=FALSE, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Pairs of individules plotted by their degree of relatedness'}
 
-if(params$Family == F){
+if(params$Family & !no_relateds){
+  ggplot(dat.inter, aes(colour = relationship)) +
+  geom_point(aes_string(x = plot2Xcol, y = plot2Ycol)) + lims(x = 0:1, y = 0:1) +
+  labs(x = 'IBD Z0', y = plot2Y) +
+  coord_fixed() + theme_bw() + theme(legend.position="right")
+} else {
   ggplot(dat.forplots, aes(colour = PI_HAT > Pi_threshold)) +
   #geom_label_repel(data = filter(dat.inter, PI_HAT > 0.1), aes(x = Z0, y = Z1, label = paste(IID1, '-', IID2))) +
   geom_point(aes_string(x = plot2Xcol, y = plot2Ycol)) + lims(x = 0:1, y = 0:1) +
@@ -115,13 +120,16 @@ if(params$Family == F){
   values = c("#377EB8", "#E41A1C")) +
   labs(x = 'IBD Z0', y = plot2Y) +
   coord_fixed() + theme_bw() + theme(legend.position="bottom")
-} else {
-  ggplot(dat.inter, aes(colour = relationship)) +
-  geom_point(aes_string(x = plot2Xcol, y = plot2Ycol)) + lims(x = 0:1, y = 0:1) +
-  labs(x = 'IBD Z0', y = plot2Y) +
-  coord_fixed() + theme_bw() + theme(legend.position="right")
 }
 ```
+
+```{r early_exit, echo=F, results='asis', eval=no_relateds}
+cat('Tables for cryptic relatedness are omitted because there are no outliers.')
+knitr::knit_exit()
+```
+
+Table \@ref(tab:ibdfail) displays the individales where the kinship coefficent was greather than `r Pi_threshold` in population based studies OR how were duplicates in family based studies.
+
 
 `r tabcap("ibdfail", sprintf("Samples with a proportion of IBD sharing > %e", Pi_threshold))`
 

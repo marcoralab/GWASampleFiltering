@@ -31,8 +31,12 @@ if (king) {
   kin <- F
   dat.inter.kin0 <- paste0(genome.file, ".kin0")
   dat.inter.kin <- paste0(genome.file, ".kin")
+  dat.inter.all.kin0 <- paste0(genome.file, ".all.kin0")
+  no_relateds_kin0 <- T
+  dat.inter.all.kin <- paste0(genome.file, ".all.kin0")
+  no_relateds_kin <- T
   if (file.exists(dat.inter.kin0)) {
-    kin0 <- T
+    no_relateds_kin0 <- F
     dat.inter.kin0 %<>% read_table2(col_types = cols(
       .default = col_double(),
       FID1 = col_character(),
@@ -43,19 +47,22 @@ if (king) {
       InfType = col_character()
     )) %>%
       rename(IID1 = ID1, IID2 = ID2, PI_HAT = PropIBD)
-    dat.inter.all.kin0 <- read_table2(paste0(genome.file, ".all.kin0"), col_types = cols(
+  }
+  if (file.exists(dat.inter.all.kin0)) {
+    kin0 <- T
+    dat.inter.all.kin0 %<>% read_table2(col_types = cols(
       .default = col_double(),
       FID1 = col_character(),
       ID1 = col_character(),
       FID2 = col_character(),
       ID2 = col_character(),
       N_SNP = col_integer()
-    )) %>%
+      )) %>%
       rename(IID1 = ID1, IID2 = ID2) %>%
-      mutate(PI_HAT = ifelse(Kinship > 0, 2*Kinship, 0))
+      mutate(PI_HAT = ifelse(Kinship > 0, 2 * Kinship, 0))
   }
   if (file.exists(dat.inter.kin)) {
-    kin <- T
+    no_relateds_kin <- F
     dat.inter.kin <- read_table2(paste0(genome.file, ".kin"), col_types = cols(
       .default = col_double(),
       FID = col_character(),
@@ -64,29 +71,38 @@ if (king) {
       N_SNP = col_integer(),
       InfType = col_character()
     )) %>%
-      rename(IID1 = ID1, IID2 = ID2, FID1 = FID, PI_HAT = PropIBD) %>%
-      mutate(FID2 = FID1)
-    dat.inter.all.kin <- read_table2(paste0(genome.file, ".all.kin"), col_types = cols(
-      .default = col_double(),
-      FID = col_character(),
-      ID1 = col_character(),
-      ID2 = col_character(),
-      N_SNP = col_integer()
-    )) %>%
-      rename(IID1 = ID1, IID2 = ID2, FID1 = FID) %>%
-      mutate(FID2 = FID1, PI_HAT = ifelse(Kinship > 0, 2*Kinship, 0))
+    rename(IID1 = ID1, IID2 = ID2, FID1 = FID, PI_HAT = PropIBD) %>%
+    mutate(FID2 = FID1)
   }
   if (kin0 & kin) {
     dat.inter.all <- bind_rows(dat.inter.all.kin0, dat.inter.all.kin) %>%
       distinct(FID1, IID1, FID2, IID2, .keep_all = T)
-    dat.inter <- bind_rows(dat.inter.kin0, dat.inter.kin) %>%
-      distinct(FID1, IID1, FID2, IID2, .keep_all = T)
+    no_relateds <- T
+    if (!no_relateds_kin0) {
+      inters <- c(inters, list(dat.inter.kin0))
+      no_relateds <- F
+    }
+    if (!no_relateds_kin) {
+      inters <- c(inters, list(dat.inter.kin))
+      no_relateds <- F
+    }
+    if (!no_relateds) {
+      dat.inter <- inters
+        bind_rows() %>%
+        distinct(FID1, IID1, FID2, IID2, .keep_all = T)
+    }
   } else if (kin0) {
     dat.inter.all <- dat.inter.all.kin0
-    dat.inter <- dat.inter.kin0
+    no_relateds <- no_relateds_kin0
+    if (!no_relateds) {
+      dat.inter <- dat.inter.kin0
+    }
   } else if (kin) {
     dat.inter.all <- dat.inter.all.kin
-    dat.inter <- dat.inter.kin
+    no_relateds <- no_relateds_kin0
+    if (!no_relateds) {
+      dat.inter <- dat.inter.kin
+    }
   }
 } else {
   dat.inter <- read_table2(genome.file, col_types = cols(
@@ -142,7 +158,7 @@ if (!king) {
            z2 = closest(Z2, rel_tab_filt$z2)) %>%
     left_join(rel_tab_filt, by = c("pi_hat", "z0", "z1", "z2")) %>%
     mutate(relationship = ifelse(is.na(relationship), "OA", relationship))
-} else {
+} else if (!no_relateds) {
   dat.inter %<>%
     mutate(relationship = InfType) %>%
     mutate(relationship = ifelse(relationship %in% c("1st", "2nd", "3rd", "4th"),
@@ -169,64 +185,73 @@ if (!king) {
 # select samples with kinship cofficents > 0.1875
 # https://link.springer.com/protocol/10.1007/978-1-60327-367-1_19
 
-if (Family == F | Family == "F"){
-  ibdcoeff <- dat.inter %>%
-    filter(PI_HAT > threshold)
-} else {
-  ibdcoeff <- dat.inter %>%
-    filter(relationship == "identicial-twins")
-}
-
-if (king) {
-  ibd_tab <- ibdcoeff %>%
-    select(FID1, IID1, FID2, IID2, IBS0, Kinship, PI_HAT, relationship)
-} else {
-  ibd_tab <- ibdcoeff %>%
-    select(FID1, IID1, FID2, IID2, Z0, Z1, Z2, PI_HAT, relationship)
-}
-
-# Iterativly remove subjects with the highest number of pairwise kinship cofficents > threshold
-# see http://www.stat-gen.org/tut/tut_preproc.html
-
-if (Family == F | Family == "F") {
-  message("Working with unrelated samples.")
-  ibdcoeff %<>%
-    mutate(FI1 = paste0(FID1, "_-_-tempsep-_-_", IID1), FI2 = paste0(FID2, "_-_-tempsep-_-_", IID2))
-  related.samples <- NULL
-  excluded <- c()
-  fam_table <- tibble(FID = c("deleteme"), IID = c("deleteme"), Related = c("deleteme"))
-  while (nrow(ibdcoeff) > 0 ) {
-    sample.counts <- arrange(plyr:::count(c(ibdcoeff$FI1, ibdcoeff$FI2)), -freq)
-    rm.sample <- sample.counts[1, "x"]
-    ID <- str_split(rm.sample, "_-_-tempsep-_-_")[[1]]
-    FID <- ID[1]
-    IID <- ID[2]
-    remtxt <- sprintf("closely related to %i other samples.",
-                      sample.counts[1, "freq"])
-    message(paste("Removing sample", IID, remtxt))
-    ft <- tibble(FID = FID, IID = IID, Related = remtxt)
-    fam_table <- fam_table %>%
-      bind_rows(ft)
-    ibdcoeff <- ibdcoeff[ibdcoeff$FI1 != rm.sample &
-                         ibdcoeff$FI2 != rm.sample, ]
-    related.samples <- c(as.character(rm.sample), related.samples)
+if (!no_relateds) {
+  if (Family == F | Family == "F"){
+    ibdcoeff <- dat.inter %>%
+      filter(PI_HAT > threshold)
+  } else {
+    ibdcoeff <- dat.inter %>%
+      filter(relationship == "identicial-twins")
   }
-  # Don't simplify fam_table. It will break.
-  fam_table <- fam_table %>%
-    filter(Related != "deleteme")
-  exclude.samples <- tibble(FI = as.character(related.samples)) %>%
-    separate(FI, c("FID", "IID"), sep = "_-_-tempsep-_-_")
-} else {
-  message("Working with related samples.")
-  fam_table <- as.data.frame(ibdcoeff)
-  related.samples <- c(ibdcoeff$IID1, ibdcoeff$IID2)
-  exclude.samples <- tibble(FID = character(), IID = character())
+
+  if (king) {
+    ibd_tab <- ibdcoeff %>%
+      select(FID1, IID1, FID2, IID2, IBS0, Kinship, PI_HAT, relationship)
+  } else {
+    ibd_tab <- ibdcoeff %>%
+      select(FID1, IID1, FID2, IID2, Z0, Z1, Z2, PI_HAT, relationship)
+  }
+
+  # Iterativly remove subjects with the highest number of pairwise kinship cofficents > threshold
+  # see http://www.stat-gen.org/tut/tut_preproc.html
+
+  if (Family == F | Family == "F") {
+    message("Working with unrelated samples.")
+    ibdcoeff %<>%
+      mutate(FI1 = paste0(FID1, "_-_-tempsep-_-_", IID1),
+             FI2 = paste0(FID2, "_-_-tempsep-_-_", IID2))
+    related.samples <- NULL
+    excluded <- c()
+    fam_table <- tibble(FID = c("deleteme"),
+                        IID = c("deleteme"),
+                        Related = c("deleteme"))
+    while (nrow(ibdcoeff) > 0 ) {
+      sample.counts <- arrange(
+        plyr:::count(c(ibdcoeff$FI1, ibdcoeff$FI2)), -freq)
+      rm.sample <- sample.counts[1, "x"]
+      ID <- str_split(rm.sample, "_-_-tempsep-_-_")[[1]]
+      FID <- ID[1]
+      IID <- ID[2]
+      remtxt <- sprintf("closely related to %i other samples.",
+                        sample.counts[1, "freq"])
+      message(paste("Removing sample", IID, remtxt))
+      ft <- tibble(FID = FID, IID = IID, Related = remtxt)
+      fam_table <- fam_table %>%
+        bind_rows(ft)
+      ibdcoeff <- ibdcoeff[ibdcoeff$FI1 != rm.sample &
+                           ibdcoeff$FI2 != rm.sample, ]
+      related.samples <- c(as.character(rm.sample), related.samples)
+    }
+    # Don't simplify fam_table. It will break.
+    fam_table <- fam_table %>%
+      filter(Related != "deleteme")
+    exclude.samples <- tibble(FI = as.character(related.samples)) %>%
+      separate(FI, c("FID", "IID"), sep = "_-_-tempsep-_-_")
+  } else {
+    message("Working with related samples.")
+    fam_table <- as.data.frame(ibdcoeff)
+    related.samples <- c(ibdcoeff$IID1, ibdcoeff$IID2)
+    exclude.samples <- tibble(FID = character(), IID = character())
+  }
 }
 
 ##  write out samples to be excluded
 write_tsv(exclude.samples, outfile, col_names = T)
-if (king) {
-  save(dat.inter, dat.inter.all, rel_tab, fam_table, ibd_tab, king, file = rdat)
+if (king & !no_relateds) {
+  save(dat.inter, dat.inter.all, rel_tab, fam_table, ibd_tab,
+    no_relateds, king, file = rdat)
+} else if (king) {
+  save(dat.inter.all, rel_tab, king, no_relateds, file = rdat)
 } else {
-  save(dat.inter, rel_tab, fam_table, ibd_tab, king, file = rdat)
+  save(dat.inter, rel_tab, fam_table, ibd_tab, king, no_relateds, file = rdat)
 }
