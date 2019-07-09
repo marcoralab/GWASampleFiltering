@@ -118,8 +118,6 @@ rule sample_callRate:
 
 # ---- Exclude Samples with discordant sex ----
 #  Use ADNI hg18 data, as the liftover removed the x chromsome data
-#  Modified rule sexcheck_QC to output empty file to conform with input for rule SampleExclusion
-#  Removed rule sex_sample_fail
 
 rule sexcheck_QC:
     input: start['sex']
@@ -130,8 +128,17 @@ rule sexcheck_QC:
         out = DATAOUT + "/{sample}_SexQC"
     shell:
         '''
-touch {output}
+{loads[plink]}
+{com[plink]} --bfile {params.indat} --check-sex --out {params.out}
 '''
+
+rule sex_sample_fail:
+    input:
+        rules.sexcheck_QC.output
+    output:
+        DATAOUT + "/{sample}_exclude.sexcheck",
+    shell:
+        '{loads[R]}; {com[R]} scripts/sexcheck_QC.R {input} {output}'
 
 if QC_callRate:
     sexcheck_in_plink = rules.sample_callRate.output[0]
