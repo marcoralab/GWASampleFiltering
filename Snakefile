@@ -1,5 +1,7 @@
 '''Snakefile for GWAS Variant and Sample QC Version 0.3.1'''
 
+do_sexqc = False
+
 from scripts.parse_config import parser
 from snakemake.remote.FTP import RemoteProvider as FTPRemoteProvider
 import socket
@@ -33,7 +35,7 @@ if isMinerva:
     loads = {'flippyr': 'module load plink/1.90', 'plink': 'module load plink/1.90',
              'bcftools': 'module load bcftools/1.9',
              'king': 'module unload gcc; module load king/2.1.6',
-             'R': ('module load R/3.4.3 pandoc/2.1.3 udunits/2.2.26; ',
+             'R': ('module load R/3.6.0 pandoc/2.1.3 udunits/2.2.26; ',
                    'RSTUDIO_PANDOC=$(which pandoc)')}
 else:
     com = {'flippyr': 'flippyr',
@@ -205,7 +207,8 @@ if config['king']:
             bim = rules.relatedness_sample_prep.output.bim,
             fam = rules.relatedness_sample_prep.output.fam
         output:
-            genome = DATAOUT + "/{sample}_IBDQC.kingfiles"
+            genome = DATAOUT + "/{sample}_IBDQCallsegs.txt"
+            #this is the only guaranteed output file from king related
         params:
             out = DATAOUT + "/{sample}_IBDQC"
         shell:
@@ -361,8 +364,8 @@ rule download_tg_chrom:
        FTP.remote(tgurl, keep_local=True),
        FTP.remote(tgurl + ".tbi", keep_local=True),
    output:
-       temp("data/1000gRaw.chr{chrom}.vcf.gz"),
-       temp("data/1000gRaw.chr{chrom}.vcf.gz.tbi")
+       "data/1000gRaw.chr{chrom}.vcf.gz",
+       "data/1000gRaw.chr{chrom}.vcf.gz.tbi"
    shell: "cp {input[0]} {output[0]}; cp {input[1]} {output[1]}"
 
 rule download_tg:
@@ -648,7 +651,7 @@ rule SampleExclusion:
     input:
         SampCallRate = DATAOUT + "/{sample}_callRate.irem",
         het = DATAOUT + "/{sample}_exclude.heterozigosity",
-        sex = DATAOUT + "/{sample}_exclude.sexcheck",
+        sex = DATAOUT + "/{sample}_exclude.sexcheck" if do_sexqc else "/dev/null",
         pca = DATAOUT + "/{sample}_exclude.pca",
         relat = DATAOUT + "/{sample}_exclude.relatedness"
     output:
@@ -692,6 +695,7 @@ rule GWAS_QC_Report:
         frqx = decorate2("SnpQc.frqx"),
         imiss = decorate2("callRate.imiss"),
         HetFile = decorate2("HetQC.het"),
+        SexFile = decorate2("HetQC.het") if do_sexqc else "/dev/null",
         IBD_stats = decorate2("IBDQC.Rdata"),
         PCA_rdat = decorate2("pca.Rdata"),
         PopStrat_eigenval = decorate2("filtered_PCA.eigenval"),
@@ -719,7 +723,7 @@ replace=F); nm <- paste(nm[1], "and", nm[2]); \
 rmarkdown::render("{input.script}", output_dir = "{params.output_dir}", \
 output_file = "{output}", intermediates_dir = "{params.idir}", \
 params = list(rwd = "{params.rwd}", Sample = "{wildcards.sample}", \
-auth = nm, Path_hwe = "{input.hwe}", \
+auth = nm, Path_hwe = "{input.hwe}", Path_SexFile = "{input.SexFile}", \
 Path_frq = "{input.frq}", Path_frqx = "{input.frqx}", \
 Path_imiss = "{input.imiss}", Path_HetFile = "{input.HetFile}", \
 pi_threshold = {params.pi_threshold}, Family = {params.Family}, \
@@ -730,4 +734,3 @@ hwe = {params.HWE}, missing_geno = {params.geno_miss}, \
 partmethod = "{params.partmethod}", \
 missing_sample = {params.samp_miss}, superpop = "{params.superpop}"))' --slave
 """
-
