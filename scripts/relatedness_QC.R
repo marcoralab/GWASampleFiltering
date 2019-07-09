@@ -57,7 +57,7 @@ if (king) {
       FID2 = col_character(),
       ID2 = col_character(),
       N_SNP = col_integer()
-      )) %>%
+    )) %>%
       rename(IID1 = ID1, IID2 = ID2) %>%
       mutate(PI_HAT = ifelse(Kinship > 0, 2 * Kinship, 0))
   }
@@ -71,23 +71,25 @@ if (king) {
       N_SNP = col_integer(),
       InfType = col_character()
     )) %>%
-    rename(IID1 = ID1, IID2 = ID2, FID1 = FID, PI_HAT = PropIBD) %>%
-    mutate(FID2 = FID1)
+      rename(IID1 = ID1, IID2 = ID2, FID1 = FID, PI_HAT = PropIBD) %>%
+      mutate(FID2 = FID1)
   }
   if (file.exists(dat.inter.kin)) {
-      dat.inter.all.kin %<>% read_table2(col_types = cols(
+    dat.inter.all.kin %<>% read_table2(col_types = cols(
       .default = col_double(),
       FID = col_character(),
       ID1 = col_character(),
       ID2 = col_character(),
       N_SNP = col_integer()
-      )) %>%
+    )) %>%
       rename(IID1 = ID1, IID2 = ID2, FID1 = FID) %>%
       mutate(FID2 = FID1, PI_HAT = ifelse(Kinship > 0, 2*Kinship, 0))
+  }
   if (kin0 & kin) {
     dat.inter.all <- bind_rows(dat.inter.all.kin0, dat.inter.all.kin) %>%
       distinct(FID1, IID1, FID2, IID2, .keep_all = T)
     no_relateds <- T
+    inters <- list()
     if (!no_relateds_kin0) {
       inters <- c(inters, list(dat.inter.kin0))
       no_relateds <- F
@@ -253,10 +255,13 @@ if (!no_relateds) {
     related.samples <- c(ibdcoeff$IID1, ibdcoeff$IID2)
     exclude.samples <- tibble(FID = character(), IID = character())
   }
+} else {
+  exclude.samples <- tibble(FID = "", IID = "")
 }
 
 ##  write out samples to be excluded
 write_tsv(exclude.samples, outfile, col_names = T)
+
 if (king & !no_relateds) {
   save(dat.inter, dat.inter.all, rel_tab, fam_table, ibd_tab,
     no_relateds, king, file = rdat)
