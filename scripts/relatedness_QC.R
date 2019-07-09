@@ -74,6 +74,16 @@ if (king) {
     rename(IID1 = ID1, IID2 = ID2, FID1 = FID, PI_HAT = PropIBD) %>%
     mutate(FID2 = FID1)
   }
+  if (file.exists(dat.inter.kin)) {
+      dat.inter.all.kin %<>% read_table2(col_types = cols(
+      .default = col_double(),
+      FID = col_character(),
+      ID1 = col_character(),
+      ID2 = col_character(),
+      N_SNP = col_integer()
+      )) %>%
+      rename(IID1 = ID1, IID2 = ID2, FID1 = FID) %>%
+      mutate(FID2 = FID1, PI_HAT = ifelse(Kinship > 0, 2*Kinship, 0))
   if (kin0 & kin) {
     dat.inter.all <- bind_rows(dat.inter.all.kin0, dat.inter.all.kin) %>%
       distinct(FID1, IID1, FID2, IID2, .keep_all = T)
