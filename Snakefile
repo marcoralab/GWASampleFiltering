@@ -122,10 +122,10 @@ rule sample_callRate:
 rule sexcheck_QC:
     input: start['sex']
     output:
-        DATAOUT + "/{sample}_exclude.sexcheck"
+        DATAOUT + "/{sample}_SexQC.sexcheck"
     params:
         indat = start['sex_stem'],
-        out = DATAOUT + "/{sample}_SexQC"
+        out = DATAOUT + "/{sample}_SexQC",
     shell:
         '''
 {loads[plink]}
@@ -702,7 +702,7 @@ rule GWAS_QC_Report:
         frqx = decorate2("SnpQc.frqx"),
         imiss = decorate2("callRate.imiss"),
         HetFile = decorate2("HetQC.het"),
-        SexFile = decorate2("HetQC.het") if do_sexqc else "/dev/null",
+        SexFile = decorate2("SexQC.sexcheck") if do_sexqc else "/dev/null",
         IBD_stats = decorate2("IBDQC.Rdata"),
         PCA_rdat = decorate2("pca.Rdata"),
         PopStrat_eigenval = decorate2("filtered_PCA.eigenval"),
