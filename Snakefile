@@ -30,10 +30,10 @@ if isMinerva:
     com = {'flippyr': 'flippyr', 'plink': 'plink --keep-allele-order',
            'plink2': 'plink', 'bcftools': 'bcftools', 'R': 'Rscript', 'R2': 'R',
            'king': 'king'}
-    loads = {'flippyr': 'module load plink/1.90', 'plink': 'module load plink/1.90',
+    loads = {'flippyr': 'module load plink/1.90b6.10', 'plink': 'module load plink/1.90b6.10',
              'bcftools': 'module load bcftools/1.9',
              'king': 'module unload gcc; module load king/2.1.6',
-             'R': ('module load R/3.4.3 pandoc/2.1.3 udunits/2.2.26; ',
+             'R': ('module load R/3.5.3 pandoc/2.6 udunits/2.2.26; ',
                    'RSTUDIO_PANDOC=$(which pandoc)')}
 else:
     com = {'flippyr': 'flippyr',
