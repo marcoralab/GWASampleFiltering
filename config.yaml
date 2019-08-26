@@ -31,5 +31,6 @@ QC:
   MAF: 0.02
   HWE: 10e-30
 
-anaconda: /sc/orga/projects/LOAD/Brian/anaconda3/bin
+anaconda: /sc/orga/work/fultob01/conda/envs/py3/bin
 
+download_tg: false
