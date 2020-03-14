@@ -362,7 +362,7 @@ tgurl = (tgbase + "release/20130502/ALL.chr{chrom}." +
 tgped = tgbase + "technical/working/20130606_sample_info/20130606_g1k.ped"
 tgfa = tgbase + "technical/reference/human_g1k_v37.fasta"
 
-predownload = False
+predownload = config['download_tg']
 
 if predownload:
     rule download_tg_chrom:
