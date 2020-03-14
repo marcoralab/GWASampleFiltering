@@ -3,6 +3,7 @@
 from scripts.parse_config import parser
 from snakemake.remote.FTP import RemoteProvider as FTPRemoteProvider
 import socket
+import sys
 import getpass
 
 FTP = FTPRemoteProvider()
@@ -14,7 +15,8 @@ configfile: "./config.yaml"
 shell.executable("/bin/bash")
 
 if isMinerva:
-    shell.prefix("PATH=" + config["anaconda"] + ":$PATH; ")
+    anacondapath = sys.exec_prefix + "/bin"
+    shell.prefix(". ~/.bashrc; PATH={}:$PATH; ".format(anacondapath))
 
 BPLINK = ["bed", "bim", "fam"]
 RWD = os.getcwd()
