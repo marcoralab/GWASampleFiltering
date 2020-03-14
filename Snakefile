@@ -30,10 +30,10 @@ if isMinerva:
     com = {'flippyr': 'flippyr', 'plink': 'plink --keep-allele-order',
            'plink2': 'plink', 'bcftools': 'bcftools', 'R': 'Rscript', 'R2': 'R',
            'king': 'king'}
-    loads = {'flippyr': 'module load plink/1.90', 'plink': 'module load plink/1.90',
+    loads = {'flippyr': 'module load plink/1.90b6.10', 'plink': 'module load plink/1.90b6.10',
              'bcftools': 'module load bcftools/1.9',
              'king': 'module unload gcc; module load king/2.1.6',
-             'R': ('module load R/3.4.3 pandoc/2.1.3 udunits/2.2.26; ',
+             'R': ('module load R/3.5.3 pandoc/2.6 udunits/2.2.26; ',
                    'RSTUDIO_PANDOC=$(which pandoc)')}
 else:
     com = {'flippyr': 'flippyr',
@@ -128,7 +128,7 @@ rule sexcheck_QC:
     shell:
         '''
 {loads[plink]}
-{com[plink]} --bfile {params.indat} --check-sex --out {params.out}
+{com[plink]} --bfile {params.indat} --check-sex --aec --out {params.out}
 '''
 
 rule sex_sample_fail:
@@ -362,35 +362,32 @@ tgurl = (tgbase + "release/20130502/ALL.chr{chrom}." +
 tgped = tgbase + "technical/working/20130606_sample_info/20130606_g1k.ped"
 tgfa = tgbase + "technical/reference/human_g1k_v37.fasta"
 
-predownload = True
+predownload = False
 
-rule download_tg_chrom:
-   input:
-       FTP.remote(tgurl, keep_local=True),
-       FTP.remote(tgurl + ".tbi", keep_local=True),
-   output:
-       temp("data/1000gRaw.chr{chrom}.vcf.gz"),
-       temp("data/1000gRaw.chr{chrom}.vcf.gz.tbi")
-   shell: "cp {input[0]} {output[0]}; cp {input[1]} {output[1]}"
-
-rule download_tg:
-   input:
-       FTP.remote(tgped, keep_local=True),
-       FTP.remote(tgfa + ".gz", keep_local=True),
-       FTP.remote(tgfa + ".fai", keep_local=True)
-   output:
-       "data/20130606_g1k.ped",
-       "data/human_g1k_v37.fasta",
-       "data/human_g1k_v37.fasta.fai"
-   shell: "cp {input[0]} {output[0]}; zcat {input[1]} > {output[1]}; cp {input[2]} {output[2]}"
+if predownload:
+    rule download_tg_chrom:
+       input:
+           FTP.remote(tgurl, keep_local=True),
+           FTP.remote(tgurl + ".tbi", keep_local=True),
+       output:
+           temp("data/1000gRaw.chr{chrom}.vcf.gz"),
+           temp("data/1000gRaw.chr{chrom}.vcf.gz.tbi")
+       shell: "cp {input[0]} {output[0]}; cp {input[1]} {output[1]}"
+    
+    rule download_tg:
+       input:
+           FTP.remote(tgped, keep_local=True),
+           FTP.remote(tgfa + ".gz", keep_local=True),
+           FTP.remote(tgfa + ".fai", keep_local=True)
+       output:
+           "data/20130606_g1k.ped",
+           "data/human_g1k_v37.fasta",
+           "data/human_g1k_v37.fasta.fai"
+       shell: "cp {input[0]} {output[0]}; zcat {input[1]} > {output[1]}; cp {input[2]} {output[2]}"
 
 tgped = "data/20130606_g1k.ped"
-if predownload:
-    refraw = ["data/1000gRaw.chr{chrom}.vcf.gz",
-              "data/1000gRaw.chr{chrom}.vcf.gz.tbi"]
-else:
-#    tgped = FTP.remote(tgped, keep_local=True)
-    refraw = "/dev/urandom"
+refraw = ["data/1000gRaw.chr{chrom}.vcf.gz",
+          "data/1000gRaw.chr{chrom}.vcf.gz.tbi"]
 
 rule makeTGpops:
     input: tgped

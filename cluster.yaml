@@ -6,8 +6,8 @@ __default__:
   mem: 10000
   time: '0:25'
 GWAS_QC_Report:
-  partition: manda
-  mem: 20000
+  mem: 8000
+  cores: 12
   time: '24:00'
 Reference_prep:
   cores: 8
@@ -37,3 +37,9 @@ pcair_king:
   cores: 8
   mem: 5200
   time: '24:00'
+relatedness_sample_fail:
+  cores: 6
+filterKING:
+  cores: 6
+PCAPartitioning:
+  cores: 6
