@@ -75,7 +75,7 @@ outputs = [outs[x] for x in config["outputs"]]
 outputs = flatten(outputs)
 
 rule all:
-    input: expand(DATAOUT + "/{sample}_pruned.bed", sample=SAMPLE) # outputs
+    input: expand(DATAOUT + "/{sample}_{refname}_merged.vcf", sample=SAMPLE, refname="1kG") # outputs
 
 
 # ---- Exlude SNPs with a high missing rate and low MAF----
@@ -152,6 +152,16 @@ else:
     sexcheck_in_plink = start['files']
     sexcheck_in_plink_stem = start['stem']
 
+# ---- Principal Compoent analysis ----
+#  Project ADNI onto a PCA using the 1000 Genomes dataset to identify
+#    population outliers
+
+#  Extract a pruned dataset from 1000 genomes using the same pruning SNPs
+#    from Sample
+# align 1000 genomes to fasta refrence
+
+predownload = config['download_tg']
+
 tgbase = "ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/"
 tgped = tgbase + "technical/working/20130606_sample_info/20130606_g1k.ped"
 
@@ -162,14 +172,201 @@ if config['genome_build'] in ['hg19', 'hg37', 'GRCh37', 'grch37', 'GRCH37']:
     tgfa = tgbase + "technical/reference/human_g1k_v37.fasta"
 elif config['genome_build'] in ['hg38', 'GRCh38', 'grch38', 'GRCH38']:
     BUILD = 'GRCh38'
-    tgurl = (tgbase + 
+    tgurl = (tgbase +
         'data_collections/1000_genomes_project/release/20181203_biallelic_SNV/' +
         'ALL.chr{chrom}.shapeit2_integrated_v1a.GRCh38.20181129.phased.vcf.gz')
     tgfa = 'technical/reference/GRCh38_reference_genome/GRCh38_full_analysis_set_plus_decoy_hla.fa'
 
+
+if predownload:
+    rule download_tg_chrom:
+       input:
+           FTP.remote(tgurl, keep_local=True),
+           FTP.remote(tgurl + ".tbi", keep_local=True),
+       output:
+           temp("data/1000gRaw.{gbuild}.chr{chrom}.vcf.gz"),
+           temp("data/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi")
+       shell: "cp {input[0]} {output[0]}; cp {input[1]} {output[1]}"
+
+    rule download_tg_fa:
+       input:
+           FTP.remote(tgfa + ".gz", keep_local=True),
+           FTP.remote(tgfa + ".fai", keep_local=True)
+       output:
+           "data/human_g1k_{gbuild}.fasta",
+           "data/human_g1k_{gbuild}.fasta.fai"
+       shell: "zcat {input[0]} > {output[0]}; cp {input[0]} {output[0]}"
+
+    rule download_tg_ped:
+       input:
+           FTP.remote(tgped, keep_local=True),
+       output:
+           "data/20130606_g1k.ped",
+       shell: "cp {input} {output}"
+
+tgped = "data/20130606_g1k.ped"
+tg_refraw = ["data/1000gRaw.{gbuild}.chr{chrom}.vcf.gz",
+          "data/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi"]
+
+rule makeTGpops:
+    input: tgped
+    output:
+        "data/1000genomes_pops.txt",
+        "data/pops.txt"
+    shell:
+        """
+awk 'BEGIN {{print "FID","IID","Population"}} NR>1 {{print $1,$2,$7}}' \
+{input} > {output[0]}
+cut -f7 {input} | sed 1d | sort | uniq > {output[1]}
+"""
+
+if (not "custom_ref" in config) or (not config['custom_ref']):
+    REF = '1kG'
+    rule Reference_prep:
+        input: tg_refraw
+        output: temp("data/1kG.{gbuild}.chr{chrom}.maxmiss{miss}.vcf.gz")
+        shell:
+            """
+    {loads[bcftools]}
+    {com[bcftools]} norm -m- {input[0]} --threads 2 | \
+    {com[bcftools]} view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
+    {com[bcftools]} annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
+    """
+
+    """
+    Selects everyone who is unrelated or only has third degree relatives in
+    thousand genomes.
+    """
+    rule Reference_foundersonly:
+        input: tgped
+        output:
+            "data/20130606_g1k.founders"
+        shell: r"""
+    awk -F "\t" '!($12 != 0 || $10 != 0 || $9 != 0 || $3 != 0 || $4 != 0) {{print $2}}' \
+    {input} > {output}
+    """
+
+    rule Reference_cat:
+        input:
+            vcfs = expand("data/1kG.{{gbuild}}.chr{chrom}.maxmiss{{miss}}.vcf.gz",
+                          chrom = list(range(1, 23)))
+        output:
+            vcf = "data/1kG_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
+            tbi = "data/1kG_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
+        shell:
+            """
+    {loads[bcftools]}
+    {com[bcftools]} concat {input.vcfs} -Oz -o {output.vcf} --threads 2
+    {com[bcftools]} index -ft {output.vcf}
+    """
+elif '.vcf' in config['custom_ref'] or '.bcf' in config['custom_ref']:
+    REF = config['custom_ref_name']
+    if '{chrom}' in config['custom_ref']:
+        rule Reference_prep:
+            input: config['custom_ref']
+            output: temp("data/{refname}.{gbuild}.chr{chrom}.maxmiss{miss}.vcf.gz")
+            shell:
+                """
+        {loads[bcftools]}
+        {com[bcftools]} norm -m- {input} --threads 2 | \
+        {com[bcftools]} view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
+        {com[bcftools]} annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
+        """
+
+        rule Reference_cat:
+            input:
+                vcfs = expand("data/{{refname}}.{{gbuild}}.chr{chrom}.maxmiss{{miss}}.vcf.gz",
+                              chrom = list(range(1, 23)))
+            output:
+                vcf = "data/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
+                tbi = "data/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
+            shell:
+                """
+        {loads[bcftools]}
+        {com[bcftools]} concat {input.vcfs} -Oz -o {output.vcf} --threads 2
+        {com[bcftools]} index -ft {output.vcf}
+        """
+    else:
+        rule Reference_prep:
+            input: config['custom_ref']
+            output:
+                vcf = "data/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
+                tbi = "data/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
+            shell:
+                """
+        {loads[bcftools]}
+        {com[bcftools]} norm -m- {input.vcf} --threads 2 | \
+        {com[bcftools]} view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
+        {com[bcftools]} annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output.vcf}
+        {com[bcftools]} index -ft {output.vcf}
+        """
+else: #PLINK fileset of all chromosomes
+    REF = config['custom_ref_name']
+    # align custom ref to fasta refrence
+    rule Ref_Flip:
+        input:
+            bim = config['custom_ref'] + '.bim',
+            bed = config['custom_ref'] + '.bed',
+            fam = config['custom_ref'] + '.fam',
+            fasta = expand("data/human_g1k_{gbuild}.fasta", gbuild=BUILD)
+        output:
+            temp(expand("data/{{refname}}_flipped.{ext}", ext=BPLINK))
+        shell:
+            """
+    {loads[flippyr]}
+    {com[flippyr]} -p {input.fasta} -o {DATAOUT}/{wildcards.refname} {input.bim}"""
+
+    rule Ref_ChromPosRefAlt:
+        input:
+            flipped = "data/{refname}_flipped.bim"
+        output:
+            bim = temp("data/{refname}_flipped_ChromPos.bim"),
+            snplist = temp("data/{refname}_flipped_snplist")
+        shell:
+            """
+    {loads[R]}
+    {com[R]} scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"""
+
+    # Recode sample plink file to vcf
+    rule Ref_Plink2Vcf:
+        input:
+            bim = rules.Ref_ChromPosRefAlt.output,
+            flipped = rules.Ref_Flip.output
+        output:
+            temp("data/{refname}_{gbuild}.vcf.gz")
+        params:
+            out = "data/{refname}_{gbuild}",
+            inp = "data/{refname}_flipped"
+        shell:
+            """
+    {loads[plink]}
+    {com[plink2]} --bfile {input.flipped} --bim {input.bim} --recode vcf bgz \
+    --real-ref-alleles --out {params.out}"""
+
+    # Index bcf
+    rule Ref_IndexVcf:
+        input: "data/{refname}_{gbuild}.vcf.gz"
+        output: "data/{refname}_{gbuild}.vcf.gz.csi"
+        shell: '{loads[bcftools]}; {com[bcftools]} index -f {input}'
+
+    rule Reference_prep:
+       input:
+            vcf = rules.Ref_Plink2Vcf.output,
+            csi = rules.Ref_IndedVcf.output
+       output:
+            vcf = "data/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
+            tbi = "data/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
+       shell:
+            """
+{loads[bcftools]}
+{com[bcftools]} norm -m- {input.vcf} --threads 2 | \
+{com[bcftools]} view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
+{com[bcftools]} annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output.vcf}
+{com[bcftools]} index -ft {output.vcf}
+"""
+
 # ---- Prune SNPs, autosome only ----
 #  Pruned SNP list is used for IBD, PCA and heterozigosity calculations
-
 
 # align sample to fasta refrence
 rule Sample_Flip:
@@ -197,11 +394,11 @@ rule Sample_ChromPosRefAlt:
 {loads[R]}
 {com[R]} scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"""
 
-panel_variants = 'panelvars.snps'
+panel_variants = 'panelvars_{refname}.snps'
 
 rule get_panelvars:
     input:
-        expand("data/1000genomes_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
+        expand("data/{{refname}}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
                gbuild=BUILD, miss=config['QC']['GenoMiss']),
     output: panel_variants
     shell:
@@ -210,16 +407,18 @@ rule get_panelvars:
 {com[bcftools]} query -f '%ID\n' {input} > {output}
 """
 
-def extract_sample(union_panel_TF, panel_variants):
-    if union_panel_TF:
-       return ("--extract {} ".format(panel_variants))
-    return ""
+if union_panel_TF:
+    PVARS = expand(panel_variants, refname=REF)
+    extract_sample = "--extract {} ".format(panel_variants).format(refname=REF)
+else:
+    PVARS = "/dev/urandom"
+    extract_sample = ""
 
 rule PruneDupvar_snps:
     input:
         fileset = rules.Sample_ChromPosRefAlt.input,
         bim = rules.Sample_ChromPosRefAlt.output.bim,
-        pvars = panel_variants if union_panel_TF else "/dev/urandom"
+        pvars = PVARS
     output:
         expand(DATAOUT + "/{{sample}}_nodup.{ext}",
                ext=['prune.in', 'prune.out']),
@@ -228,7 +427,7 @@ rule PruneDupvar_snps:
         indat = sexcheck_in_plink_stem,
         dupvar = DATAOUT + "/{sample}_nodup.dupvar",
         out = DATAOUT + "/{sample}_nodup",
-        extract = extract_sample(union_panel_TF, panel_variants)
+        extract = extract_sample
     shell:
         """
 {loads[plink]}
@@ -255,6 +454,137 @@ rule sample_prune:
 {loads[plink]}
 {com[plink]} --bfile {params.indat_plink} --extract {input.prune} \
 --exclude {input.dupvar} --make-bed --out {params.out}"""
+
+rule sample_make_prunelist:
+  input: DATAOUT + "/{sample}_pruned.bim"
+  output: DATAOUT + "/{sample}_pruned.snplist"
+  shell: "cut -f2 {input} > {output}"
+
+#TODO fix founders for custom ref
+rule Reference_prune:
+    input:
+        vcf = expand("data/{{refname}}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
+                     gbuild=BUILD, miss=config['QC']['GenoMiss']),
+        prune = DATAOUT + "/{sample}_pruned.snplist",
+        founders = "data/20130606_g1k.founders"
+    output:
+        vcf = temp(DATAOUT + "/{sample}_{refname}pruned.vcf.gz"),
+        tbi = temp(DATAOUT + "/{sample}_{refname}pruned.vcf.gz.tbi")
+    shell:
+        """
+{loads[bcftools]}
+{com[bcftools]} view -i 'ID=@{input.prune}' -S {input.founders} \
+-Oz -o {output.vcf} --force-samples {input.vcf} --threads 4
+{com[bcftools]} index -ft {output.vcf}
+"""
+
+# allow for tg sample:
+rule tgfam:
+    input: DATAOUT + "/{sample}_pruned.fam"
+    output: DATAOUT + "/{sample}_pruned_tg.fam"
+    shell: """awk '$1 = "1000g___"$1 {{print}}' {input} > {output}"""
+
+# Recode sample plink file to vcf
+rule Sample_Plink2Bcf:
+    input:
+        bed = DATAOUT + "/{sample}_pruned.bed",
+        bim = DATAOUT + "/{sample}_pruned.bim",
+        fam = rules.tgfam.output if istg else rules.tgfam.input
+    output: DATAOUT + "/{sample}_pruned.vcf.gz"
+    params:
+        out = DATAOUT + "/{sample}_pruned"
+    shell:
+        """
+{loads[plink]}
+{com[plink2]} --bed {input.bed} --bim {input.bim} --fam {input.fam} --recode vcf bgz \
+--real-ref-alleles --out {params.out}"""
+
+# Index bcf
+rule Sample_IndexBcf:
+    input: DATAOUT + "/{sample}_pruned.vcf.gz"
+    output: DATAOUT + "/{sample}_pruned.vcf.gz.csi"
+    shell: '{loads[bcftools]}; {com[bcftools]} index -f {input}'
+
+# Merge ref and sample
+rule Merge_RefenceSample:
+    input:
+        bcf_1kg = DATAOUT + "/{sample}_{refname}pruned.vcf.gz",
+        tbi_1kg = DATAOUT + "/{sample}_{refname}pruned.vcf.gz.tbi",
+        bcf_samp = DATAOUT + "/{sample}_pruned.vcf.gz",
+        csi_samp = DATAOUT + "/{sample}_pruned.vcf.gz.csi"
+    params:
+        miss = config['QC']['GenoMiss']
+    output:
+        out = DATAOUT + "/{sample}_{refname}_merged.vcf"
+    shell:
+        r"""
+{loads[bcftools]}
+{com[bcftools]} merge -m none --threads 2 {input.bcf_1kg} {input.bcf_samp} | \
+{com[bcftools]} view  -i 'F_MISSING <= {params.miss}' -Ov -o {output.out} --threads 2"""
+
+# recode merged sample to plink
+rule Plink_RefenceSample:
+    input:
+        vcf = DATAOUT + "/{sample}_{refname}_merged.vcf"
+    output:
+        expand(DATAOUT + "/{{sample}}_{{refname}}_merged.{ext}", ext=BPLINK)
+    params:
+        out = DATAOUT + "/{sample}_{refname}_merged"
+    shell:
+        '''
+{loads[plink]}
+{com[plink]} --vcf {input.vcf} --const-fid --make-bed --out {params.out}'''
+
+rule fix_fam:
+    input:
+        oldfam = rules.Sample_Plink2Bcf.input.fam,
+        newfam = DATAOUT + "/{sample}_{refname}_merged.fam",
+        tgped = tgped
+    output: DATAOUT + "/{sample}_{refname}_merged_fixed.fam"
+    shell:
+        """
+{loads[R]}
+{com[R]} scripts/fix_fam.R {input.oldfam} {input.newfam} {output} {input.tgped}"""
+
+# PCA analysis to identify population outliers
+rule PcaPopulationOutliers:
+    input:
+        plink = expand(DATAOUT + "/{{sample}}_{{refname}}_merged.{ext}", ext=BPLINK),
+        fam = rules.fix_fam.output,
+        pop = "data/1000genomes_pops.txt",
+        clust = "data/pops.txt"
+    output:
+        expand(DATAOUT + "/{{sample}}_{{refname}}_merged.{ext}", ext=['eigenval', 'eigenvec'])
+    params:
+        indat_plink = DATAOUT + "/{sample}_{refname}_merged",
+        out = DATAOUT + "/{sample}_{refname}_merged"
+    shell:
+        """
+{loads[plink]}
+{com[plink]} --bfile {params.indat_plink} --fam {input.fam} --pca 10 \
+--within {input.pop} --pca-clusters {input.clust} --out {params.out}
+"""
+
+# Rscript to identify population outliers
+rule ExcludePopulationOutliers:
+    input:
+        eigenval = expand(DATAOUT + "/{{sample}}_{refname}_merged.eigenval", refname=REF),
+        eigenvec = expand(DATAOUT + "/{{sample}}_{refname}_merged.eigenvec", refname=REF),
+        fam = rules.Sample_Plink2Bcf.input.fam,
+        tgped = tgped
+    output:
+        excl = DATAOUT + "/{sample}_exclude.pca",
+        rmd = temp(DATAOUT + "/{sample}_pca.Rdata")
+    params:
+        samp = "{sample}",
+        superpop = config['superpop']
+    shell:
+        """
+{loads[R]}
+scripts/PCA_QC.R -s {params.samp} -p {params.superpop} \
+--vec {input.eigenvec} --val {input.eigenval} \
+-b {input.tgped} -t {input.fam} -o {output.excl} -R {output.rmd}
+"""
 
 # ---- Exclude Samples with interealtedness ----
 rule relatedness_sample_prep:
@@ -360,254 +690,6 @@ rule heterozygosity_sample_fail:
     output: DATAOUT + "/{sample}_exclude.heterozigosity"
     shell: '{loads[R]}; {com[R]}  scripts/heterozygosity_QC.R {input} {output}'
 
-
-# allow for tg sample:
-rule tgfam:
-    input: DATAOUT + "/{sample}_pruned_flipped.fam"
-    output: DATAOUT + "/{sample}_pruned_flipped_tg.fam"
-    shell: """awk '$1 = "1000g___"$1 {{print}}' {input} > {output}"""
-
-# Recode sample plink file to vcf
-rule Sample_Plink2Bcf:
-    input:
-        bed = DATAOUT + "/{sample}_pruned_flipped.bed",
-        bim = DATAOUT + "/{sample}_flipped_ChromPos.bim",
-        fam = rules.tgfam.output if istg else rules.tgfam.input
-    output:
-        DATAOUT + "/{sample}_pruned_flipped.vcf.gz"
-    params:
-        out = DATAOUT + "/{sample}_pruned_flipped"
-    shell:
-        """
-{loads[plink]}
-{com[plink2]} --bed {input.bed} --bim {input.bim} --fam {input.fam} --recode vcf bgz \
---real-ref-alleles --out {params.out}"""
-
-# Index bcf
-rule Sample_IndexBcf:
-    input:
-        bcf = DATAOUT + "/{sample}_pruned_flipped.vcf.gz"
-    output:
-        DATAOUT + "/{sample}_pruned_flipped.vcf.gz.csi"
-    shell:
-        '{loads[bcftools]}; {com[bcftools]} index -f {input.bcf}'
-
-# ---- Principal Compoent analysis ----
-#  Project ADNI onto a PCA using the 1000 Genomes dataset to identify
-#    population outliers
-
-#  Extract a pruned dataset from 1000 genomes using the same pruning SNPs
-#    from Sample
-# align 1000 genomes to fasta refrence
-
-predownload = config['download_tg']
-
-if predownload:
-    rule download_tg_chrom:
-       input:
-           FTP.remote(tgurl, keep_local=True),
-           FTP.remote(tgurl + ".tbi", keep_local=True),
-       output:
-           temp("data/1000gRaw.{gbuild}.chr{chrom}.vcf.gz"),
-           temp("data/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi")
-       shell: "cp {input[0]} {output[0]}; cp {input[1]} {output[1]}"
-    
-    rule download_tg_fa:
-       input:
-           FTP.remote(tgfa + ".gz", keep_local=True),
-           FTP.remote(tgfa + ".fai", keep_local=True)
-       output:
-           "data/human_g1k_{gbuild}.fasta",
-           "data/human_g1k_{gbuild}.fasta.fai"
-       shell: "zcat {input[0]} > {output[0]}; cp {input[0]} {output[0]}"
-
-    rule download_tg_ped:
-       input:
-           FTP.remote(tgped, keep_local=True),
-       output:
-           "data/20130606_g1k.ped",
-       shell: "cp {input} {output}"
-
-tgped = "data/20130606_g1k.ped"
-tg_refraw = ["data/1000gRaw.{gbuild}.chr{chrom}.vcf.gz",
-          "data/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi"]
-
-rule makeTGpops:
-    input: tgped
-    output:
-        "data/1000genomes_pops.txt",
-        "data/pops.txt"
-    shell:
-        """
-awk 'BEGIN {{print "FID","IID","Population"}} NR>1 {{print $1,$2,$7}}' \
-{input} > {output[0]}
-cut -f7 {input} | sed 1d | sort | uniq > {output[1]}
-"""
-
-# align custom ref to fasta refrence
-rule Ref_Flip:
-    input:
-        bim = config['custom_ref'] + '.bim',
-        bed = config['custom_ref'] + '.bed',
-        fam = config['custom_ref'] + '.fam',
-        fasta = expand("data/human_g1k_{gbuild}.fasta", gbuild=BUILD)
-    output:
-        temp("data/{{refname}}_flipped.{ext}", ext=BPLINK))
-    shell:
-        """
-{loads[flippyr]}
-{com[flippyr]} -p {input.fasta} -o {DATAOUT}/{wildcards.sample} {input.bim}"""
-
-rule Ref_ChromPosRefAlt:
-    input:
-        flipped = "data/{refname}_flipped.bim"
-    output:
-        bim = temp("data/{refname}_flipped_ChromPos.bim"),
-        snplist = temp("data/{refname}_flipped_snplist")
-    shell:
-        """
-{loads[R]}
-{com[R]} scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"""
-
-rule Reference_prep:
-    input: tg_refraw
-    output: temp("data/1000G.{gbuild}.chr{chrom}.maxmiss{miss}.vcf.gz")
-    params:
-        url = rules.download_tg_chrom.output[0] if predownload else tgurl
-    shell:
-        """
-{loads[bcftools]}
-{com[bcftools]} norm -m- {params.url} --threads 2 | \
-{com[bcftools]} view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
-{com[bcftools]} annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
-"""
-
-"""
-Selects everyone who is unrelated or only has third degree relatives in
-thousand genomes.
-"""
-rule Reference_foundersonly:
-    input: tgped
-    output:
-        "data/20130606_g1k.founders"
-    shell: r"""
-awk -F "\t" '!($12 != 0 || $10 != 0 || $9 != 0 || $3 != 0 || $4 != 0) {{print $2}}' \
-{input} > {output}
-"""
-
-rule Reference_cat:
-    input:
-        vcfs = expand("data/1000G.{{gbuild}}.chr{chrom}.maxmiss{{miss}}.vcf.gz",
-                      chrom = list(range(1, 23)))
-    output:
-        vcf = "data/1000genomes_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
-        tbi = "data/1000genomes_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
-    shell:
-        """
-{loads[bcftools]}
-{com[bcftools]} concat {input.vcfs} -Oz -o {output.vcf} --threads 2
-{com[bcftools]} index -ft {output.vcf}
-"""
-
-rule Reference_prune:
-    input:
-        vcf = expand("data/1000genomes_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
-                     gbuild=BUILD, miss=config['QC']['GenoMiss']),
-        prune = DATAOUT + "/{sample}_pruned_snplist",
-        founders = "data/20130606_g1k.founders"
-    output:
-        vcf = temp(DATAOUT + "/{sample}_1kgpruned.vcf.gz"),
-        tbi = temp(DATAOUT + "/{sample}_1kgpruned.vcf.gz.tbi")
-    shell:
-        """
-{loads[bcftools]}
-{com[bcftools]} view -i 'ID=@{input.prune}' -S {input.founders} \
--Oz -o {output.vcf} --force-samples {input.vcf} --threads 4
-{com[bcftools]} index -ft {output.vcf}
-"""
-
-# Merge ref and sample
-rule Merge_RefenceSample:
-    input:
-        bcf_1kg = DATAOUT + "/{sample}_1kgpruned.vcf.gz",
-        tbi_1kg = DATAOUT + "/{sample}_1kgpruned.vcf.gz.tbi",
-        bcf_samp = DATAOUT + "/{sample}_pruned_flipped.vcf.gz",
-        csi_samp = DATAOUT + "/{sample}_pruned_flipped.vcf.gz.csi"
-    params:
-        miss = config['QC']['GenoMiss']
-    output:
-        out = DATAOUT + "/{sample}_1kg_merged.vcf"
-    shell:
-        r"""
-{loads[bcftools]}
-{com[bcftools]} merge -m none --threads 2 {input.bcf_1kg} {input.bcf_samp} | \
-{com[bcftools]} view  -i 'F_MISSING <= {params.miss}' -Ov -o {output.out} --threads 2"""
-
-# recode merged sample to plink
-rule Plink_RefenceSample:
-    input:
-        vcf = DATAOUT + "/{sample}_1kg_merged.vcf"
-    output:
-        expand(DATAOUT + "/{{sample}}_1kg_merged.{ext}", ext=BPLINK)
-    params:
-        out = DATAOUT + "/{sample}_1kg_merged"
-    shell:
-        '''
-{loads[plink]}
-{com[plink]} --vcf {input.vcf} --const-fid --make-bed --out {params.out}'''
-
-rule fix_fam:
-    input:
-        oldfam = rules.Sample_Plink2Bcf.input.fam,
-        newfam = DATAOUT + "/{sample}_1kg_merged.fam",
-        tgped = tgped
-    output: DATAOUT + "/{sample}_1kg_merged_fixed.fam"
-    shell:
-        """
-{loads[R]}
-{com[R]} scripts/fix_fam.R {input.oldfam} {input.newfam} {output} {input.tgped}"""
-
-# PCA analysis to identify population outliers
-rule PcaPopulationOutliers:
-    input:
-        plink = expand(DATAOUT + "/{{sample}}_1kg_merged.{ext}", ext=BPLINK),
-        fam = rules.fix_fam.output,
-        pop = "data/1000genomes_pops.txt",
-        clust = "data/pops.txt"
-    output:
-        expand(DATAOUT + "/{{sample}}_1kg_merged.{ext}",
-               ext=['eigenval', 'eigenvec'])
-    params:
-        indat_plink = DATAOUT + "/{sample}_1kg_merged",
-        out = DATAOUT + "/{sample}_1kg_merged"
-    shell:
-        """
-{loads[plink]}
-{com[plink]} --bfile {params.indat_plink} --fam {input.fam} --pca 10 \
---within {input.pop} --pca-clusters {input.clust} --out {params.out}
-"""
-
-# Rscript to identify population outliers
-rule ExcludePopulationOutliers:
-    input:
-        eigenval = DATAOUT + "/{sample}_1kg_merged.eigenval",
-        eigenvec = DATAOUT + "/{sample}_1kg_merged.eigenvec",
-        fam = rules.Sample_Plink2Bcf.input.fam,
-        tgped = tgped
-    output:
-        excl = DATAOUT + "/{sample}_exclude.pca",
-        rmd = temp(DATAOUT + "/{sample}_pca.Rdata")
-    params:
-        samp = "{sample}",
-        superpop = config['superpop']
-    shell:
-        """
-{loads[R]}
-scripts/PCA_QC.R -s {params.samp} -p {params.superpop} \
---vec {input.eigenvec} --val {input.eigenval} \
--b {input.tgped} -t {input.fam} -o {output.excl} -R {output.rmd}
-"""
-
 # Run PCA to control for population stratification
 if config['pcair']:
     assert config['king'], "You must use KING for relatedness if using PCAiR!"
@@ -653,8 +735,7 @@ fi
             king = rules.filterKING.output,
             iterative = rules.relatedness_sample_fail.output.out
         output:
-            expand(DATAOUT + "/{{sample}}_filtered_PCApre.{ext}",
-                   ext=['unrel', 'partition.log'])
+            expand(DATAOUT + "/{{sample}}_filtered_PCApre.{ext}",ext=['unrel', 'partition.log'])
         params:
             stem = rules.ancestryFilt.params.plinkout,
             king = rules.filterKING.params.indat + ".popfilt"
@@ -686,8 +767,7 @@ fi
             unrel = rules.PCAPartitioning.output[0],
             frq = rules.stratFrq.output
         output:
-            expand(DATAOUT + "/{{sample}}_filtered_PCA.{ext}",
-                   ext=['eigenval', 'eigenvec'])
+            expand(DATAOUT + "/{{sample}}_filtered_PCA.{ext}", ext=['eigenval', 'eigenvec'])
         params:
             indat = rules.ancestryFilt.params.plinkout,
             out = DATAOUT + "/{sample}_filtered_PCA"
@@ -705,8 +785,7 @@ else:
                            ext=BPLINK),
             exclude = DATAOUT + "/{sample}_exclude.pca"
         output:
-            expand(DATAOUT + "/{{sample}}_filtered_PCA.{ext}",
-                   ext=['eigenval', 'eigenvec'])
+            expand(DATAOUT + "/{{sample}}_filtered_PCA.{ext}", ext=['eigenval', 'eigenvec'])
         params:
             indat = DATAOUT + "/{sample}_pruned",
             out = DATAOUT + "/{sample}_filtered_PCA"
@@ -803,4 +882,3 @@ hwe = {params.HWE}, missing_geno = {params.geno_miss}, \
 partmethod = "{params.partmethod}", \
 missing_sample = {params.samp_miss}, superpop = "{params.superpop}"))' --slave
 """
-
