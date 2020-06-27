@@ -1,6 +1,15 @@
 .DS_Store
 .snakemake/*
+.snakejob/*
+ftp.1000*/
 data/*
 temp/*
 stats/*
 scripts/GWAS_QC_cache/*
+output/*
+scripts/__pycache__/*
+*.bk
+*.bed
+*.bim
+*.fam
+
