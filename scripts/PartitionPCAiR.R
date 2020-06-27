@@ -29,7 +29,7 @@ use_iterlist <- function(fam, iterlist) {
   rel <- iterlist
   return(list(rels = rel, unrels = unrel))
 }
-pcair_part1 <- function(fam, kingstem) {
+import_KING_external <- function(fam, kingstem) {
   if (length(unique(fam$FID)) == 1) {
     kingext <- ".kin"
   } else if (length(unique(fam$FID)) == length(fam$FID)) {
@@ -66,7 +66,7 @@ pcair_part1 <- function(fam, kingstem) {
   return(KINGmat)
 }
 
-pcair_part2 <- function(KINGmat, divthresh="default") {
+pcair_segment <- function(KINGmat, divthresh="default") {
   if (divthresh == "default") {
     if (exists("kingToMatrix")) {
       raws <- pcairPartition(kinobj = KINGmat, divobj = KINGmat)
@@ -88,9 +88,9 @@ pcair_part2 <- function(KINGmat, divthresh="default") {
 tryDivthresh <- function(KINGmat, thresholds, retry=F) {
   ret <- tryCatch({
     if (retry) {
-      raws <- pcair_part2(KINGmat, thresholds[1])
+      raws <- pcair_segment(KINGmat, thresholds[1])
     } else {
-      raws <- pcair_part2(KINGmat)
+      raws <- pcair_segment(KINGmat)
     }
     raws
   }, error = function (e) {
@@ -105,8 +105,8 @@ tryDivthresh <- function(KINGmat, thresholds, retry=F) {
 }
 
 use_pcair <- function(fam, kingstem) {
-  raws <- tryDivthresh(pcair_part1(fam, kingstem),
-                       -2^-c(6, 6.5, 7, 8))
+  raws <- import_KING_external(fam, kingstem) %>%
+    tryDivthresh(-2^-c(6, 6.5, 7, 8))
   print("Related set:")
   print(raws$rels)
   print("Unrelated set:")
