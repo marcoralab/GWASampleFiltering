@@ -31,4 +31,5 @@ QC:
   MAF: 0.02
   HWE: 10e-30
 
-download_tg: false
+download_tg: true
+genome_build: hg19

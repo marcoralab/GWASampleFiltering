@@ -27,6 +27,7 @@ istg = config['isTG'] if 'isTG' in config else False
 # QC Steps:
 QC_snp = True
 QC_callRate = True
+union_panel_TF = True
 
 if isMinerva:
     com = {'flippyr': 'flippyr', 'plink': 'plink --keep-allele-order',
@@ -35,7 +36,7 @@ if isMinerva:
     loads = {'flippyr': 'module load plink/1.90b6.10', 'plink': 'module load plink/1.90b6.10',
              'bcftools': 'module load bcftools/1.9',
              'king': 'module unload gcc; module load king/2.1.6',
-             'R': ('module load R/3.5.3 pandoc/2.6 udunits/2.2.26; ',
+             'R': ('module load R/3.6.3 pandoc/2.6 udunits/2.2.26; ',
                    'RSTUDIO_PANDOC=$(which pandoc)')}
 else:
     com = {'flippyr': 'flippyr',
@@ -53,7 +54,7 @@ def decorate(text):
     return expand(DATAOUT + "/{sample}_" + text,
                   sample=SAMPLE)
 
-localrules: all, download_tg, download_tg_chrom
+localrules: all, download_tg_fa, download_tg_ped, download_tg_chrom
 
 def flatten(nested):
     flat = []
@@ -74,7 +75,7 @@ outputs = [outs[x] for x in config["outputs"]]
 outputs = flatten(outputs)
 
 rule all:
-    input: outputs
+    input: expand(DATAOUT + "/{sample}_pruned.bed", sample=SAMPLE) # outputs
 
 
 # ---- Exlude SNPs with a high missing rate and low MAF----
@@ -151,11 +152,74 @@ else:
     sexcheck_in_plink = start['files']
     sexcheck_in_plink_stem = start['stem']
 
+tgbase = "ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/"
+tgped = tgbase + "technical/working/20130606_sample_info/20130606_g1k.ped"
+
+if config['genome_build'] in ['hg19', 'hg37', 'GRCh37', 'grch37', 'GRCH37']:
+    BUILD = 'hg19'
+    tgurl = (tgbase + "release/20130502/ALL.chr{chrom}." +
+        "phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.vcf.gz")
+    tgfa = tgbase + "technical/reference/human_g1k_v37.fasta"
+elif config['genome_build'] in ['hg38', 'GRCh38', 'grch38', 'GRCH38']:
+    BUILD = 'GRCh38'
+    tgurl = (tgbase + 
+        'data_collections/1000_genomes_project/release/20181203_biallelic_SNV/' +
+        'ALL.chr{chrom}.shapeit2_integrated_v1a.GRCh38.20181129.phased.vcf.gz')
+    tgfa = 'technical/reference/GRCh38_reference_genome/GRCh38_full_analysis_set_plus_decoy_hla.fa'
+
 # ---- Prune SNPs, autosome only ----
 #  Pruned SNP list is used for IBD, PCA and heterozigosity calculations
 
+
+# align sample to fasta refrence
+rule Sample_Flip:
+    input:
+        bim = sexcheck_in_plink_stem + '.bim',
+        bed = sexcheck_in_plink_stem + '.bed',
+        fam = sexcheck_in_plink_stem + '.fam',
+        fasta = expand("data/human_g1k_{gbuild}.fasta", gbuild=BUILD)
+    output:
+        temp(expand(DATAOUT + "/{{sample}}_flipped.{ext}",
+                    ext=BPLINK))
+    shell:
+        """
+{loads[flippyr]}
+{com[flippyr]} -p {input.fasta} -o {DATAOUT}/{wildcards.sample} {input.bim}"""
+
+rule Sample_ChromPosRefAlt:
+    input:
+        flipped = DATAOUT + "/{sample}_flipped.bim"
+    output:
+        bim = temp(DATAOUT + "/{sample}_flipped_ChromPos.bim"),
+        snplist = temp(DATAOUT + "/{sample}_flipped_snplist")
+    shell:
+        """
+{loads[R]}
+{com[R]} scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"""
+
+panel_variants = 'panelvars.snps'
+
+rule get_panelvars:
+    input:
+        expand("data/1000genomes_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
+               gbuild=BUILD, miss=config['QC']['GenoMiss']),
+    output: panel_variants
+    shell:
+        """
+{loads[bcftools]}
+{com[bcftools]} query -f '%ID\n' {input} > {output}
+"""
+
+def extract_sample(union_panel_TF, panel_variants):
+    if union_panel_TF:
+       return ("--extract {} ".format(panel_variants))
+    return ""
+
 rule PruneDupvar_snps:
-    input: sexcheck_in_plink
+    input:
+        fileset = rules.Sample_ChromPosRefAlt.input,
+        bim = rules.Sample_ChromPosRefAlt.output.bim,
+        pvars = panel_variants if union_panel_TF else "/dev/urandom"
     output:
         expand(DATAOUT + "/{{sample}}_nodup.{ext}",
                ext=['prune.in', 'prune.out']),
@@ -163,12 +227,14 @@ rule PruneDupvar_snps:
     params:
         indat = sexcheck_in_plink_stem,
         dupvar = DATAOUT + "/{sample}_nodup.dupvar",
-        out = DATAOUT + "/{sample}_nodup"
+        out = DATAOUT + "/{sample}_nodup",
+        extract = extract_sample(union_panel_TF, panel_variants)
     shell:
         """
 {loads[plink]}
 {loads[R]}
-{com[plink]} --bfile {params.indat} --autosome --indep 50 5 1.5 \
+{com[plink]} --bfile {params.indat} -bim {input.bim} \
+{params.extract}--autosome --indep 50 5 1.5 \
 --list-duplicate-vars --out {params.out}
 {com[R]}  scripts/DuplicateVars.R {params.dupvar}"""
 
@@ -179,7 +245,8 @@ rule sample_prune:
         prune = DATAOUT + "/{sample}_nodup.prune.in",
         dupvar = DATAOUT + "/{sample}_nodup.dupvar.delete"
     output:
-        temp(expand(DATAOUT + "/{{sample}}_pruned.{ext}", ext=BPLINK))
+        temp(expand(DATAOUT + "/{{sample}}_pruned.{ext}",
+                    ext=BPLINK))
     params:
         indat_plink = sexcheck_in_plink_stem,
         out = DATAOUT + "/{sample}_pruned"
@@ -293,31 +360,6 @@ rule heterozygosity_sample_fail:
     output: DATAOUT + "/{sample}_exclude.heterozigosity"
     shell: '{loads[R]}; {com[R]}  scripts/heterozygosity_QC.R {input} {output}'
 
-# align sample to fasta refrence
-rule Sample_Flip:
-    input:
-        bim = DATAOUT + "/{sample}_pruned.bim",
-        bed = DATAOUT + "/{sample}_pruned.bed",
-        fam = DATAOUT + "/{sample}_pruned.fam",
-        fasta = "data/human_g1k_v37.fasta"
-    output:
-        temp(expand(DATAOUT + "/{{sample}}_pruned_flipped.{ext}",
-                    ext=BPLINK))
-    shell:
-        """
-{loads[flippyr]}
-{com[flippyr]} -p {input.fasta} {input.bim}"""
-
-rule Sample_ChromPosRefAlt:
-    input:
-        flipped = DATAOUT + "/{sample}_pruned_flipped.bim"
-    output:
-        bim = temp(DATAOUT + "/{sample}_flipped_ChromPos.bim"),
-        snplist = temp(DATAOUT + "/{sample}_pruned_snplist")
-    shell:
-        """
-{loads[R]}
-{com[R]} scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"""
 
 # allow for tg sample:
 rule tgfam:
@@ -358,12 +400,6 @@ rule Sample_IndexBcf:
 #    from Sample
 # align 1000 genomes to fasta refrence
 
-tgbase = "ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/"
-tgurl = (tgbase + "release/20130502/ALL.chr{chrom}." +
-    "phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.vcf.gz")
-tgped = tgbase + "technical/working/20130606_sample_info/20130606_g1k.ped"
-tgfa = tgbase + "technical/reference/human_g1k_v37.fasta"
-
 predownload = config['download_tg']
 
 if predownload:
@@ -372,24 +408,29 @@ if predownload:
            FTP.remote(tgurl, keep_local=True),
            FTP.remote(tgurl + ".tbi", keep_local=True),
        output:
-           temp("data/1000gRaw.chr{chrom}.vcf.gz"),
-           temp("data/1000gRaw.chr{chrom}.vcf.gz.tbi")
+           temp("data/1000gRaw.{gbuild}.chr{chrom}.vcf.gz"),
+           temp("data/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi")
        shell: "cp {input[0]} {output[0]}; cp {input[1]} {output[1]}"
     
-    rule download_tg:
+    rule download_tg_fa:
        input:
-           FTP.remote(tgped, keep_local=True),
            FTP.remote(tgfa + ".gz", keep_local=True),
            FTP.remote(tgfa + ".fai", keep_local=True)
        output:
+           "data/human_g1k_{gbuild}.fasta",
+           "data/human_g1k_{gbuild}.fasta.fai"
+       shell: "zcat {input[0]} > {output[0]}; cp {input[0]} {output[0]}"
+
+    rule download_tg_ped:
+       input:
+           FTP.remote(tgped, keep_local=True),
+       output:
            "data/20130606_g1k.ped",
-           "data/human_g1k_v37.fasta",
-           "data/human_g1k_v37.fasta.fai"
-       shell: "cp {input[0]} {output[0]}; zcat {input[1]} > {output[1]}; cp {input[2]} {output[2]}"
+       shell: "cp {input} {output}"
 
 tgped = "data/20130606_g1k.ped"
-refraw = ["data/1000gRaw.chr{chrom}.vcf.gz",
-          "data/1000gRaw.chr{chrom}.vcf.gz.tbi"]
+tg_refraw = ["data/1000gRaw.{gbuild}.chr{chrom}.vcf.gz",
+          "data/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi"]
 
 rule makeTGpops:
     input: tgped
@@ -403,9 +444,34 @@ awk 'BEGIN {{print "FID","IID","Population"}} NR>1 {{print $1,$2,$7}}' \
 cut -f7 {input} | sed 1d | sort | uniq > {output[1]}
 """
 
+# align custom ref to fasta refrence
+rule Ref_Flip:
+    input:
+        bim = config['custom_ref'] + '.bim',
+        bed = config['custom_ref'] + '.bed',
+        fam = config['custom_ref'] + '.fam',
+        fasta = expand("data/human_g1k_{gbuild}.fasta", gbuild=BUILD)
+    output:
+        temp("data/{{refname}}_flipped.{ext}", ext=BPLINK))
+    shell:
+        """
+{loads[flippyr]}
+{com[flippyr]} -p {input.fasta} -o {DATAOUT}/{wildcards.sample} {input.bim}"""
+
+rule Ref_ChromPosRefAlt:
+    input:
+        flipped = "data/{refname}_flipped.bim"
+    output:
+        bim = temp("data/{refname}_flipped_ChromPos.bim"),
+        snplist = temp("data/{refname}_flipped_snplist")
+    shell:
+        """
+{loads[R]}
+{com[R]} scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"""
+
 rule Reference_prep:
-    input: refraw
-    output: temp("data/1000Gchr{chrom}.maxmiss{miss}.vcf.gz")
+    input: tg_refraw
+    output: temp("data/1000G.{gbuild}.chr{chrom}.maxmiss{miss}.vcf.gz")
     params:
         url = rules.download_tg_chrom.output[0] if predownload else tgurl
     shell:
@@ -431,11 +497,11 @@ awk -F "\t" '!($12 != 0 || $10 != 0 || $9 != 0 || $3 != 0 || $4 != 0) {{print $2
 
 rule Reference_cat:
     input:
-        vcfs = expand("data/1000Gchr{chrom}.maxmiss{{miss}}.vcf.gz",
+        vcfs = expand("data/1000G.{{gbuild}}.chr{chrom}.maxmiss{{miss}}.vcf.gz",
                       chrom = list(range(1, 23)))
     output:
-        vcf = "data/1000genomes_allChr_maxmiss{miss}.vcf.gz",
-        tbi = "data/1000genomes_allChr_maxmiss{miss}.vcf.gz.tbi"
+        vcf = "data/1000genomes_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
+        tbi = "data/1000genomes_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
     shell:
         """
 {loads[bcftools]}
@@ -445,8 +511,8 @@ rule Reference_cat:
 
 rule Reference_prune:
     input:
-        vcf = expand("data/1000genomes_allChr_maxmiss{miss}.vcf.gz",
-                     miss = config['QC']['GenoMiss']),
+        vcf = expand("data/1000genomes_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
+                     gbuild=BUILD, miss=config['QC']['GenoMiss']),
         prune = DATAOUT + "/{sample}_pruned_snplist",
         founders = "data/20130606_g1k.founders"
     output:
