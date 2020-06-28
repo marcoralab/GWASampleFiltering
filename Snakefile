@@ -5,6 +5,7 @@ from snakemake.remote.FTP import RemoteProvider as FTPRemoteProvider
 import socket
 import sys
 import getpass
+import warnings
 
 FTP = FTPRemoteProvider()
 
@@ -17,6 +18,19 @@ shell.executable("/bin/bash")
 if isMinerva:
     anacondapath = sys.exec_prefix + "/bin"
     shell.prefix(". ~/.bashrc; PATH={}:$PATH; ".format(anacondapath))
+
+# figure out if downloading reference
+if config['download_tg']:
+    try:
+        socket.setdefaulttimeout(3)
+        itest = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        itest.connect(('8.8.8.8', 53))
+        iconnect = True
+        predownload = True
+    except socket.error as ex:
+        warnings.warn("\n\nYou have enabled the download of 1000g reference files but have no internet access.\n"
+            "Snakemake will not attempt to download but will look in the data folder.\n")
+        predownload = False
 
 BPLINK = ["bed", "bim", "fam"]
 RWD = os.getcwd()
@@ -32,19 +46,19 @@ union_panel_TF = True
 if isMinerva:
     com = {'flippyr': 'flippyr', 'plink': 'plink --keep-allele-order',
            'plink2': 'plink', 'bcftools': 'bcftools', 'R': 'Rscript', 'R2': 'R',
-           'king': 'king'}
+           'king': 'king', 'faidx': 'samtools faidx'}
     loads = {'flippyr': 'module load plink/1.90b6.10', 'plink': 'module load plink/1.90b6.10',
-             'bcftools': 'module load bcftools/1.9',
+             'bcftools': 'module load bcftools/1.9', 'faidx': 'module load samtools',
              'king': 'module unload gcc; module load king/2.1.6',
              'R': ('module load R/3.6.3 pandoc/2.6 udunits/2.2.26; ',
                    'RSTUDIO_PANDOC=$(which pandoc)')}
 else:
     com = {'flippyr': 'flippyr',
-           'plink': 'plink --keep-allele-order', 'plink2': 'plink',
+           'plink': 'plink --keep-allele-order', 'plink2': 'plink', 'faidx': 'samtools faidx',
            'bcftools': 'bcftools', 'R': 'Rscript', 'R2': 'R', 'king': 'king'}
     loads = {'flippyr': 'echo running flippyr', 'plink': 'echo running plink',
              'bcftools': 'echo running bcftools',  'R': 'echo running R',
-             'king': 'echo running KING'}
+             'king': 'echo running KING', 'faidx': 'echo running samtools faidx'}
 
 if getpass.getuser() == "sheaandrews":
     com["flippyr"] = '/Users/sheaandrews/Programs/flippyr/flippyr.py'
@@ -160,9 +174,9 @@ else:
 #    from Sample
 # align 1000 genomes to fasta refrence
 
-predownload = config['download_tg']
 
-tgbase = "ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/"
+#tgbase = "ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/"
+tgbase = "ftp://ftp-trace.ncbi.nih.gov/1000genomes/ftp/"
 tgped = tgbase + "technical/working/20130606_sample_info/20130606_g1k.ped"
 
 if config['genome_build'] in ['hg19', 'hg37', 'GRCh37', 'grch37', 'GRCH37']:
@@ -190,12 +204,19 @@ if predownload:
 
     rule download_tg_fa:
        input:
-           FTP.remote(tgfa + ".gz", keep_local=True),
-           FTP.remote(tgfa + ".fai", keep_local=True)
+           FTP.remote(tgfa + ".gz") if BUILD == 'hg19' else FTP.remote(tgfa)
        output:
            "data/human_g1k_{gbuild}.fasta",
            "data/human_g1k_{gbuild}.fasta.fai"
-       shell: "zcat {input[0]} > {output[0]}; cp {input[0]} {output[0]}"
+       shell:
+           """
+{loads[faidx]}
+if [[ "{input[0]}" == *.gz ]]; then
+  zcat {input[0]} > {output[0]}
+else
+  cp {input[0]} {output[0]}
+fi
+{com[faidx]} {output[0]}"""
 
     rule download_tg_ped:
        input:
