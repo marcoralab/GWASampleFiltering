@@ -12,4 +12,6 @@ scripts/__pycache__/*
 *.bed
 *.bim
 *.fam
-
+inputs/
+*heap*
+.fuse*

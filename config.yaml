@@ -34,20 +34,25 @@ QC:
 download_tg: true
 genome_build: hg19
 
+union_panel: true #make sure population ref panel and sample snps all overlap
+union_extra: true #require snp overlap with extra ref if present
+
 # custom_ref_name: The name of a custom reference set, if using a custom main reference.
 #   This should be descriptive and not contain whitespace, underscores or periods
 #   DO NOT call it 1kG or extraref, as those are reserved names.
-custom_ref_name: fooby
+custom_ref_name: false
+#fooby
 # custom_ref: the file, filestem or fileset with your custom reference, if using a custom ref.
 #   It can be the filestem for a binary PLINK fileset containing all chromosomes.
 #   for VCF references, give the filename. If there is a file for each chromosomem,
 #     {chrom} will be replaced with the chromosome number
-custom_ref: inputs/foo.bar_baz # inputs/foo.baz_bar.vcf.gz #inputs/foo.bar_baz_chr{chrom}.qux.vcf.gz
-# custom_pops: file with the header "FID IID Population" 
+custom_ref: false
+  #inputs/foo.bar_baz # inputs/foo.baz_bar.vcf.gz #inputs/foo.bar_baz_chr{chrom}.qux.vcf.gz
+# custom_pops: file with the header "FID IID Population"
 #   and FID, IID and subpopulation in each row.
 #   file should be space-separated and have entries for all ref samples
 #   if you are using a VCF reference, FID should be the VCF sample ID befpre the first underscore,
-#     and IID shhould be everything after. If there are no underscores, FID and IID should both 
+#     and IID shhould be everything after. If there are no underscores, FID and IID should both
 #     be the VCF sample ID.
 custom_pops: inputs/fooby.pops
 
@@ -56,6 +61,6 @@ custom_pops: inputs/fooby.pops
 #   It can be the filestem for a binary PLINK fileset containing all chromosomes.
 #   for VCF references, give the filename. If there is a file for each chromosomem,
 #     {chrom} will be replaced with the chromosome number
-extra_ref: false
+extra_ref: inputs/foo.bar_baz
 # subpopulation code for your additional reference. It should be a subpopulation of the superpop or not be a 1kgp population
 extra_ref_subpop: "AJ"
