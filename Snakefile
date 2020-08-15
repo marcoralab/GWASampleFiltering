@@ -437,7 +437,7 @@ else:
 
 rule PruneDupvar_snps:
     input:
-        fileset = rules.Sample_ChromPosRefAlt.input,
+        fileset = rules.Sample_Flip.output,
         bim = rules.Sample_ChromPosRefAlt.output.bim,
         pvars = PVARS
     output:
@@ -445,7 +445,7 @@ rule PruneDupvar_snps:
                ext=['prune.in', 'prune.out']),
         DATAOUT + "/{sample}_nodup.dupvar.delete"
     params:
-        indat = sexcheck_in_plink_stem,
+        indat = DATAOUT + "/{sample}_flipped",
         dupvar = DATAOUT + "/{sample}_nodup.dupvar",
         out = DATAOUT + "/{sample}_nodup",
         extract = extract_sample
@@ -461,20 +461,23 @@ rule PruneDupvar_snps:
 # Prune sample dataset
 rule sample_prune:
     input:
-        sexcheck_in_plink,
+        fileset = rules.Sample_Flip.output,
+        bim = rules.Sample_ChromPosRefAlt.output.bim,
         prune = DATAOUT + "/{sample}_nodup.prune.in",
         dupvar = DATAOUT + "/{sample}_nodup.dupvar.delete"
     output:
         temp(expand(DATAOUT + "/{{sample}}_pruned.{ext}",
                     ext=BPLINK))
     params:
-        indat_plink = sexcheck_in_plink_stem,
+        indat = DATAOUT + "/{sample}_flipped",
         out = DATAOUT + "/{sample}_pruned"
     shell:
         """
 {loads[plink]}
-{com[plink]} --bfile {params.indat_plink} --extract {input.prune} \
---exclude {input.dupvar} --make-bed --out {params.out}"""
+{com[plink]} --bfile {params.indat} --bim {input.bim} \
+--extract {input.prune} --exclude {input.dupvar} \
+--make-bed --out {params.out}
+"""
 
 rule sample_make_prunelist:
   input: DATAOUT + "/{sample}_pruned.bim"
