@@ -33,6 +33,7 @@ QC:
 
 download_tg: true
 genome_build: hg19
+mirror: ebi # ncbi or ebi
 
 union_panel: true #make sure population ref panel and sample snps all overlap
 union_extra: true #require snp overlap with extra ref if present
@@ -61,6 +62,6 @@ custom_pops: inputs/fooby.pops
 #   It can be the filestem for a binary PLINK fileset containing all chromosomes.
 #   for VCF references, give the filename. If there is a file for each chromosomem,
 #     {chrom} will be replaced with the chromosome number
-extra_ref: inputs/foo.bar_baz
+extra_ref: inputs/lz
 # subpopulation code for your additional reference. It should be a subpopulation of the superpop or not be a 1kgp population
 extra_ref_subpop: "AJ"

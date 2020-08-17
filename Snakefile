@@ -197,8 +197,11 @@ else:
 # align 1000 genomes to fasta refrence
 
 
-#tgbase = "ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/"
-tgbase = "ftp://ftp-trace.ncbi.nih.gov/1000genomes/ftp/"
+if config['mirror'] == 'ncbi':
+    tgbase = "ftp://ftp-trace.ncbi.nih.gov/1000genomes/ftp/"
+elif config['mirror'] == 'ebi':
+    tgbase = "ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/"
+
 tgped = tgbase + "technical/working/20130606_sample_info/20130606_g1k.ped"
 
 if config['genome_build'] in ['hg19', 'hg37', 'GRCh37', 'grch37', 'GRCH37']:
@@ -344,7 +347,7 @@ else: #PLINK fileset of all chromosomes
         shell:
             """
     {loads[flippyr]}
-    {com[flippyr]} -p {input.fasta} -o {DATAOUT}/{wildcards.refname}_{wildcards.gbuild} {input.bim}"""
+    {com[flippyr]} -p {input.fasta} -o data/{wildcards.refname}_{wildcards.gbuild}_flipped {input.bim}"""
 
     rule Ref_ChromPosRefAlt:
         input:
@@ -360,20 +363,17 @@ else: #PLINK fileset of all chromosomes
     # Recode sample plink file to vcf
     rule Ref_Plink2Vcf:
         input:
-            bim = rules.Ref_ChromPosRefAlt.output,
+            bim = rules.Ref_ChromPosRefAlt.output.bim,
             flipped = rules.Ref_Flip.output
         output:
             temp("data/{refname}_{gbuild}_unQC_maxmissUnfilt.vcf.gz")
         params:
             out = "data/{refname}_{gbuild}_unQC_maxmissUnfilt",
             inp = "data/{refname}_{gbuild}_flipped"
-        #wildcard_constraints:
-            #gbuild = "hg19|GRCh38",
-            #refname = "[a-zA-Z0-9-]",
         shell:
             """
     {loads[plink]}
-    {com[plink2]} --bfile {input.flipped} --bim {input.bim} --recode vcf bgz \
+    {com[plink2]} --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
     --real-ref-alleles --out {params.out}"""
 
     # Index bcf
@@ -458,7 +458,7 @@ else: #PLINK fileset of all chromosomes
         shell:
             """
     {loads[flippyr]}
-    {com[flippyr]} -p {input.fasta} -o {DATAOUT}/{wildcards.refname}_{wildcards.gbuild} {input.bim}"""
+    {com[flippyr]} -p {input.fasta} -o {DATAOUT}/extraref_{wildcards.gbuild}_flipped {input.bim}"""
 
     rule Ref_ChromPosRefAlt_extra:
         input:
@@ -474,20 +474,17 @@ else: #PLINK fileset of all chromosomes
     # Recode sample plink file to vcf
     rule Ref_Plink2Vcf_extra:
         input:
-            bim = rules.Ref_ChromPosRefAlt_extra.output,
+            bim = rules.Ref_ChromPosRefAlt_extra.output.bim,
             flipped = rules.Ref_Flip_extra.output
         output:
             temp(DATAOUT + "/extraref_{gbuild}_unQC_maxmissUnfilt.vcf.gz")
         params:
             out = DATAOUT + "/extraref_{gbuild}_unQC_maxmissUnfilt",
             inp = DATAOUT + "/extraref_{gbuild}_flipped"
-        #wildcard_constraints:
-            #gbuild = "hg19|GRCh38",
-            #refname = "[a-zA-Z0-9-]",
         shell:
             """
     {loads[plink]}
-    {com[plink2]} --bfile {input.flipped} --bim {input.bim} --recode vcf bgz \
+    {com[plink2]} --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
     --real-ref-alleles --out {params.out}"""
 
     # Index bcf
@@ -502,11 +499,7 @@ else: #PLINK fileset of all chromosomes
             csi = rules.Ref_IndexVcf_extra.output
         output:
             vcf = DATAOUT + "/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
-            tbi = "data/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
-        #wildcard_constraints:
-            #gbuild = "hg19|GRCh38",
-            #refname = "[a-zA-Z0-9-]",
-            #miss = "[0-9.]",
+            tbi = DATAOUT + "/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
         shell:
             """
 {loads[bcftools]}
@@ -549,7 +542,7 @@ rule Sample_ChromPosRefAlt:
 if config['union_panel']:
     if extraref and ("union_extra" in config) and (config['union_extra'] != False):
         erefc = True
-    PVARS = DATAOUT + 'panelvars_all.snp'
+    PVARS = DATAOUT + '/panelvars_all.snp'
     extract_sample = "--extract {} ".format(PVARS)
 else:
     PVARS = "/dev/urandom"
@@ -734,13 +727,14 @@ rule merge_pops:
     input:
         main = "data/{refname}_pops.txt",
         extra = rules.Reference_prune_extra.input.vcf
-    output: DATAOUT + '/{refname}_allpops.txt'
+    output:
+        DATAOUT + '/{refname}_allpops.txt',
+        DATAOUT + '/{refname}_allpops_unique.txt'
     shell:
         """
-{loads[bcftools]}
-awk -F "\t" -v pop="{config[extra_ref_subpop]}" \
-  'NR == FNR {print} NR != FNR {print $0, $0, pop}' \
-  {input.main} <({com[bcftools]} query -l {input.extra}) > {output}
+{loads[R]}
+{com[R]} scripts/add_extraref_pops.R \
+  {input.main} {input.extra} {config[extra_ref_subpop]} {output}
 """
 
 # PCA analysis to identify population outliers
@@ -749,7 +743,7 @@ rule PcaPopulationOutliers:
         plink = expand(DATAOUT + "/{{sample}}_{{refname}}_merged.{ext}", ext=BPLINK),
         fam = rules.fix_fam.output,
         pop = DATAOUT + '/{refname}_allpops.txt' if extraref else "data/{refname}_pops.txt",
-        clust = "data/{refname}_pops_unique.txt"
+        clust = DATAOUT + '/{refname}_allpops_unique.txt' if extraref else "data/{refname}_pops_unique.txt"
     output:
         expand(DATAOUT + "/{{sample}}_{{refname}}_merged.{ext}", ext=['eigenval', 'eigenvec'])
     params:

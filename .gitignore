@@ -2,6 +2,7 @@
 .snakemake/*
 .snakejob/*
 ftp.1000*/
+ftp-trace*/
 data/*
 temp/*
 stats/*
