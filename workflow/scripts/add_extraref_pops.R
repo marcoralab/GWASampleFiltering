@@ -4,13 +4,11 @@ suppressPackageStartupMessages(library(dplyr))
 library(readr)
 library(tidyr)
 
-args <- commandArgs(T)
-
-refpops <- args[1]
-extravcf <- args[2]
-subpop <- args[3]
-out <- args[4]
-out2 <- args[5]
+refpops = snakemake@input[['main']]
+extravcf = snakemake@input[['extra']]
+subpop = snakemake@params[['extra_ref_code']]
+out = snakemake@output[[1]]
+out2 = snakemake@output[[2]]
 
 extraref <- sprintf('zgrep -m1 "^#CHROM" %s', extravcf) %>%
   pipe() %>%

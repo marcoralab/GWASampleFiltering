@@ -1,36 +1,40 @@
 '''Snakefile for GWAS Variant and Sample QC Version 0.3.1'''
 
 from scripts.parse_config import parser
-from snakemake.remote.FTP import RemoteProvider as FTPRemoteProvider
 import socket
 import sys
 import getpass
 import warnings
 
-FTP = FTPRemoteProvider()
+from snakemake.remote.FTP import RemoteProvider as FTPRemoteProvider
+from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
+
+from urllib.request import urlopen
+from urllib.error import URLError
+
+try:
+  response = urlopen('https://www.google.com/', timeout=10)
+  iconnect = True
+except urllib.error.URLError as ex:
+  iconnect = False
+
+class dummyprovider:
+  def remote(string_, allow_redirects = "foo"):
+    return string_
+
+FTP = FTPRemoteProvider() if iconnect else dummyprovider
+HTTP = HTTPRemoteProvider() if iconnect else dummyprovider
 
 isMinerva = "hpc.mssm.edu" in socket.getfqdn()
 
-configfile: "./config.yaml"
+configfile: "config/config.yaml"
 
-shell.executable("/bin/bash")
-
-if isMinerva:
-    anacondapath = sys.exec_prefix + "/bin"
-    shell.prefix(". ~/.bashrc; PATH={}:$PATH; ".format(anacondapath))
-
-# figure out if downloading reference
-if config['download_tg']:
-    try:
-        socket.setdefaulttimeout(3)
-        itest = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        itest.connect(('8.8.8.8', 53))
-        iconnect = True
-        predownload = True
-    except socket.error as ex:
-        warnings.warn("\n\nYou have enabled the download of 1000g reference files but have no internet access.\n"
-            "Snakemake will not attempt to download but will look in the data folder.\n")
-        predownload = False
+# shell.executable("/bin/bash")
+#
+# if isMinerva:
+#     anacondapath = sys.exec_prefix + "/bin"
+#     shell.prefix(". ~/.bashrc; PATH={}:$PATH; ".format(anacondapath))
+#
 
 BPLINK = ["bed", "bim", "fam"]
 RWD = os.getcwd()
@@ -43,22 +47,22 @@ QC_snp = True
 QC_callRate = True
 union_panel_TF = True
 
-if isMinerva:
-    com = {'flippyr': 'flippyr', 'plink': 'plink --keep-allele-order',
-           'plink2': 'plink', 'bcftools': 'bcftools', 'R': 'Rscript', 'R2': 'R',
-           'king': 'king', 'faidx': 'samtools faidx'}
-    loads = {'flippyr': 'module load plink/1.90b6.10', 'plink': 'module load plink/1.90b6.10',
-             'bcftools': 'module load bcftools/1.9', 'faidx': 'module load samtools',
-             'king': 'module unload gcc; module load king/2.1.6',
-             'R': ('module load R/3.6.3 pandoc/2.6 udunits/2.2.26; ',
-                   'RSTUDIO_PANDOC=$(which pandoc)')}
-else:
-    com = {'flippyr': 'flippyr',
-           'plink': 'plink --keep-allele-order', 'plink2': 'plink', 'faidx': 'samtools faidx',
-           'bcftools': 'bcftools', 'R': 'Rscript', 'R2': 'R', 'king': 'king'}
-    loads = {'flippyr': 'echo running flippyr', 'plink': 'echo running plink',
-             'bcftools': 'echo running bcftools',  'R': 'echo running R',
-             'king': 'echo running KING', 'faidx': 'echo running samtools faidx'}
+# if isMinerva:
+#     com = {'flippyr': 'flippyr', 'plink': 'plink --keep-allele-order',
+#            'plink2': 'plink', 'bcftools': 'bcftools', 'R': 'Rscript', 'R2': 'R',
+#            'king': 'king', 'faidx': 'samtools faidx'}
+#     loads = {'flippyr': 'module load plink/1.90b6.10', 'plink': 'module load plink/1.90b6.10',
+#              'bcftools': 'module load bcftools/1.9', 'faidx': 'module load samtools',
+#              'king': 'module unload gcc; module load king/2.1.6',
+#              'R': ('module load R/3.6.3 pandoc/2.6 udunits/2.2.26; ',
+#                    'RSTUDIO_PANDOC=$(which pandoc)')}
+# else:
+#     com = {'flippyr': 'flippyr',
+#            'plink': 'plink --keep-allele-order', 'plink2': 'plink', 'faidx': 'samtools faidx',
+#            'bcftools': 'bcftools', 'R': 'Rscript', 'R2': 'R', 'king': 'king'}
+#     loads = {'flippyr': 'echo running flippyr', 'plink': 'echo running plink',
+#              'bcftools': 'echo running bcftools',  'R': 'echo running R',
+#              'king': 'echo running KING', 'faidx': 'echo running samtools faidx'}
 
 if getpass.getuser() == "sheaandrews":
     com["flippyr"] = '/Users/sheaandrews/Programs/flippyr/flippyr.py'
@@ -98,6 +102,8 @@ extraref = False
 if ("extra_ref" in config) and (config['extra_ref'] != False):
     extraref = True
     ereftype = detect_ref_type(config['extra_ref'])
+else:
+    ereftype = 'none'
 
 outs = {
     "report": expand(DATAOUT + "/stats/{sample}_GWAS_QC.html", sample=SAMPLE),
@@ -109,9 +115,10 @@ outputs = [outs[x] for x in config["outputs"]]
 outputs = flatten(outputs)
 
 rule all:
-    input: expand(DATAOUT + "/{sample}_exclude.pca", sample=SAMPLE)
-
-    #expand(DATAOUT + "/{sample}_{refname}_merged.vcf", sample=SAMPLE, refname=REF) # outputs
+    input:
+        expand(DATAOUT + "/{sample}_exclude.pca", sample=SAMPLE),
+        expand(DATAOUT + "/stats/{sample}_GWAS_QC.html", sample=SAMPLE),
+        expand(DATAOUT + "/{sample}_{refname}_merged.vcf", sample=SAMPLE, refname=REF) # outputs
 
 
 # ---- Exlude SNPs with a high missing rate and low MAF----
@@ -128,13 +135,14 @@ rule snp_qc:
         miss = config['QC']['GenoMiss'],
         MAF = config['QC']['MAF'],
         HWE = config['QC']['HWE']
+    conda: "workflow/envs/plink.yaml"
     shell:
         """
-{loads[plink]}
-{com[plink]} --bfile {params.stem} --freq --out {params.out}
-{com[plink]} --bfile {params.stem} --freqx --out {params.out}
-{com[plink]} --bfile {params.stem} --geno {params.miss} \
---maf {params.MAF} --hardy --hwe {params.HWE} --make-bed --out {params.out}"""
+        plink --keep-allele-order --bfile {params.stem} --freq --out {params.out}
+        plink --keep-allele-order --bfile {params.stem} --freqx --out {params.out}
+        plink --keep-allele-order --bfile {params.stem} --geno {params.miss} \
+        --maf {params.MAF} --hardy --hwe {params.HWE} --make-bed --out {params.out}
+        """
 
 # ---- Exclude Samples with high missing rate ----
 rule sample_callRate:
@@ -147,11 +155,12 @@ rule sample_callRate:
         indat = rules.snp_qc.params.out if QC_snp else start['stem'],
         miss = config['QC']['SampMiss'],
         out = DATAOUT + "/{sample}_callRate"
+    conda: "workflow/envs/plink.yaml"
     shell:
         """
-{loads[plink]}
-{com[plink]} --bfile {params.indat} --mind {params.miss} \
---missing --make-bed --out {params.out}"""
+        plink --keep-allele-order --bfile {params.indat} --mind {params.miss} \
+        --missing --make-bed --out {params.out}
+        """
 
 # ---- Exclude Samples with discordant sex ----
 #  Use ADNI hg18 data, as the liftover removed the x chromsome data
@@ -164,11 +173,8 @@ rule sexcheck_QC:
     params:
         indat = start['sex_stem'],
         out = DATAOUT + "/{sample}_SexQC",
-    shell:
-        '''
-{loads[plink]}
-{com[plink]} --bfile {params.indat} --check-sex --aec --out {params.out}
-'''
+    conda: "workflow/envs/plink.yaml"
+    shell: "plink --keep-allele-order --bfile {params.indat} --check-sex --aec --out {params.out}"
 
 rule sex_sample_fail:
     input:
@@ -217,23 +223,23 @@ elif config['genome_build'] in ['hg38', 'GRCh38', 'grch38', 'GRCH38']:
     tgfa = 'technical/reference/GRCh38_reference_genome/GRCh38_full_analysis_set_plus_decoy_hla.fa'
 
 
-if predownload:
-    rule download_tg_chrom:
-       input:
-           FTP.remote(tgurl, keep_local=True),
-           FTP.remote(tgurl + ".tbi", keep_local=True),
-       output:
-           temp("data/1000gRaw.{gbuild}.chr{chrom}.vcf.gz"),
-           temp("data/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi")
-       shell: "cp {input[0]} {output[0]}; cp {input[1]} {output[1]}"
+rule download_tg_chrom:
+   input:
+       FTP.remote(tgurl),
+       FTP.remote(tgurl + ".tbi"),
+   output:
+       temp("reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz"),
+       temp("reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi")
+   shell: "cp {input[0]} {output[0]}; cp {input[1]} {output[1]}"
 
-    rule download_tg_fa:
-       input:
-           FTP.remote(tgfa + ".gz") if BUILD == 'hg19' else FTP.remote(tgfa)
-       output:
-           "data/human_g1k_{gbuild}.fasta",
-           "data/human_g1k_{gbuild}.fasta.fai"
-       shell:
+
+rule download_tg_fa:
+   input:
+       FTP.remote(tgfa + ".gz") if BUILD == 'hg19' else FTP.remote(tgfa)
+   output:
+       "reference/human_g1k_{gbuild}.fasta",
+       "reference/human_g1k_{gbuild}.fasta.fai"
+   shell:
            """
 {loads[faidx]}
 if [[ "{input[0]}" == *.gz ]]; then
@@ -243,14 +249,14 @@ else
 fi
 {com[faidx]} {output[0]}"""
 
-    rule download_tg_ped:
-       input:
-           FTP.remote(tgped, keep_local=True),
-       output:
-           "data/20130606_g1k.ped",
-       shell: "cp {input} {output}"
+rule download_tg_ped:
+    input:
+        FTP.remote(tgped),
+    output:
+        "reference/20130606_g1k.ped",
+    shell: "cp {input} {output}"
 
-tgped = "data/20130606_g1k.ped"
+tgped = "reference/20130606_g1k.ped"
 
 
 if REF == '1kG':
@@ -261,42 +267,43 @@ if REF == '1kG':
     rule Reference_foundersonly:
         input: tgped
         output:
-            "data/20130606_g1k.founders"
-        shell: r"""
-    awk -F "\t" '!($12 != 0 || $10 != 0 || $9 != 0 || $3 != 0 || $4 != 0) {{print $2}}' \
-    {input} > {output}
-    """
+            "reference/20130606_g1k.founders"
+        shell:
+            r"""
+            awk -F "\t" '!($12 != 0 || $10 != 0 || $9 != 0 || $3 != 0 || $4 != 0) {{print $2}}' \
+            {input} > {output}
+            """
 
     rule makeTGpops:
         input: tgped
         output:
-            "data/1kG_pops.txt",
-            "data/1kG_pops_unique.txt"
+            "reference/1kG_pops.txt",
+            "reference/1kG_pops_unique.txt"
         shell:
             """
-    awk 'BEGIN {{print "FID","IID","Population"}} NR>1 {{print $1,$2,$7}}' \
-    {input} > {output[0]}
-    cut -f7 {input} | sed 1d | sort | uniq > {output[1]}
-    """
+            awk 'BEGIN {{print "FID","IID","Population"}} NR>1 {{print $1,$2,$7}}' \
+            {input} > {output[0]}
+            cut -f7 {input} | sed 1d | sort | uniq > {output[1]}
+            """
 else:
     rule make_custom_pops:
         input: config['custom_pops']
         output:
-            "data/{refname}_pops.txt",
-            "data/{refname}_pops_unique.txt"
+            "reference/{refname}_pops.txt",
+            "reference/{refname}_pops_unique.txt"
         shell:
             """
-    cp {input} {output[0]}
-    awk 'NR > 1 {{print $3}}' {input} | sort | uniq > {output[1]}
-    """
+            cp {input} {output[0]}
+            awk 'NR > 1 {{print $3}}' {input} | sort | uniq > {output[1]}
+            """
 
 
 if REF == '1kG' or creftype == 'vcfchr':
     rule Reference_prep:
         input:
-            vcf = "data/1000gRaw.{gbuild}.chr{chrom}.vcf.gz" if REF == '1kG' else config['custom_ref'],
-            tbi = "data/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi" if REF == '1kG' else config['custom_ref'] + '.tbi'
-        output: temp("data/{refname}.{gbuild}.chr{chrom}.maxmiss{miss}.vcf.gz")
+            vcf = "reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz" if REF == '1kG' else config['custom_ref'],
+            tbi = "reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi" if REF == '1kG' else config['custom_ref'] + '.tbi'
+        output: temp("reference/{refname}.{gbuild}.chr{chrom}.maxmiss{miss}.vcf.gz")
         shell:
             """
     {loads[bcftools]}
@@ -307,11 +314,11 @@ if REF == '1kG' or creftype == 'vcfchr':
 
     rule Reference_cat:
         input:
-            vcfs = expand("data/{{refname}}.{{gbuild}}.chr{chrom}.maxmiss{{miss}}.vcf.gz",
+            vcfs = expand("reference/{{refname}}.{{gbuild}}.chr{chrom}.maxmiss{{miss}}.vcf.gz",
                           chrom = list(range(1, 23)))
         output:
-            vcf = "data/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
-            tbi = "data/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
+            vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
+            tbi = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
         shell:
             """
     {loads[bcftools]}
@@ -324,8 +331,8 @@ elif creftype == 'vcf':
             vcf = config['custom_ref'],
             tbi = config['custom_ref'] + '.tbi'
         output:
-            vcf = "data/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
-            tbi = "data/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
+            vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
+            tbi = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
         shell:
             """
     {loads[bcftools]}
@@ -341,20 +348,20 @@ else: #PLINK fileset of all chromosomes
             bim = config['custom_ref'] + '.bim',
             bed = config['custom_ref'] + '.bed',
             fam = config['custom_ref'] + '.fam',
-            fasta = expand("data/human_g1k_{gbuild}.fasta", gbuild=BUILD)
+            fasta = expand("reference/human_g1k_{gbuild}.fasta", gbuild=BUILD)
         output:
-            temp(expand("data/{{refname}}_{{gbuild}}_flipped.{ext}", ext=BPLINK))
+            temp(expand("reference/{{refname}}_{{gbuild}}_flipped.{ext}", ext=BPLINK))
         shell:
             """
     {loads[flippyr]}
-    {com[flippyr]} -p {input.fasta} -o data/{wildcards.refname}_{wildcards.gbuild}_flipped {input.bim}"""
+    {com[flippyr]} -p {input.fasta} -o reference/{wildcards.refname}_{wildcards.gbuild}_flipped {input.bim}"""
 
     rule Ref_ChromPosRefAlt:
         input:
-            flipped = "data/{refname}_{gbuild}_flipped.bim"
+            flipped = "reference/{refname}_{gbuild}_flipped.bim"
         output:
-            bim = temp("data/{refname}_{gbuild}_flipped_ChromPos.bim"),
-            snplist = temp("data/{refname}_{gbuild}_flipped_snplist")
+            bim = temp("reference/{refname}_{gbuild}_flipped_ChromPos.bim"),
+            snplist = temp("reference/{refname}_{gbuild}_flipped_snplist")
         shell:
             """
     {loads[R]}
@@ -366,10 +373,10 @@ else: #PLINK fileset of all chromosomes
             bim = rules.Ref_ChromPosRefAlt.output.bim,
             flipped = rules.Ref_Flip.output
         output:
-            temp("data/{refname}_{gbuild}_unQC_maxmissUnfilt.vcf.gz")
+            temp("reference/{refname}_{gbuild}_unQC_maxmissUnfilt.vcf.gz")
         params:
-            out = "data/{refname}_{gbuild}_unQC_maxmissUnfilt",
-            inp = "data/{refname}_{gbuild}_flipped"
+            out = "reference/{refname}_{gbuild}_unQC_maxmissUnfilt",
+            inp = "reference/{refname}_{gbuild}_flipped"
         shell:
             """
     {loads[plink]}
@@ -378,8 +385,8 @@ else: #PLINK fileset of all chromosomes
 
     # Index bcf
     rule Ref_IndexVcf:
-        input: "data/{refname}_{gbuild}_unQC_maxmissUnfilt.vcf.gz"
-        output: "data/{refname}_{gbuild}_unQC_maxmissUnfilt.vcf.gz.csi"
+        input: "reference/{refname}_{gbuild}_unQC_maxmissUnfilt.vcf.gz"
+        output: "reference/{refname}_{gbuild}_unQC_maxmissUnfilt.vcf.gz.csi"
         shell: '{loads[bcftools]}; {com[bcftools]} index -f {input}'
 
     rule Reference_prep:
@@ -387,8 +394,8 @@ else: #PLINK fileset of all chromosomes
             vcf = rules.Ref_Plink2Vcf.output,
             csi = rules.Ref_IndexVcf.output
         output:
-            vcf = "data/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
-            tbi = "data/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
+            vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
+            tbi = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
         #wildcard_constraints:
             #gbuild = "hg19|GRCh38",
             #refname = "[a-zA-Z0-9-]",
@@ -445,14 +452,14 @@ elif ereftype == 'vcf':
     {com[bcftools]} annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output.vcf}
     {com[bcftools]} index -ft {output.vcf}
     """
-else: #PLINK fileset of all chromosomes
+elif ereftype != 'none': #PLINK fileset of all chromosomes
     # align custom ref to fasta refrence
     rule Ref_Flip_extra:
         input:
             bim = config['extra_ref'] + '.bim',
             bed = config['extra_ref'] + '.bed',
             fam = config['extra_ref'] + '.fam',
-            fasta = expand("data/human_g1k_{gbuild}.fasta", gbuild=BUILD)
+            fasta = expand("reference/human_g1k_{gbuild}.fasta", gbuild=BUILD)
         output:
             temp(expand(DATAOUT + "/extraref_{{gbuild}}_flipped.{ext}", ext=BPLINK))
         shell:
@@ -519,14 +526,12 @@ rule Sample_Flip:
         bim = sexcheck_in_plink_stem + '.bim',
         bed = sexcheck_in_plink_stem + '.bed',
         fam = sexcheck_in_plink_stem + '.fam',
-        fasta = expand("data/human_g1k_{gbuild}.fasta", gbuild=BUILD)
+        fasta = expand("reference/human_g1k_{gbuild}.fasta", gbuild=BUILD)
     output:
         temp(expand(DATAOUT + "/{{sample}}_flipped.{ext}",
                     ext=BPLINK))
-    shell:
-        """
-{loads[flippyr]}
-{com[flippyr]} -p {input.fasta} -o {DATAOUT}/{wildcards.sample} {input.bim}"""
+    conda: "workflow/envs/flippyr.yaml"
+    shell: "flippyr -p {input.fasta} -o {DATAOUT}/{wildcards.sample} {input.bim}"
 
 rule Sample_ChromPosRefAlt:
     input:
@@ -534,12 +539,10 @@ rule Sample_ChromPosRefAlt:
     output:
         bim = temp(DATAOUT + "/{sample}_flipped_ChromPos.bim"),
         snplist = temp(DATAOUT + "/{sample}_flipped_snplist")
-    shell:
-        """
-{loads[R]}
-{com[R]} scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"""
+    conda: "workflow/envs/r.yaml"
+    script: "workflow/scripts/bim_ChromPosRefAlt.R"
 
-if config['union_panel']:
+if config['union_panel'] and extraref:
     if extraref and ("union_extra" in config) and (config['union_extra'] != False):
         erefc = True
     PVARS = DATAOUT + '/panelvars_all.snp'
@@ -548,11 +551,15 @@ else:
     PVARS = "/dev/urandom"
     extract_sample = ""
 
+
+if not extraref:
+    erefc = False
+
 rule get_panelvars:
     input:
-        expand("data/{{refname}}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
+        expand("reference/{{refname}}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
                gbuild=BUILD, miss=config['QC']['GenoMiss'], refname=REF)
-    output: 'data/panelvars_{refname}.snps' if erefc else PVARS
+    output: 'reference/panelvars_{refname}.snps' if erefc else DATAOUT + '/panelvars_all.snp'
     shell:
         """
 {loads[bcftools]}
@@ -561,11 +568,12 @@ rule get_panelvars:
 
 rule merge_panelvars:
     input:
-        ref = expand('data/panelvars_{refname}.snps', refname=REF),
+        ref = expand('reference/panelvars_{refname}.snps', refname=REF),
         eref = expand(DATAOUT + "/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
                       gbuild=BUILD, miss=config['QC']['GenoMiss'])
     output: PVARS if erefc else "do.not"
     shell: 'cat {input} | sort | uniq > {output}'
+#import ipdb; ipdb.set_trace()
 
 rule PruneDupvar_snps:
     input:
@@ -581,14 +589,14 @@ rule PruneDupvar_snps:
         dupvar = DATAOUT + "/{sample}_nodup.dupvar",
         out = DATAOUT + "/{sample}_nodup",
         extract = extract_sample
+    conda: "workflow/envs/plink.yaml"
     shell:
         """
-{loads[plink]}
-{loads[R]}
-{com[plink]} --bfile {params.indat} -bim {input.bim} \
-{params.extract}--autosome --indep 50 5 1.5 \
---list-duplicate-vars --out {params.out}
-{com[R]}  scripts/DuplicateVars.R {params.dupvar}"""
+        plink --keep-allele-order --bfile {params.indat} -bim {input.bim} \
+        {params.extract}--autosome --indep 50 5 1.5 \
+        --list-duplicate-vars --out {params.out}
+        Rscript scripts/DuplicateVars.R {params.dupvar}
+        """
 
 # Prune sample dataset
 rule sample_prune:
@@ -603,13 +611,13 @@ rule sample_prune:
     params:
         indat = DATAOUT + "/{sample}_flipped",
         out = DATAOUT + "/{sample}_pruned"
+    conda: "workflow/envs/plink.yaml"
     shell:
         """
-{loads[plink]}
-{com[plink]} --bfile {params.indat} --bim {input.bim} \
---extract {input.prune} --exclude {input.dupvar} \
---make-bed --out {params.out}
-"""
+        plink --keep-allele-order --bfile {params.indat} --bim {input.bim} \
+        --extract {input.prune} --exclude {input.dupvar} \
+        --make-bed --out {params.out}
+        """
 
 rule sample_make_prunelist:
   input: DATAOUT + "/{sample}_pruned.bim"
@@ -618,22 +626,22 @@ rule sample_make_prunelist:
 
 rule Reference_prune:
     input:
-        vcf = expand("data/{{refname}}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
+        vcf = expand("reference/{{refname}}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
                      gbuild=BUILD, miss=config['QC']['GenoMiss']),
         prune = DATAOUT + "/{sample}_pruned.snplist",
-        founders = "data/20130606_g1k.founders" if REF == '1kG' else '/dev/urandom'
+        founders = "reference/20130606_g1k.founders" if REF == '1kG' else '/dev/urandom'
     output:
         vcf = temp(DATAOUT + "/{sample}_{refname}pruned.vcf.gz"),
         tbi = temp(DATAOUT + "/{sample}_{refname}pruned.vcf.gz.tbi")
     params:
-        founders = "-S data/20130606_g1k.founders " if REF == '1kG' else ''
+        founders = "-S reference/20130606_g1k.founders " if REF == '1kG' else ''
+    conda: "workflow/envs/bcftools.yaml"
     shell:
         """
-{loads[bcftools]}
-{com[bcftools]} view -i 'ID=@{input.prune}' {params.founders}\
--Oz -o {output.vcf} --force-samples {input.vcf} --threads 4
-{com[bcftools]} index -ft {output.vcf}
-"""
+        bcftools view -i 'ID=@{input.prune}' {params.founders}\
+        -Oz -o {output.vcf} --force-samples {input.vcf} --threads 4
+        bcftools index -ft {output.vcf}
+        """
 
 rule Reference_prune_extra:
     input:
@@ -643,13 +651,13 @@ rule Reference_prune_extra:
     output:
         vcf = temp(DATAOUT + "/eref.{sample}pruned.vcf.gz"),
         tbi = temp(DATAOUT + "/eref.{sample}pruned.vcf.gz.tbi")
+    conda: "workflow/envs/bcftools.yaml"
     shell:
         """
-{loads[bcftools]}
-{com[bcftools]} view -i 'ID=@{input.prune}' \
--Oz -o {output.vcf} --force-samples {input.vcf} --threads 4
-{com[bcftools]} index -ft {output.vcf}
-"""
+        bcftools view -i 'ID=@{input.prune}' \
+        -Oz -o {output.vcf} --force-samples {input.vcf} --threads 4
+        bcftools index -ft {output.vcf}
+        """
 
 # allow for tg sample:
 rule tgfam:
@@ -666,17 +674,19 @@ rule Sample_Plink2Bcf:
     output: DATAOUT + "/{sample}_pruned.vcf.gz"
     params:
         out = DATAOUT + "/{sample}_pruned"
+    conda: "workflow/envs/plink.yaml"
     shell:
         """
-{loads[plink]}
-{com[plink2]} --bed {input.bed} --bim {input.bim} --fam {input.fam} --recode vcf bgz \
---real-ref-alleles --out {params.out}"""
+        plink --bed {input.bed} --bim {input.bim} --fam {input.fam} --recode vcf bgz \
+        --real-ref-alleles --out {params.out}
+        """
 
 # Index bcf
 rule Sample_IndexBcf:
     input: DATAOUT + "/{sample}_pruned.vcf.gz"
     output: DATAOUT + "/{sample}_pruned.vcf.gz.csi"
-    shell: '{loads[bcftools]}; {com[bcftools]} index -f {input}'
+    conda: "workflow/envs/bcftools.yaml"
+    shell: 'bcftools index -f {input}'
 
 # Merge ref and sample
 rule Merge_RefenceSample:
@@ -692,12 +702,13 @@ rule Merge_RefenceSample:
         extra = DATAOUT + "/eref.{sample}pruned.vcf.gz" if extraref else ''
     output:
         out = DATAOUT + "/{sample}_{refname}_merged.vcf"
+    conda: "workflow/envs/bcftools.yaml"
     shell:
         r"""
-{loads[bcftools]}
-{com[bcftools]} merge -m none --threads 2 \
- {input.bcf_ref} {input.bcf_samp} {params.extra} | \
-{com[bcftools]} view  -i 'F_MISSING <= {params.miss}' -Ov -o {output.out} --threads 2"""
+        bcftools merge -m none --threads 2 \
+         {input.bcf_ref} {input.bcf_samp} {params.extra} | \
+         bcftools view  -i 'F_MISSING <= {params.miss}' -Ov -o {output.out} --threads 2
+         """
 
 # recode merged sample to plink
 rule Plink_RefenceSample:
@@ -707,54 +718,48 @@ rule Plink_RefenceSample:
         expand(DATAOUT + "/{{sample}}_{{refname}}_merged.{ext}", ext=BPLINK)
     params:
         out = DATAOUT + "/{sample}_{refname}_merged"
-    shell:
-        '''
-{loads[plink]}
-{com[plink]} --vcf {input.vcf} --const-fid --make-bed --out {params.out}'''
+    conda: "workflow/envs/plink.yaml"
+    shell: "plink --keep-allele-order --vcf {input.vcf} --const-fid --make-bed --out {params.out}"
 
 rule fix_fam:
     input:
         oldfam = rules.Sample_Plink2Bcf.input.fam,
         newfam = DATAOUT + "/{sample}_{refname}_merged.fam",
         tgped = tgped
-    output: DATAOUT + "/{sample}_{refname}_merged_fixed.fam"
-    shell:
-        """
-{loads[R]}
-{com[R]} scripts/fix_fam.R {input.oldfam} {input.newfam} {output} {input.tgped}"""
+    output: fixed = DATAOUT + "/{sample}_{refname}_merged_fixed.fam"
+    conda: "workflow/envs/r.yaml"
+    script: "workflow/scripts/fix_fam.R"
 
 rule merge_pops:
     input:
-        main = "data/{refname}_pops.txt",
+        main = "reference/{refname}_pops.txt",
         extra = rules.Reference_prune_extra.input.vcf
     output:
         DATAOUT + '/{refname}_allpops.txt',
         DATAOUT + '/{refname}_allpops_unique.txt'
-    shell:
-        """
-{loads[R]}
-{com[R]} scripts/add_extraref_pops.R \
-  {input.main} {input.extra} {config[extra_ref_subpop]} {output}
-"""
+    params:
+        extra_ref_code = config['extra_ref_subpop']
+    conda: "workflow/envs/r.yaml"
+    script: "workflow/scripts/add_extraref_pops.R"
 
 # PCA analysis to identify population outliers
 rule PcaPopulationOutliers:
     input:
         plink = expand(DATAOUT + "/{{sample}}_{{refname}}_merged.{ext}", ext=BPLINK),
         fam = rules.fix_fam.output,
-        pop = DATAOUT + '/{refname}_allpops.txt' if extraref else "data/{refname}_pops.txt",
-        clust = DATAOUT + '/{refname}_allpops_unique.txt' if extraref else "data/{refname}_pops_unique.txt"
+        ref = DATAOUT + '/{refname}_allpops.txt' if extraref else "reference/{refname}_pops.txt",
+        clust = DATAOUT + '/{refname}_allpops_unique.txt' if extraref else "reference/{refname}_pops_unique.txt"
     output:
         expand(DATAOUT + "/{{sample}}_{{refname}}_merged.{ext}", ext=['eigenval', 'eigenvec'])
     params:
         indat_plink = DATAOUT + "/{sample}_{refname}_merged",
         out = DATAOUT + "/{sample}_{refname}_merged"
+    conda: "workflow/envs/plink.yaml"
     shell:
         """
-{loads[plink]}
-{com[plink]} --bfile {params.indat_plink} --fam {input.fam} --pca 10 \
---within {input.pop} --pca-clusters {input.clust} --out {params.out}
-"""
+        plink --keep-allele-order --bfile {params.indat_plink} --fam {input.fam} --pca 10 \
+        --within {input.ref} --pca-clusters {input.clust} --out {params.out}
+        """
 
 # Rscript to identify population outliers
 rule ExcludePopulationOutliers:
@@ -769,13 +774,14 @@ rule ExcludePopulationOutliers:
     params:
         samp = "{sample}",
         superpop = config['superpop']
-    shell:
-        """
-{loads[R]}
-scripts/PCA_QC.R -s {params.samp} -p {params.superpop} \
---vec {input.eigenvec} --val {input.eigenval} \
--b {input.tgped} -t {input.fam} -o {output.excl} -R {output.rmd}
-"""
+    conda: "workflow/envs/r.yaml"
+    script: "workflow/scripts/PCA_QC.R"
+    # shell:
+    #     """
+    #     Rscript scripts/PCA_QC.R -s {params.samp} -p {params.superpop} \
+    #     --vec {input.eigenvec} --val {input.eigenval} \
+    #     -b {input.tgped} -t {input.fam} -o {output.excl} -R {output.rmd}
+    #     """
 
 # ---- Exclude Samples with interealtedness ----
 rule relatedness_sample_prep:
@@ -787,14 +793,15 @@ rule relatedness_sample_prep:
     params:
         indat_plink = sexcheck_in_plink_stem,
         out = DATAOUT + "/{sample}_IBDQCfilt"
+    conda: "workflow/envs/plink.yaml"
     shell:
         """
-{loads[plink]}
-{com[plink2]} --bfile {params.indat_plink} \
-  --geno 0.02 \
-  --maf 0.02 \
-  --memory 6000 \
-  --make-bed --out {params.out}"""
+        plink --bfile {params.indat_plink} \
+          --geno 0.02 \
+          --maf 0.02 \
+          --memory 6000 \
+          --make-bed --out {params.out}
+          """
 
 if config['king']:
     rule relatedness_QC:
@@ -806,14 +813,14 @@ if config['king']:
             genome = DATAOUT + "/{sample}_IBDQC.kingfiles"
         params:
             out = DATAOUT + "/{sample}_IBDQC"
+        conda: "workflow/envs/king.yaml"
         shell:
             """
-{loads[king]}
-{com[king]} -b {input.bed} --related --degree 3 --prefix {params.out}
-if test -n "$(find {DATAOUT} -name "{wildcards.sample}_IBDQC.kin*")"; then
-  find {DATAOUT} -name "{wildcards.sample}_IBDQC.kin*" > {output.genome}
-fi
-"""
+            king -b {input.bed} --related --degree 3 --prefix {params.out}
+            if test -n "$(find {DATAOUT} -name "{wildcards.sample}_IBDQC.kin*")"; then
+              find {DATAOUT} -name "{wildcards.sample}_IBDQC.kin*" > {output.genome}
+            fi
+            """
 
     rule king_all:
         input:
@@ -824,14 +831,14 @@ fi
             genome = DATAOUT + "/{sample}_IBDQC.all.kingfiles",
         params:
             out = DATAOUT + "/{sample}_IBDQC.all"
+        conda: "workflow/envs/king.yaml"
         shell:
             """
-{loads[king]}
-{com[king]} -b {input.bed} --kinship --ibs --prefix {params.out}
-if test -n "$(find {DATAOUT} -name "{wildcards.sample}_IBDQC.all.kin*")"; then
-  find {DATAOUT} -name "{wildcards.sample}_IBDQC.all.kin*" > {output.genome}
-fi
-"""
+            king -b {input.bed} --kinship --ibs --prefix {params.out}
+            if test -n "$(find {DATAOUT} -name "{wildcards.sample}_IBDQC.all.kin*")"; then
+              find {DATAOUT} -name "{wildcards.sample}_IBDQC.all.kin*" > {output.genome}
+            fi
+            """
 else:
     rule relatedness_QC:
         input: rules.sample_prune.output
@@ -840,11 +847,12 @@ else:
         params:
             indat_plink = DATAOUT + "/{sample}_pruned",
             out = DATAOUT + "/{sample}_IBDQC"
+        conda: "workflow/envs/plink.yaml"
         shell:
             """
-{loads[plink]}
-{com[plink]} --bfile {params.indat_plink} --genome --min 0.05 \
---out {params.out}"""
+            plink --keep-allele-order --bfile {params.indat_plink} --genome --min 0.05 \
+            --out {params.out}
+            """
 
 rule relatedness_sample_fail:
     input:
@@ -859,10 +867,8 @@ rule relatedness_sample_fail:
     output:
         out = DATAOUT + "/{sample}_exclude.relatedness",
         rdat = DATAOUT + "/{sample}_IBDQC.Rdata"
-    shell:
-        """
-{loads[R]}; {com[R]}  scripts/relatedness_QC.R {params.geno} {params.threshold} \
-{params.Family} {params.king} {output.out} {output.rdat}"""
+    conda: "workflow/envs/r.yaml"
+    script: "workflow/scripts/relatedness_QC.R"
 
 # ---- Exclude Samples with outlying heterozigosity ----
 rule heterozygosity_QC:
@@ -871,15 +877,14 @@ rule heterozygosity_QC:
     params:
         indat_plink = rules.sample_prune.params.out,
         out = DATAOUT + "/{sample}_HetQC"
-    shell:
-        '''
-{loads[plink]}
-{com[plink]} --bfile {params.indat_plink} --het --out {params.out}'''
+    conda: "workflow/envs/plink.yaml"
+    shell: "plink --keep-allele-order --bfile {params.indat_plink} --het --out {params.out}"
 
 rule heterozygosity_sample_fail:
     input: rules.heterozygosity_QC.output
     output: DATAOUT + "/{sample}_exclude.heterozigosity"
-    shell: '{loads[R]}; {com[R]}  scripts/heterozygosity_QC.R {input} {output}'
+    conda: "workflow/envs/r.yaml"
+    script: 'workflow/scripts/heterozygosity_QC.R'
 
 # Run PCA to control for population stratification
 if config['pcair']:
@@ -895,13 +900,13 @@ if config['pcair']:
         params:
             indat = DATAOUT + "/{sample}_pruned",
             plinkout = DATAOUT + "/{sample}_filtered_PCApre"
+        conda: "workflow/envs/plink.yaml"
         shell:
             r"""
-{loads[plink]}
-{com[plink]} --bfile {params.indat} \
-  --remove {input.exclude} \
-  --make-bed --out {params.plinkout}
-"""
+            plink --keep-allele-order --bfile {params.indat} \
+              --remove {input.exclude} \
+              --make-bed --out {params.plinkout}
+            """
 
     rule filterKING:
         input:
@@ -911,14 +916,14 @@ if config['pcair']:
             DATAOUT + "/{sample}_IBDQC.all.popfilt.kingfiles"
         params:
             indat = DATAOUT + "/{sample}_IBDQC.all",
+        conda: "workflow/envs/r.yaml"
         shell:
             r"""
-{loads[R]}
-{com[R]} scripts/filterKing.R {params.indat} {input.exclude}
-if test -n "$(find {DATAOUT} -name "{wildcards.sample}_IBDQC.all.popfilt.kin*")"; then
-  find {DATAOUT} -name "{wildcards.sample}_IBDQC.all.popfilt.kin*" > {output}
-fi
-"""
+            Rscript workflow/scripts/filterKing.R {params.indat} {input.exclude}
+            if test -n "$(find {DATAOUT} -name "{wildcards.sample}_IBDQC.all.popfilt.kin*")"; then
+              find {DATAOUT} -name "{wildcards.sample}_IBDQC.all.popfilt.kin*" > {output}
+            fi
+            """
 
     rule PCAPartitioning:
         input:
@@ -930,11 +935,8 @@ fi
         params:
             stem = rules.ancestryFilt.params.plinkout,
             king = rules.filterKING.params.indat + ".popfilt"
-        shell:
-            """
-{loads[R]}
-{com[R]} scripts/PartitionPCAiR.R {params.stem} {params.king} {input.iterative}
-"""
+        conda: "workflow/envs/r.yaml"
+        script: "workflow/scripts/PartitionPCAiR.R"
 
     rule stratFrq:
         input:
@@ -944,13 +946,13 @@ fi
         params:
             indat = rules.ancestryFilt.params.plinkout,
             out = DATAOUT + "/{sample}_filtered_PCAfreq"
+        conda: "workflow/envs/plink.yaml"
         shell:
             """
-{loads[plink]}
-{com[plink]} --bfile {params.indat} --freqx \
-  --within {input.unrel} --keep-cluster-names unrelated \
-  --out {params.out}
-"""
+            plink --keep-allele-order --bfile {params.indat} --freqx \
+              --within {input.unrel} --keep-cluster-names unrelated \
+              --out {params.out}
+            """
 
     rule PopulationStratification:
         input:
@@ -962,13 +964,13 @@ fi
         params:
             indat = rules.ancestryFilt.params.plinkout,
             out = DATAOUT + "/{sample}_filtered_PCA"
+        conda: "workflow/envs/plink.yaml"
         shell:
             """
-{loads[plink]}
-{com[plink]} --bfile {params.indat} --read-freq {input.frq} --pca 10 \
-  --within {input.unrel} --pca-cluster-names unrelated \
-  --out {params.out}
-"""
+            plink --keep-allele-order --bfile {params.indat} --read-freq {input.frq} --pca 10 \
+              --within {input.unrel} --pca-cluster-names unrelated \
+              --out {params.out}
+            """
 else:
     rule PopulationStratification:
         input:
@@ -980,12 +982,12 @@ else:
         params:
             indat = DATAOUT + "/{sample}_pruned",
             out = DATAOUT + "/{sample}_filtered_PCA"
+        conda: "workflow/envs/plink.yaml"
         shell:
             """
-{loads[plink]}
-{com[plink]} --bfile {params.indat} --remove {input.exclude} --pca 10 \
---out {params.out}
-"""
+            plink --keep-allele-order --bfile {params.indat} --remove {input.exclude} --pca 10 \
+            --out {params.out}
+            """
 
 rule SampleExclusion:
     input:
@@ -997,12 +999,8 @@ rule SampleExclusion:
     output:
         out = DATAOUT + "/{sample}_exclude.samples",
         out_distinct = DATAOUT + "/{sample}_exclude.distinct_samples"
-    shell:
-        """
-{loads[R]}
-{com[R]} scripts/sample_QC.R {input.SampCallRate} {input.het} \
-{input.sex} {input.pca} {input.relat} {output.out} {output.out_distinct}
-"""
+    conda: "workflow/envs/r.yaml"
+    script: "workflow/scripts/sample_QC.R "
 
 rule Exclude_failed:
     input:
@@ -1014,17 +1012,16 @@ rule Exclude_failed:
     params:
         indat_plink = sexcheck_in_plink_stem,
         out = DATAOUT + "/{sample}_Excluded"
+    conda: "workflow/envs/plink.yaml"
     shell:
         """
-cat {input.indat_exclude} | sed '1d' | cut -d' ' -f1,2 > {output.excl}
-{loads[plink]}
-{com[plink]} --bfile {params.indat_plink} --remove {output.excl} \
---make-bed --out {params.out}"""
-
+        cat {input.indat_exclude} | sed '1d' | cut -d' ' -f1,2 > {output.excl}
+        plink --keep-allele-order --bfile {params.indat_plink} --remove {output.excl} \
+        --make-bed --out {params.out}
+        """
 
 def decorate2(text):
     return DATAOUT + "/{sample}_" + text
-
 
 rule GWAS_QC_Report:
     input:
@@ -1054,10 +1051,10 @@ rule GWAS_QC_Report:
         HWE = config['QC']['HWE'],
         superpop = config['superpop'],
         partmethod = rules.PCAPartitioning.output[1] if config["pcair"] else "none"
+    conda: "workflow/envs/r.yaml"
     shell:
         """
-{loads[R]}
-{com[R2]} -e 'nm <- sample(c("Shea J. Andrews", "Brian Fulton-Howard"), \
+R -e 'nm <- sample(c("Shea J. Andrews", "Brian Fulton-Howard"), \
 replace=F); nm <- paste(nm[1], "and", nm[2]); \
 rmarkdown::render("{input.script}", output_dir = "{params.output_dir}", \
 output_file = "{output}", intermediates_dir = "{params.idir}", \

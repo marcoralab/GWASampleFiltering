@@ -1,0 +1,8 @@
+channels:
+    - bioconda
+    - conda-forge    
+dependencies:
+    - plink=1.90b6.18
+    - r-base=4.0.3
+    - r-essentials=4.0
+    - r-here=1.0.1

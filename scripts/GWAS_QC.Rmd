@@ -40,7 +40,6 @@ params:
     hwe: 1e-6
     superpop: "EUR"
     partmethod: "none"
-
 title: "GWAS QC: `r params$Sample`"
 author: "`r params$auth`"
 ---

@@ -1,10 +1,9 @@
 suppressMessages(library(readr))
 suppressMessages(library(dplyr))
 
-args <- commandArgs(trailingOnly = TRUE)
-in_bim <- args[1]
-out_bim <- args[2]
-out_snplist <- args[3]
+in_bim = snakemake@input[['flipped']]
+out_bim = snakemake@output[['bim']]
+out_snplist = snakemake@output[['snplist']]
 
 cat("in_bim: ", in_bim, "\n")
 cat("out_bim: ", out_bim, "\n")
