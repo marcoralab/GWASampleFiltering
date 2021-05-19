@@ -64,10 +64,6 @@ union_panel_TF = True
 #              'bcftools': 'echo running bcftools',  'R': 'echo running R',
 #              'king': 'echo running KING', 'faidx': 'echo running samtools faidx'}
 
-if getpass.getuser() == "sheaandrews":
-    com["flippyr"] = '/Users/sheaandrews/Programs/flippyr/flippyr.py'
-
-
 def decorate(text):
     return expand(DATAOUT + "/{sample}_" + text,
                   sample=SAMPLE)
@@ -182,7 +178,7 @@ rule sex_sample_fail:
     output:
         DATAOUT + "/{sample}_exclude.sexcheck",
     shell:
-        '{loads[R]}; {com[R]} scripts/sexcheck_QC.R {input} {output}'
+        'Rscript scripts/sexcheck_QC.R {input} {output}'
 
 if QC_callRate:
     sexcheck_in_plink = rules.sample_callRate.output[0]
@@ -304,12 +300,12 @@ if REF == '1kG' or creftype == 'vcfchr':
             vcf = "reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz" if REF == '1kG' else config['custom_ref'],
             tbi = "reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi" if REF == '1kG' else config['custom_ref'] + '.tbi'
         output: temp("reference/{refname}.{gbuild}.chr{chrom}.maxmiss{miss}.vcf.gz")
+        conda: "workflow/envs/bcftools.yaml"
         shell:
             """
-    {loads[bcftools]}
-    {com[bcftools]} norm -m- {input.vcf} --threads 2 | \
-    {com[bcftools]} view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
-    {com[bcftools]} annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
+    bcftools norm -m- {input.vcf} --threads 2 | \
+    bcftools view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
+    bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
     """
 
     rule Reference_cat:
@@ -319,11 +315,11 @@ if REF == '1kG' or creftype == 'vcfchr':
         output:
             vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
+        conda: "workflow/envs/bcftools.yaml"
         shell:
             """
-    {loads[bcftools]}
-    {com[bcftools]} concat {input.vcfs} -Oz -o {output.vcf} --threads 2
-    {com[bcftools]} index -ft {output.vcf}
+    bcftools concat {input.vcfs} -Oz -o {output.vcf} --threads 2
+    bcftools index -ft {output.vcf}
     """
 elif creftype == 'vcf':
     rule Reference_prep:
@@ -333,13 +329,13 @@ elif creftype == 'vcf':
         output:
             vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
+        conda: "workflow/envs/bcftools.yaml"
         shell:
             """
-    {loads[bcftools]}
-    {com[bcftools]} norm -m- {input.vcf} --threads 2 | \
-    {com[bcftools]} view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
-    {com[bcftools]} annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output.vcf}
-    {com[bcftools]} index -ft {output.vcf}
+    bcftools norm -m- {input.vcf} --threads 2 | \
+    bcftools view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
+    bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output.vcf}
+    bcftools index -ft {output.vcf}
     """
 else: #PLINK fileset of all chromosomes
     # align custom ref to fasta refrence
@@ -351,10 +347,8 @@ else: #PLINK fileset of all chromosomes
             fasta = expand("reference/human_g1k_{gbuild}.fasta", gbuild=BUILD)
         output:
             temp(expand("reference/{{refname}}_{{gbuild}}_flipped.{ext}", ext=BPLINK))
-        shell:
-            """
-    {loads[flippyr]}
-    {com[flippyr]} -p {input.fasta} -o reference/{wildcards.refname}_{wildcards.gbuild}_flipped {input.bim}"""
+        conda: "workflow/envs/flippyr.yaml"
+        shell:"flippyr -p {input.fasta} -o reference/{wildcards.refname}_{wildcards.gbuild}_flipped {input.bim}"
 
     rule Ref_ChromPosRefAlt:
         input:
@@ -362,10 +356,8 @@ else: #PLINK fileset of all chromosomes
         output:
             bim = temp("reference/{refname}_{gbuild}_flipped_ChromPos.bim"),
             snplist = temp("reference/{refname}_{gbuild}_flipped_snplist")
-        shell:
-            """
-    {loads[R]}
-    {com[R]} scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"""
+        conda: "workflow/envs/r.yaml"
+        shell: "Rscript scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"
 
     # Recode sample plink file to vcf
     rule Ref_Plink2Vcf:
@@ -377,17 +369,17 @@ else: #PLINK fileset of all chromosomes
         params:
             out = "reference/{refname}_{gbuild}_unQC_maxmissUnfilt",
             inp = "reference/{refname}_{gbuild}_flipped"
+        conda: "workflow/envs/plink.yaml"
         shell:
             """
-    {loads[plink]}
-    {com[plink2]} --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
+    plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
     --real-ref-alleles --out {params.out}"""
 
     # Index bcf
     rule Ref_IndexVcf:
         input: "reference/{refname}_{gbuild}_unQC_maxmissUnfilt.vcf.gz"
         output: "reference/{refname}_{gbuild}_unQC_maxmissUnfilt.vcf.gz.csi"
-        shell: '{loads[bcftools]}; {com[bcftools]} index -f {input}'
+        shell: 'bcftools index -f {input}'
 
     rule Reference_prep:
         input:
@@ -400,13 +392,13 @@ else: #PLINK fileset of all chromosomes
             #gbuild = "hg19|GRCh38",
             #refname = "[a-zA-Z0-9-]",
             #miss = "[0-9.]",
+        conda: "workflow/envs/bcftools.yaml"
         shell:
             """
-{loads[bcftools]}
-{com[bcftools]} norm -m- {input.vcf} --threads 2 | \
-{com[bcftools]} view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
-{com[bcftools]} annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output.vcf}
-{com[bcftools]} index -ft {output.vcf}
+bcftools norm -m- {input.vcf} --threads 2 | \
+bcftools view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
+bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output.vcf}
+bcftools index -ft {output.vcf}
 """
 
 if ereftype == 'vcfchr':
@@ -415,12 +407,12 @@ if ereftype == 'vcfchr':
             vcf = config['extra_ref'],
             tbi = config['extra_ref'] + '.tbi'
         output: temp(DATAOUT + "/extraref.{gbuild}.chr{chrom}.maxmiss{miss}.vcf.gz")
+        conda: "workflow/envs/bcftools.yaml"
         shell:
             """
-    {loads[bcftools]}
-    {com[bcftools]} norm -m- {input.vcf} --threads 2 | \
-    {com[bcftools]} view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
-    {com[bcftools]} annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
+    bcftools norm -m- {input.vcf} --threads 2 | \
+    bcftools view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
+    bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
     """
 
     rule Reference_cat_extra:
@@ -432,9 +424,8 @@ if ereftype == 'vcfchr':
             tbi = DATAOUT + "/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
         shell:
             """
-    {loads[bcftools]}
-    {com[bcftools]} concat {input.vcfs} -Oz -o {output.vcf} --threads 2
-    {com[bcftools]} index -ft {output.vcf}
+    bcftools concat {input.vcfs} -Oz -o {output.vcf} --threads 2
+    bcftools index -ft {output.vcf}
     """
 elif ereftype == 'vcf':
     rule Reference_prep_extra:
@@ -444,13 +435,13 @@ elif ereftype == 'vcf':
         output:
             vcf = DATAOUT + "/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = DATAOUT + "/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
+        conda: "workflow/envs/bcftools.yaml"
         shell:
             """
-    {loads[bcftools]}
-    {com[bcftools]} norm -m- {input.vcf} --threads 2 | \
-    {com[bcftools]} view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
-    {com[bcftools]} annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output.vcf}
-    {com[bcftools]} index -ft {output.vcf}
+    bcftools norm -m- {input.vcf} --threads 2 | \
+    bcftools view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
+    bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output.vcf}
+    bcftools index -ft {output.vcf}
     """
 elif ereftype != 'none': #PLINK fileset of all chromosomes
     # align custom ref to fasta refrence
@@ -462,10 +453,8 @@ elif ereftype != 'none': #PLINK fileset of all chromosomes
             fasta = expand("reference/human_g1k_{gbuild}.fasta", gbuild=BUILD)
         output:
             temp(expand(DATAOUT + "/extraref_{{gbuild}}_flipped.{ext}", ext=BPLINK))
-        shell:
-            """
-    {loads[flippyr]}
-    {com[flippyr]} -p {input.fasta} -o {DATAOUT}/extraref_{wildcards.gbuild}_flipped {input.bim}"""
+        conda: "workflow/envs/flippyr.yaml"
+        shell:"flippyr -p {input.fasta} -o {DATAOUT}/extraref_{wildcards.gbuild}_flipped {input.bim}"
 
     rule Ref_ChromPosRefAlt_extra:
         input:
@@ -473,10 +462,8 @@ elif ereftype != 'none': #PLINK fileset of all chromosomes
         output:
             bim = temp(DATAOUT + "/extraref_{gbuild}_flipped_ChromPos.bim"),
             snplist = temp(DATAOUT + "/extraref_{gbuild}_flipped_snplist")
-        shell:
-            """
-    {loads[R]}
-    {com[R]} scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"""
+        conda: "workflow/envs/r.yaml"
+        shell: "R scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"
 
     # Recode sample plink file to vcf
     rule Ref_Plink2Vcf_extra:
@@ -488,10 +475,10 @@ elif ereftype != 'none': #PLINK fileset of all chromosomes
         params:
             out = DATAOUT + "/extraref_{gbuild}_unQC_maxmissUnfilt",
             inp = DATAOUT + "/extraref_{gbuild}_flipped"
+        conda: "workflow/envs/plink.yaml"
         shell:
             """
-    {loads[plink]}
-    {com[plink2]} --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
+    plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
     --real-ref-alleles --out {params.out}"""
 
     # Index bcf
@@ -507,13 +494,13 @@ elif ereftype != 'none': #PLINK fileset of all chromosomes
         output:
             vcf = DATAOUT + "/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = DATAOUT + "/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
+        conda: "workflow/envs/bcftools.yaml"
         shell:
             """
-{loads[bcftools]}
-{com[bcftools]} norm -m- {input.vcf} --threads 2 | \
-{com[bcftools]} view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
-{com[bcftools]} annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output.vcf}
-{com[bcftools]} index -ft {output.vcf}
+bcftools norm -m- {input.vcf} --threads 2 | \
+bcftools view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
+bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output.vcf}
+bcftools index -ft {output.vcf}
 """
 
 
@@ -560,11 +547,8 @@ rule get_panelvars:
         expand("reference/{{refname}}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
                gbuild=BUILD, miss=config['QC']['GenoMiss'], refname=REF)
     output: 'reference/panelvars_{refname}.snps' if erefc else DATAOUT + '/panelvars_all.snp'
-    shell:
-        """
-{loads[bcftools]}
-{com[bcftools]} query -f '%ID\n' {input} > {output}
-"""
+    conda: "workflow/envs/bcftools.yaml"
+    shell: "bcftools query -f '%ID\n' {input} > {output}"
 
 rule merge_panelvars:
     input:

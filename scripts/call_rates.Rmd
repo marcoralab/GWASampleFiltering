@@ -55,11 +55,33 @@ disptab <- function(x) {
 
 # ---- readin plink .frq ---- ##
 message("reading plink frq file")
-freq.raw <- read_table(params$Path_frq, col_names = T)
+freq.raw <- read_table(params$Path_frq, col_names = T,
+  col_types = cols(
+  CHR = col_double(),
+  SNP =col_character(),
+  A1 = col_character(),
+  A2 = col_character(),
+  MAF = col_double(),
+  NCHROBS = col_double()
+)
+  )
 
 # ---- readin plink .frqx ---- ##
 message("reading plink frqx file")
-freqx.raw <- read_tsv(params$Path_frqx, col_names = T)
+freqx.raw <- read_tsv(params$Path_frqx, col_names = T,
+  col_types = cols(
+  CHR = col_double(),
+  SNP = col_character(),
+  A1 = col_character(),
+  A2 = col_character(),
+  `C(HOM A1)` = col_double(),
+  `C(HET)` = col_double(),
+  `C(HOM A2)` = col_double(),
+  `C(HAP A1)` = col_double(),
+  `C(HAP A2)` = col_double(),
+  `C(MISSING)` = col_double()
+)
+)
 
 # ---- readin plink .imiss ---- ##
 message("reading plink individual missingness file")
@@ -163,16 +185,16 @@ library(ggtern)
 #     AddToTernary(points, to_plot, col=adjustcolor(col, alpha.f = 0.3), pch=16, cex=0.3)
 #   }
 # }
-# 
-# 
+#
+#
 # par(mar=c(0,0,0,0))
 # TernaryPlot('AB', 'BB', 'AA', grid.minor.lty=0)
-# 
+#
 # legend("topleft", legend=c('Pass', 'Fail'), bty="n",
 #        col=c(adjustcolor("blue", alpha.f = 0.3),
 #              adjustcolor("red", alpha.f = 0.3)),
 #        pch=16, horiz=F, title="HWE Test:", cex=0.8)
-# 
+#
 # snps %>% filter(hwe) %>% tern_add("blue")
 # snps %>% filter(!hwe) %>% tern_add("red")
 

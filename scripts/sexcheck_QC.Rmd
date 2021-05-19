@@ -52,7 +52,7 @@ disptab <- function(x) {
 ```{r read in sex check data, echo=F, message=F, warning=F}
 ## ---- Read in Data ----##
 
-sexcheck.raw <- read_table(params$Path_SexFile)
+sexcheck.raw <- read_table2(params$Path_SexFile)
 
 ##  recode sex varibles
 sexcheck <- sexcheck.raw %>%

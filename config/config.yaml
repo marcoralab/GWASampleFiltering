@@ -17,7 +17,7 @@ sample: false
 SexIn: original
 
 # This is the directory with the input files:
-DataIn: HRC_imputed
+DataIn: postImpute
 
 # This is the directory with the output files:
 DataOut: output

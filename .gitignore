@@ -19,3 +19,7 @@ inputs/
 reference
 .ropeproject
 sandbox/
+input/
+samp.irem
+temp/
+stats/

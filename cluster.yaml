@@ -5,6 +5,10 @@ __default__:
   cores: 1
   mem: 10000
   time: '0:25'
+Sample_ChromPosRefAlt:
+  cores: 2
+  mem: 8000
+  time: '0:25'
 GWAS_QC_Report:
   mem: 8000
   cores: 12
