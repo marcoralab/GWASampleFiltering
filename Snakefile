@@ -112,10 +112,7 @@ outputs = flatten(outputs)
 
 rule all:
     input:
-        expand(DATAOUT + "/{sample}_exclude.pca", sample=SAMPLE),
-        expand(DATAOUT + "/stats/{sample}_GWAS_QC.html", sample=SAMPLE),
-        expand(DATAOUT + "/{sample}_{refname}_merged.vcf", sample=SAMPLE, refname=REF) # outputs
-
+        outputs
 
 # ---- Exlude SNPs with a high missing rate and low MAF----
 rule snp_qc:
@@ -984,7 +981,7 @@ rule SampleExclusion:
         out = DATAOUT + "/{sample}_exclude.samples",
         out_distinct = DATAOUT + "/{sample}_exclude.distinct_samples"
     conda: "workflow/envs/r.yaml"
-    script: "workflow/scripts/sample_QC.R "
+    script: "workflow/scripts/sample_QC.R"
 
 rule Exclude_failed:
     input:
