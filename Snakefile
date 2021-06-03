@@ -186,7 +186,7 @@ elif QC_snp:
 else:
     sexcheck_in_plink = start['files']
     sexcheck_in_plink_stem = start['stem']
-
+print(sexcheck_in_plink)
 # ---- Principal Compoent analysis ----
 #  Project ADNI onto a PCA using the 1000 Genomes dataset to identify
 #    population outliers
