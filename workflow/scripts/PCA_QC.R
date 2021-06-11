@@ -35,24 +35,23 @@ status <- import(c(
 # params <- parser$parse_args()
 # save(params, file=paste0(params$output, ".params.Rdata"))
 
-vec = snakemake@input[['eigenvec']]
-val = snakemake@input[['eigenval']]
-base = snakemake@input[['tgped']]
-target = snakemake@input[['fam']]
-output = snakemake@output[['excl']]
-rmd = snakemake@output[['rmd']]
-sample = snakemake@params[['samp']]
-population = snakemake@params[['superpop']]
 
-##  Standarize varibles to have a mean of 0 and sd of 1
-zscore = function(x){(x - mean(x, na.rm = T)) / sd(x, na.rm = T)}
+vec <- snakemake@input[['eigenvec']]
+val <- snakemake@input[['eigenval']]
+base <- snakemake@input[['pops']]
+target <- snakemake@input[['fam']]
+output <- snakemake@output[['excl']]
+rmd <- snakemake@output[['rmd']]
+sample <- snakemake@wildcards[['sample']]
+population <- snakemake@params[['superpop']]
+extraref <- snakemake@params[['extraref']]
+save.image(file = paste0(output, ".pca.params.Rdata"))
 
 ##---- Read in Data ----##
 message("Reading data files")
 
-# count colums and PCs
-n_cols <- count_fields(vec, tokenizer_delim(delim = " "), n_max = 1)
-n_eig <- n_cols - 2
+# count columns and PCs
+n_eig <- count_fields(vec, tokenizer_delim(delim = " "), n_max = 1) - 2
 
 # Generate colnames
 pc_names <- paste0("PC", 1:n_eig)
@@ -62,20 +61,19 @@ names_col <- c("FID", "IID", pc_names)
 pca_orig <- read_delim(vec,
                   delim = " ", col_names = names_col,
                   col_types = cols(.default = "d", FID = "c", IID = "c")) %>%
-         mutate_at(pc_names, zscore)
+         mutate_at(pc_names, function(x) as.vector(scale(x)))
 
 # read in egienvalues
-eigenval.raw <- parse_number(read_lines(val))
-eigenval <- tibble(eigenval = eigenval.raw,
-                   PC = factor(pc_names, levels = pc_names)) %>% #PC Names
-              mutate(PVE = round(eigenval / sum(eigenval), 3)) %>% #PVE
-              select(PC, eigenval, PVE) #Reorder columns
+eigenval <- val %>%
+  read_lines %>%
+  parse_number %>%
+  tibble(eigenval = .,
+         PC = factor(pc_names, levels = pc_names)) %>% #PC Names
+  mutate(PVE = round(eigenval / sum(eigenval), 3)) %>% #PVE
+  select(PC, eigenval, PVE) #Reorder columns
 
-# population data file from 1000 genomes
-ct <- cols_only(`Individual ID` = "c",
-                `Family ID` = "c",
-                Population = "c")
-base_pops.raw <- read_tsv(base, col_types = ct)
+# population data file, usually from 1000 genomes and potentially with extra ref
+base_pops.raw <- read_table2(base, col_types = cols(.default = "c"))
 
 # population data from target set
 famcols = c("FID", "IID", "PID", "MID", "Sex", "Pheno")
@@ -92,7 +90,17 @@ s_pops <- list(GBR = "EUR", FIN = "EUR", IBS = "EUR", CEU = "EUR", TSI = "EUR",
                ACB = "AFR", GWD = "AFR", ESN = "AFR", MSL = "AFR", LWK = "AFR",
                YRI = "AFR", ASW = "AFR")
 
+extra_pops <- base_pops.raw[!(base_pops.raw$Population %in% names(s_pops)),] %>%
+  distinct(Population) %>%
+  pull(Population)
 
+if (length(extra_pops) == 1 && extraref == extra_pops) {
+  s_pops[extraref] <- population
+} else if (length(extra_pops) == 0 && extraref != "none") {
+  stop("Extra population missing from reference!")
+} else if (length(extra_pops) > 1) {
+  stop("Non-1kG population codes are not yet implemented. Go bug Brian.")
+}
 
 # Deal with invalid cohort names
 
@@ -109,8 +117,7 @@ if (sample %in% s_pops) {
 
 ##  Munge population dataframes from 1000 genomes
 base_pops <- base_pops.raw %>%
-  dplyr::rename(FID = `Family ID`, IID = `Individual ID`) %>%
-  mutate(cohort = "1kgenomes",
+  mutate(cohort = "Reference",
          superpop = recode(.$Population, !!!s_pops))
 
 ##  Munge target population dataframes
@@ -123,7 +130,7 @@ target_pops <- target_pops.raw %>%
 TGremove = TRUE
 if ( TGremove ) {
   target_pops <- target_pops %>%
-    filter(!(IID %in% base_pops$IID))
+    filter(!(IID %in% base_pops$IID & FID %in% base_pops$FID))
 }
 
 # fix improperly split FID_IID
@@ -132,12 +139,14 @@ pca_FIDIID <- pca_orig %>%
 
 
 ##  Munge PCA, base pop and target pop
-pca <- target_pops %>%
+both_pops <- target_pops %>%
   bind_rows(base_pops) %>%
   ##### FIX BAD FID_IID SPLIT #####
-  unite("FIDIID", FID, IID, sep = "_", remove = F) %>%
-  right_join(pca_FIDIID, by = "FIDIID") %>%
-  select(-FIDIID) %>%
+  unite("FIDIID", FID, IID, sep = "_", remove = F)
+
+pca <- pca_FIDIID %>%
+  left_join(both_pops, by = "FIDIID") %>%
+  select(any_of(names(both_pops)), everything(), -FIDIID) %>%
   mutate(FID = str_remove(FID, "^1000g___"))
 
 ## Colours for plots

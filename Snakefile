@@ -762,12 +762,13 @@ rule ExcludePopulationOutliers:
         eigenval = expand(DATAOUT + "/{{sample}}_{refname}_merged.eigenval", refname=REF),
         eigenvec = expand(DATAOUT + "/{{sample}}_{refname}_merged.eigenvec", refname=REF),
         fam = rules.Sample_Plink2Bcf.input.fam,
-        tgped = tgped
+        pops = DATAOUT + '/{refname}_allpops.txt' if extraref else "reference/{refname}_pops.txt"
     output:
         excl = DATAOUT + "/{sample}_exclude.pca",
         rmd = temp(DATAOUT + "/{sample}_pca.Rdata")
     params:
-        superpop = config['superpop']
+        superpop = config['superpop'],
+        extraref = 'none' if not extraref else config['extra_ref_subpop']
     conda: "workflow/envs/r.yaml"
     script: "workflow/scripts/PCA_QC.R"
     # shell:
