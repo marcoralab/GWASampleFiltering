@@ -47,12 +47,13 @@ author: "`r params$auth`"
 ```{r setup, include=FALSE, echo=F, message=F, warning=F}
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(root.dir = paste0(params$rwd, '/scripts'))
+sexcheck_tf = params$Path_SexFile != "/dev/null"
 ```
 
 ```{r child = 'call_rates.Rmd'}
 ```
 
-```{r child = 'sexcheck_QC.Rmd'}
+```{r child = 'sexcheck_QC.Rmd', eval = sexcheck_tf}
 ```
 
 ```{r child = 'Heterozygosity_QC.Rmd'}

@@ -5,6 +5,8 @@
 outputs: [report, exclusions]
 #options are report, exclusions, and filtered
 
+do_sexqc: true
+
 # Set to 'false' for automatic scanning of plink filesets,
 #   provide single sample, or provide list
 sample: false

@@ -28,6 +28,7 @@ HTTP = HTTPRemoteProvider() if iconnect else dummyprovider
 isMinerva = "hpc.mssm.edu" in socket.getfqdn()
 
 configfile: "config/config.yaml"
+do_sexqc = config['do_sexqc']
 
 # shell.executable("/bin/bash")
 #
@@ -188,7 +189,7 @@ elif QC_snp:
 else:
     sexcheck_in_plink = start['files']
     sexcheck_in_plink_stem = start['stem']
-print(sexcheck_in_plink)
+
 # ---- Principal Compoent analysis ----
 #  Project ADNI onto a PCA using the 1000 Genomes dataset to identify
 #    population outliers
@@ -986,7 +987,7 @@ rule SampleExclusion:
     input:
         SampCallRate = DATAOUT + "/{sample}_callRate.irem",
         het = DATAOUT + "/{sample}_exclude.heterozigosity",
-        sex = DATAOUT + "/{sample}_exclude.sexcheck",
+        sex = DATAOUT + "/{sample}_exclude.sexcheck" if do_sexqc else '/dev/null',
         pca = DATAOUT + "/{sample}_exclude.pca",
         relat = DATAOUT + "/{sample}_exclude.relatedness"
     output:
@@ -1019,7 +1020,7 @@ def decorate2(text):
 rule GWAS_QC_Report:
     input:
         script = "scripts/GWAS_QC.Rmd",
-        SexFile = decorate2("SexQC.sexcheck"),
+        SexFile = decorate2("SexQC.sexcheck") if do_sexqc else '/dev/null',
         hwe = decorate2("SnpQc.hwe"),
         frq = decorate2("SnpQc.frq"),
         frqx = decorate2("SnpQc.frqx"),
