@@ -90,7 +90,8 @@ The following histogram (Fig. \@ref(fig:kinplot)) shows the distribution of prop
 
 ```{r kinplot, echo=FALSE, fig.width=4.7, fig.height=4.7, fig.align='center', fig.cap='Distribution of pairwise kinship coefficients'}
 ggplot(dat.forplots, aes(x = PI_HAT)) +
-  geom_histogram(binwidth = 0.01, fill = "#377EB8") + lims(x = (min(dat.forplots$PI_HAT) - 0.05):1) +
+  geom_histogram(binwidth = 0.01, fill = "#377EB8") +
+  coord_cartesian(xlim = c(min(dat.forplots$PI_HAT) - 0.05, 1)) +
   theme_bw() + labs(x = 'IBD Sharing (pi-hat in PLINK)') +
   geom_vline(xintercept = Pi_threshold, colour = 'red', linetype = 2)
 
@@ -108,22 +109,24 @@ rel_tab %>% kable(caption = "IBD relationships", booktabs = TRUE) %>%
 The following plot (Fig. \@ref(fig:relplot)) shows the `r plot2Ydesc` by the proportion of loci where individules share zero alleles (Z0), where the proportion of IBD sharing is greater than 0.05. In family based studies, pairs are coloured by IBD relationship. Table \@ref(tab:ibdfail) displays the individules where the kinship coefficent was greather than `r Pi_threshold` in population based studies OR how were duplicates in family based studies.
 ```{r relplot, echo=FALSE, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Pairs of individules plotted by their degree of relatedness'}
 
-  geom_point(aes_string(x = plot2Xcol, y = plot2Ycol)) + lims(x = 0:1, y = 0:1) +
-  scale_colour_manual(name = sprintf("IBD Sharing > %f", Pi_threshold),
-  values = c("#377EB8", "#E41A1C")) +
-  labs(x = 'IBD Z0', y = plot2Y) +
-  coord_fixed() + theme_bw() + theme(legend.position="bottom")
 
 if(params$Family == F) {
   dat.forplots %>%
     select(-FID1, -IID1, -FID2, -IID2) %>%
     mutate(related = PI_HAT > Pi_threshold) %>%
     ggplot(aes(colour = related)) +
+      geom_point(aes_string(x = plot2Xcol, y = plot2Ycol)) +
+      scale_colour_manual(name = sprintf("IBD Sharing > %f", Pi_threshold),
+      values = c("#377EB8", "#E41A1C")) +
+      labs(x = 'IBD Z0', y = plot2Y) +
+      coord_cartesian(xlim = c(0,1), ylim = c(0,1)) + theme_bw() +
+      theme(legend.position = "bottom")
 } else {
   ggplot(dat.inter, aes(colour = relationship)) +
-  geom_point(aes_string(x = plot2Xcol, y = plot2Ycol)) + lims(x = 0:1, y = 0:1) +
-  labs(x = 'IBD Z0', y = plot2Y) +
-  coord_fixed() + theme_bw() + theme(legend.position="right")
+    geom_point(aes_string(x = plot2Xcol, y = plot2Ycol)) +
+    coord_cartesian(xlim = c(0,1), ylim = c(0,1)) +
+    labs(x = 'IBD Z0', y = plot2Y) +
+    theme_bw() + theme(legend.position = "right")
 }
 ```
 
