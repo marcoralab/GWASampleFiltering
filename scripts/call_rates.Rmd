@@ -55,7 +55,7 @@ disptab <- function(x) {
 
 # ---- readin plink .frq ---- ##
 message("reading plink frq file")
-freq.raw <- read_table(params$Path_frq, col_names = T,
+freq.raw <- read_table2(params$Path_frq, col_names = T,
   col_types = cols(
   CHR = col_double(),
   SNP =col_character(),
@@ -85,11 +85,11 @@ freqx.raw <- read_tsv(params$Path_frqx, col_names = T,
 
 # ---- readin plink .imiss ---- ##
 message("reading plink individual missingness file")
-imiss.raw <- read_table(params$Path_imiss, col_names = T)
+imiss.raw <- read_table2(params$Path_imiss, col_names = T)
 
 # ---- readin plink .hwe ---- ##
 message("reading plink hwe file")
-hwe.raw <- read_table(params$Path_hwe, col_types = cols(
+hwe.raw <- read_table2(params$Path_hwe, col_types = cols(
   CHR = col_integer(),
   SNP = col_character(),
   TEST = col_character(),
