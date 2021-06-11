@@ -23,6 +23,7 @@ library(magrittr)
 library(knitr)
 library(kableExtra)
 library(DT)
+library(gdata)
 tabcap <- function (name, caption) {
   sprintf("<table width=\"100%%\"><caption>(#tab:%s) %s </caption></table>", name, caption)
 }
@@ -41,7 +42,7 @@ disptab <- function(x) {
 Pi_threshold <- params$pi_threshold
 dat.inter.raw <- load(params$Path_IBD_stats)
 if ( king ) {
-  dat.forplots <- dat.inter.all
+  mv(from = "dat.inter.all", to = "dat.forplots")
   plot2Ydesc <- "kinship coefficient"
   plot2Y <- "Kinship Coefficient"
   plot2Ycol <- "Kinship"
@@ -107,14 +108,17 @@ rel_tab %>% kable(caption = "IBD relationships", booktabs = TRUE) %>%
 The following plot (Fig. \@ref(fig:relplot)) shows the `r plot2Ydesc` by the proportion of loci where individules share zero alleles (Z0), where the proportion of IBD sharing is greater than 0.05. In family based studies, pairs are coloured by IBD relationship. Table \@ref(tab:ibdfail) displays the individules where the kinship coefficent was greather than `r Pi_threshold` in population based studies OR how were duplicates in family based studies.
 ```{r relplot, echo=FALSE, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Pairs of individules plotted by their degree of relatedness'}
 
-if(params$Family == F){
-  ggplot(dat.forplots, aes(colour = PI_HAT > Pi_threshold)) +
-  #geom_label_repel(data = filter(dat.inter, PI_HAT > 0.1), aes(x = Z0, y = Z1, label = paste(IID1, '-', IID2))) +
   geom_point(aes_string(x = plot2Xcol, y = plot2Ycol)) + lims(x = 0:1, y = 0:1) +
   scale_colour_manual(name = sprintf("IBD Sharing > %f", Pi_threshold),
   values = c("#377EB8", "#E41A1C")) +
   labs(x = 'IBD Z0', y = plot2Y) +
   coord_fixed() + theme_bw() + theme(legend.position="bottom")
+
+if(params$Family == F) {
+  dat.forplots %>%
+    select(-FID1, -IID1, -FID2, -IID2) %>%
+    mutate(related = PI_HAT > Pi_threshold) %>%
+    ggplot(aes(colour = related)) +
 } else {
   ggplot(dat.inter, aes(colour = relationship)) +
   geom_point(aes_string(x = plot2Xcol, y = plot2Ycol)) + lims(x = 0:1, y = 0:1) +

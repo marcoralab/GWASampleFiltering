@@ -11,7 +11,7 @@ Sample_ChromPosRefAlt:
   time: '0:25'
 GWAS_QC_Report:
   mem: 8000
-  cores: 12
+  cores: 17
   time: '24:00'
 Reference_prep:
   cores: 8
@@ -43,6 +43,7 @@ pcair_king:
   time: '24:00'
 relatedness_sample_fail:
   cores: 6
+  time: '4:00'
 filterKING:
   cores: 6
 PCAPartitioning:
