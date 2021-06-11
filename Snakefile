@@ -238,7 +238,10 @@ rule download_tg_fa:
            """
 {loads[faidx]}
 if [[ "{input[0]}" == *.gz ]]; then
-  zcat {input[0]} > {output[0]}
+  zcat {input[0]} > {output[0]} && rstatus=0 || rstatus=$?; true
+  if [ $rstatus -ne 2 && $rstatus -ne 0 ]; then
+    exit $rstatus
+  fi
 else
   cp {input[0]} {output[0]}
 fi
@@ -490,7 +493,8 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
     rule Ref_IndexVcf_extra:
         input: DATAOUT + "/extraref_{gbuild}_unQC_maxmissUnfilt.vcf.gz"
         output: DATAOUT + "/extraref_{gbuild}_unQC_maxmissUnfilt.vcf.gz.csi"
-        shell: '{loads[bcftools]}; {com[bcftools]} index -f {input}'
+        conda: "workflow/envs/bcftools.yaml"
+        shell: 'bcftools index -f {input}'
 
     rule Reference_prep_extra:
         input:
