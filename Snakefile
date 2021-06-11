@@ -234,9 +234,9 @@ rule download_tg_fa:
    output:
        "reference/human_g1k_{gbuild}.fasta",
        "reference/human_g1k_{gbuild}.fasta.fai"
+   conda: 'workflow/envs/bcftools.yaml'
    shell:
-           """
-{loads[faidx]}
+           '''
 if [[ "{input[0]}" == *.gz ]]; then
   zcat {input[0]} > {output[0]} && rstatus=0 || rstatus=$?; true
   if [ $rstatus -ne 2 && $rstatus -ne 0 ]; then
@@ -245,7 +245,8 @@ if [[ "{input[0]}" == *.gz ]]; then
 else
   cp {input[0]} {output[0]}
 fi
-{com[faidx]} {output[0]}"""
+samtools faidx {output[0]}
+'''
 
 rule download_tg_ped:
     input:
