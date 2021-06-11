@@ -23,3 +23,8 @@ input/
 samp.irem
 temp/
 stats/
+rstudio*
+*.rda
+*.Rproj
+.Rproj*
+.Rdata*
