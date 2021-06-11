@@ -258,3 +258,7 @@ imiss %>%
 ```{r unload packages, echo=F, eval=F}
 #detach("package:ggtern", unload=TRUE)
 ```
+
+```{r cleanup_callrate, include=F}
+rm(freq.raw, freqx.raw, hwe.raw, hwe, imiss.raw, imiss, snps)
+```

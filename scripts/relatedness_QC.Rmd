@@ -143,3 +143,9 @@ To construct a sample of unrelated individuals, participants with the highest nu
 ```{r pressure, echo=FALSE, warning=FALSE}
 fam_table %>% disptab
 ```
+
+```{r cleanup_rel, include=F}
+rm(fam_table, dat.forplots, dat.inter, dat.inter.raw, ibd_tab, rel_tab,
+   king, package, plot2Xcol, plot2Y, plot2Ycol, plot2Ydesc, Pi_threshold,
+   dat.inter.raw)
+```

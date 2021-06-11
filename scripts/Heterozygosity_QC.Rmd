@@ -90,4 +90,7 @@ ggplot(het, aes(x = Het, fill = exclude)) + geom_histogram(binwidth = 0.001) +
 exclude.samples %>% disptab
 ```
 
+```{r cleanup_het, include=F}
+rm(exclude.samples, het, het.raw, upper.het, lower.het)
+```
 
