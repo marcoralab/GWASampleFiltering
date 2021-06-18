@@ -762,7 +762,7 @@ rule ExcludePopulationOutliers:
         eigenval = expand(DATAOUT + "/{{sample}}_{refname}_merged.eigenval", refname=REF),
         eigenvec = expand(DATAOUT + "/{{sample}}_{refname}_merged.eigenvec", refname=REF),
         fam = rules.Sample_Plink2Bcf.input.fam,
-        pops = DATAOUT + '/{refname}_allpops.txt' if extraref else "reference/{refname}_pops.txt"
+        pops = expand(DATAOUT + '/{refname}_allpops.txt' if extraref else "reference/{refname}_pops.txt", refname=REF)
     output:
         excl = DATAOUT + "/{sample}_exclude.pca",
         rmd = temp(DATAOUT + "/{sample}_pca.Rdata")
