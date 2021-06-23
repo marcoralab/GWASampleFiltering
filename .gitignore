@@ -27,4 +27,8 @@ rstudio*
 *.rda
 *.Rproj
 .Rproj*
-.Rdata*
+.RData*
+output_*/
+LZ*
+core.*
+extra.sh
