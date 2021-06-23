@@ -13,14 +13,16 @@ from urllib.request import urlopen
 from urllib.error import URLError
 
 try:
-  response = urlopen('https://www.google.com/', timeout=10)
-  iconnect = True
+    response = urlopen('https://www.google.com/', timeout=10)
+    iconnect = True
 except urllib.error.URLError as ex:
-  iconnect = False
+    iconnect = False
+
 
 class dummyprovider:
-  def remote(string_, allow_redirects = "foo"):
-    return string_
+    def remote(string_, allow_redirects = "foo"):
+        return string_
+
 
 FTP = FTPRemoteProvider() if iconnect else dummyprovider
 HTTP = HTTPRemoteProvider() if iconnect else dummyprovider
@@ -49,28 +51,8 @@ QC_snp = True
 QC_callRate = True
 union_panel_TF = True
 
-# if isMinerva:
-#     com = {'flippyr': 'flippyr', 'plink': 'plink --keep-allele-order',
-#            'plink2': 'plink', 'bcftools': 'bcftools', 'R': 'Rscript', 'R2': 'R',
-#            'king': 'king', 'faidx': 'samtools faidx'}
-#     loads = {'flippyr': 'module load plink/1.90b6.10', 'plink': 'module load plink/1.90b6.10',
-#              'bcftools': 'module load bcftools/1.9', 'faidx': 'module load samtools',
-#              'king': 'module unload gcc; module load king/2.1.6',
-#              'R': ('module load R/3.6.3 pandoc/2.6 udunits/2.2.26; ',
-#                    'RSTUDIO_PANDOC=$(which pandoc)')}
-# else:
-#     com = {'flippyr': 'flippyr',
-#            'plink': 'plink --keep-allele-order', 'plink2': 'plink', 'faidx': 'samtools faidx',
-#            'bcftools': 'bcftools', 'R': 'Rscript', 'R2': 'R', 'king': 'king'}
-#     loads = {'flippyr': 'echo running flippyr', 'plink': 'echo running plink',
-#              'bcftools': 'echo running bcftools',  'R': 'echo running R',
-#              'king': 'echo running KING', 'faidx': 'echo running samtools faidx'}
-
-def decorate(text):
-    return expand(DATAOUT + "/{sample}_" + text,
-                  sample=SAMPLE)
-
 localrules: all, download_tg_fa, download_tg_ped, download_tg_chrom
+
 
 def flatten(nested):
     flat = []
@@ -81,6 +63,7 @@ def flatten(nested):
             flat += flatten(el)
     return flat
 
+
 def detect_ref_type(reffile):
     if '.vcf' in reffile or '.bcf' in reffile:
         if '{chrom}' in reffile:
@@ -90,14 +73,15 @@ def detect_ref_type(reffile):
     else:
         return "plink"
 
-if (not "custom_ref" in config) or (config['custom_ref'] == False):
+
+if ("custom_ref" not in config) or (config['custom_ref'] is False):
     REF = '1kG'
 else:
     REF = config['custom_ref_name']
     creftype = detect_ref_type(config['custom_ref'])
 
 extraref = False
-if ("extra_ref" in config) and (config['extra_ref'] != False):
+if ("extra_ref" in config) and (config['extra_ref'] is not False):
     extraref = True
     ereftype = detect_ref_type(config['extra_ref'])
 else:
@@ -112,7 +96,7 @@ outs = {
     "report": expand(DATAOUT + "/stats/{sample}_GWAS_QC.html", sample=SAMPLE),
     "exclusions": expand(DATAOUT + "/{sample}_exclude.samples", sample=SAMPLE),
     "filtered": expand(DATAOUT + "/{sample}_Excluded.{ext}",
-        sample=SAMPLE, ext=BPLINK)}
+                       sample=SAMPLE, ext=BPLINK)}
 
 outputs = [outs[x] for x in config["outputs"]]
 outputs = flatten(outputs)
@@ -226,24 +210,24 @@ elif config['genome_build'] in ['hg38', 'GRCh38', 'grch38', 'GRCH38']:
 
 
 rule download_tg_chrom:
-   input:
-       FTP.remote(tgurl),
-       FTP.remote(tgurl + ".tbi"),
-   output:
-       temp("reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz"),
-       temp("reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi")
-   shell: "cp {input[0]} {output[0]}; cp {input[1]} {output[1]}"
+    input:
+        FTP.remote(tgurl),
+        FTP.remote(tgurl + ".tbi"),
+    output:
+        temp("reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz"),
+        temp("reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi")
+    shell: "cp {input[0]} {output[0]}; cp {input[1]} {output[1]}"
 
 
 rule download_tg_fa:
-   input:
-       FTP.remote(tgfa + ".gz") if BUILD == 'hg19' else FTP.remote(tgfa)
-   output:
-       "reference/human_g1k_{gbuild}.fasta",
-       "reference/human_g1k_{gbuild}.fasta.fai"
-   conda: 'workflow/envs/bcftools.yaml'
-   shell:
-           '''
+    input:
+        FTP.remote(tgfa + ".gz") if BUILD == 'hg19' else FTP.remote(tgfa)
+    output:
+        "reference/human_g1k_{gbuild}.fasta",
+        "reference/human_g1k_{gbuild}.fasta.fai"
+    conda: 'workflow/envs/bcftools.yaml'
+    shell:
+        '''
 if [[ "{input[0]}" == *.gz ]]; then
   zcat {input[0]} > {output[0]} && rstatus=0 || rstatus=$?; true
   if [ $rstatus -ne 2 && $rstatus -ne 0 ]; then
