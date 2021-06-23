@@ -53,7 +53,7 @@ disptab <- function(x) {
 ```{r read_data heterozygosity, echo=F, cache=T}
 ## ---- Read in Data ----##
 
-het.raw <- as.tibble(read.table(params$Path_HetFile, header = TRUE, check.names = FALSE, as.is = TRUE))
+het.raw <- as_tibble(read.table(params$Path_HetFile, header = TRUE, check.names = FALSE, as.is = TRUE))
 ```
 
 ```{r data_wrangling heterozygosity, echo=F}
@@ -93,4 +93,3 @@ exclude.samples %>% disptab
 ```{r cleanup_het, include=F}
 rm(exclude.samples, het, het.raw, upper.het, lower.het)
 ```
-
