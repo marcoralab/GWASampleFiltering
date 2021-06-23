@@ -132,7 +132,7 @@ plot_ly(pca, x = ~PC2, y = ~PC1, z = ~PC3, color = ~superpop,
 
 ### Population Outliers
 
-Individuals of non-`r sp_labs[params$superpop]` ancestry were identified by determining the mean and standard deviation of the 10 principal components scores for the `r params$superpop` super-population (Table 1). Participants in `r params$Sample` who were \pm 6 SD from the `r params$superpop` population mean were determined to be of non-`r sp_labs[params$superpop]` ancestry (Tab. \@ref(tab:pcastats)).
+Individuals of non-`r sp_labs[params$superpop]` ancestry were identified by determining the mean and standard deviation of the 10 principal components scores for the `r params$superpop` super-population (Table 1). Participants in `r params$Sample` who were \pm `r sdev` SD from the `r params$superpop` population mean were determined to be of non-`r sp_labs[params$superpop]` ancestry (Tab. \@ref(tab:pcastats)).
 
 ```{r pcastats, echo=F}
 tab_1 %>% kable(booktabs = T, caption = sprintf("Mean and SD of PCs in %s population", params$superpop)) %>%

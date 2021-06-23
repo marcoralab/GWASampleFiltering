@@ -102,6 +102,11 @@ if ("extra_ref" in config) and (config['extra_ref'] != False):
 else:
     ereftype = 'none'
 
+if "pca_sd" in config:
+    pca_sd = int(config["pca_sd"])
+else:
+    pca_sd = 6
+
 outs = {
     "report": expand(DATAOUT + "/stats/{sample}_GWAS_QC.html", sample=SAMPLE),
     "exclusions": expand(DATAOUT + "/{sample}_exclude.samples", sample=SAMPLE),
@@ -768,7 +773,8 @@ rule ExcludePopulationOutliers:
         rmd = temp(DATAOUT + "/{sample}_pca.Rdata")
     params:
         superpop = config['superpop'],
-        extraref = 'none' if not extraref else config['extra_ref_subpop']
+        extraref = 'none' if not extraref else config['extra_ref_subpop'],
+        sd = pca_sd
     conda: "workflow/envs/r.yaml"
     script: "workflow/scripts/PCA_QC.R"
     # shell:

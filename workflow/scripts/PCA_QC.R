@@ -45,6 +45,7 @@ rmd <- snakemake@output[['rmd']]
 sample <- snakemake@wildcards[['sample']]
 population <- snakemake@params[['superpop']]
 extraref <- snakemake@params[['extraref']]
+sdev <- snakemake@params[["sd"]]
 save.image(file = paste0(output, ".pca.params.Rdata"))
 
 ##---- Read in Data ----##
@@ -160,21 +161,21 @@ pca_col <- pca %>%
   mutate(colour = ifelse(superpop == "SAS", "#FF7F00", colour))
 
 # ---- Population Outliers ---- #
-# Calculate the mean and ± 6 sd for each PC of 1000 Genomes EUR population
+# Calculate the mean and ± specified number of sd for each PC of 1000 Genomes EUR population
 
 chosen_pca <- pca %>%
   gather(key = "PC", value = "eigenvalue", !!paste0("PC", 1:n_eig)) %>%
   filter(superpop == population) %>%
   group_by(superpop, PC) %>%
   dplyr::summarize(mean = mean(eigenvalue), sd = sd(eigenvalue)) %>%
-  mutate(lower = mean - sd * 6, upper = mean + sd*6) %>%
+  mutate(lower = mean - sd * sdev, upper = mean + sd * sdev) %>%
   mutate(PC = factor(PC, levels = paste0("PC", 1:n_eig))) %>%
   arrange(PC)
 
 #***Table 1:*** Mean and SD of PC in chosen population
 tab_1 <- as.data.frame(chosen_pca)
 
-# For each individual in the sample, determine if ±6SD from the chosen population
+# For each individual in the sample, determine if ± specified SD from the chosen population
 # for each principal component
 
 pca_range <- function(PC, vals) {
@@ -218,5 +219,5 @@ exclude_pop_outliers <- sample.pca %>%
   select(FID, IID)
 
 write_tsv(exclude_pop_outliers, output, col_names = F)
-save(tab_1, tab_2, no_outliers, pca, sample.pca, eigenval, pca_col,
+save(tab_1, tab_2, no_outliers, pca, sample.pca, eigenval, pca_col, sdev,
      file = rmd)
