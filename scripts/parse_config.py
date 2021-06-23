@@ -34,7 +34,7 @@ def parser(config):
     DATAIN = fix_path(config['DataIn'])
     DATAOUT = fix_path(config['DataOut'])
     sample_conf = config['sample']
-    FAMILY = 'T' if config['family'] else 'F'
+
 
     try:
         SEXIN = fix_path(config['SexIn'])
@@ -104,4 +104,4 @@ def parser(config):
             start['sex'] = start['files']
             start['sex_stem'] = start['stem']
 
-    return start, FAMILY, SAMPLE, DATAOUT
+    return start, SAMPLE, DATAOUT

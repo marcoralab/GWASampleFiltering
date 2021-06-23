@@ -39,8 +39,9 @@ do_sexqc = config['do_sexqc']
 
 BPLINK = ["bed", "bim", "fam"]
 RWD = os.getcwd()
-start, FAMILY, SAMPLE, DATAOUT = parser(config)
+start, SAMPLE, DATAOUT = parser(config)
 
+FAMILY = 'T' if config['family'] else 'F'
 istg = config['isTG'] if 'isTG' in config else False
 
 # QC Steps:
@@ -1021,22 +1022,20 @@ plink --keep-allele-order --bfile {params.indat_plink} --remove {output.excl} \
 --make-bed --out {params.out}
 '''
 
-def decorate2(text):
-    return DATAOUT + "/{sample}_" + text
 
 rule GWAS_QC_Report:
     input:
         script = "scripts/GWAS_QC.Rmd",
-        SexFile = decorate2("SexQC.sexcheck") if do_sexqc else '/dev/null',
-        hwe = decorate2("SnpQc.hwe"),
-        frq = decorate2("SnpQc.frq"),
-        frqx = decorate2("SnpQc.frqx"),
-        imiss = decorate2("callRate.imiss"),
-        HetFile = decorate2("HetQC.het"),
-        IBD_stats = decorate2("IBDQC.Rdata"),
-        PCA_rdat = decorate2("pca.Rdata"),
-        PopStrat_eigenval = decorate2("filtered_PCA.eigenval"),
-        PopStrat_eigenvec = decorate2("filtered_PCA.eigenvec"),
+        SexFile = DATAOUT + "/{sample}_SexQC.sexcheck" if do_sexqc else '/dev/null',
+        hwe = DATAOUT + "/{sample}_SnpQc.hwe",
+        frq = DATAOUT + "/{sample}_SnpQc.frq",
+        frqx = DATAOUT + "/{sample}_SnpQc.frqx",
+        imiss = DATAOUT + "/{sample}_callRate.imiss",
+        HetFile = DATAOUT + "/{sample}_HetQC.het",
+        IBD_stats = DATAOUT + "/{sample}_IBDQC.Rdata",
+        PCA_rdat = DATAOUT + "/{sample}_pca.Rdata",
+        PopStrat_eigenval = DATAOUT + "/{sample}_filtered_PCA.eigenval",
+        PopStrat_eigenvec = DATAOUT + "/{sample}_filtered_PCA.eigenvec",
         partmethod = rules.PCAPartitioning.output[1] if config["pcair"] else "/dev/null"
     output:
         DATAOUT + "/stats/{sample}_GWAS_QC.html"
