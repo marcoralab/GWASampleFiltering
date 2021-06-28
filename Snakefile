@@ -221,7 +221,7 @@ rule download_tg_chrom:
         HTTP.remote(tgurl),
         HTTP.remote(tgurl + ".tbi"),
     output:
-        temp("reference/"reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz"),
+        temp("reference/reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz"),
         temp("reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi")
     shell: "cp {input[0]} {output[0]}; cp {input[1]} {output[1]}"
 
