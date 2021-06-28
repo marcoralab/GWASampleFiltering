@@ -4,8 +4,8 @@
 
 outputs: [report, exclusions]
 #options are report, exclusions, and filtered
-
-do_sexqc: true
+nointernet: true
+do_sexqc: false
 
 # Set to 'false' for automatic scanning of plink filesets,
 #   provide single sample, or provide list
@@ -39,7 +39,7 @@ QC:
 
 download_tg: true
 genome_build: hg19
-mirror: ncbi # ncbi or ebi
+mirror: ebi # ncbi or ebi
 
 union_panel: true #make sure population ref panel and sample snps all overlap
 union_extra: true #require snp overlap with extra ref if present
