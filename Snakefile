@@ -574,9 +574,9 @@ rule PruneDupvar_snps:
         bim = rules.Sample_ChromPosRefAlt.output.bim,
         pvars = PVARS
     output:
+        "{dataout}/{sample}_nodup.dupvar",
         expand("{{dataout}}/{{sample}}_nodup.{ext}",
                ext=['prune.in', 'prune.out'], dataout = DATAOUT),
-        "{dataout}/{sample}_nodup.dupvar.delete"
     params:
         indat = "{dataout}/{sample}_flipped",
         dupvar = "{dataout}/{sample}_nodup.dupvar",
@@ -588,8 +588,13 @@ rule PruneDupvar_snps:
 plink --keep-allele-order --bfile {params.indat} -bim {input.bim} \
   {params.extract}--autosome --indep 50 5 1.5 \
   --list-duplicate-vars --out {params.out}
-Rscript scripts/DuplicateVars.R {params.dupvar}
 '''
+
+rule SelectDupvar_snps:
+    input: rules.PruneDupvar_snps.output[0]
+    output: "{dataout}/{sample}_nodup.dupvar.delete"
+    conda: "workflow/envs/r.yaml"
+    script: "workflow/scripts/DuplicateVars.R"
 
 # Prune sample dataset
 rule sample_prune:
@@ -597,7 +602,7 @@ rule sample_prune:
         fileset = rules.Sample_Flip.output,
         bim = rules.Sample_ChromPosRefAlt.output.bim,
         prune = "{dataout}/{sample}_nodup.prune.in",
-        dupvar = "{dataout}/{sample}_nodup.dupvar.delete"
+        dupvar = rules.SelectDupvar_snps.output
     output:
         temp(expand("{{dataout}}/{{sample}}_pruned.{ext}",
                     ext=BPLINK, dataout = DATAOUT))
