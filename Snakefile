@@ -306,6 +306,7 @@ if REF == '1kG' or creftype == 'vcfchr':
             '''
 bcftools norm -m- {input.vcf} --threads 2 | \
 bcftools view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
+bcftools annotate --rename-chrs reference/chr_name_conv.txt --threads 2 | \
 bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
 '''
 
@@ -333,8 +334,10 @@ elif creftype == 'vcf':
         conda: "workflow/envs/bcftools.yaml"
         shell:
             '''
+for i in {1..22}; do echo "chr$i $i"; done > reference/chr_name_conv.txt;
 bcftools norm -m- {input.vcf} --threads 2 | \
 bcftools view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
+bcftools annotate --rename-chrs reference/chr_name_conv.txt --threads 2 | \
 bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output.vcf}
 bcftools index -ft {output.vcf}
 '''
@@ -401,8 +404,10 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
         conda: "workflow/envs/bcftools.yaml"
         shell:
             '''
+for i in {1..22}; do echo "chr$i $i"; done > reference/chr_name_conv.txt;
 bcftools norm -m- {input.vcf} --threads 2 | \
 bcftools view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
+bcftools annotate --rename-chrs reference/chr_name_conv.txt --threads 2 | \
 bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output.vcf}
 bcftools index -ft {output.vcf}
 '''
@@ -416,8 +421,10 @@ if ereftype == 'vcfchr':
         conda: "workflow/envs/bcftools.yaml"
         shell:
             '''
+for i in {1..22}; do echo "chr$i $i"; done > reference/chr_name_conv.txt;
 bcftools norm -m- {input.vcf} --threads 2 | \
 bcftools view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
+bcftools annotate --rename-chrs reference/chr_name_conv.txt --threads 2 | \
 bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
 '''
 
@@ -444,8 +451,10 @@ elif ereftype == 'vcf':
         conda: "workflow/envs/bcftools.yaml"
         shell:
             '''
+for i in {1..22}; do echo "chr$i $i"; done > reference/chr_name_conv.txt;
 bcftools norm -m- {input.vcf} --threads 2 | \
 bcftools view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
+bcftools annotate --rename-chrs reference/chr_name_conv.txt --threads 2 | \
 bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output.vcf}
 bcftools index -ft {output.vcf}
 '''
@@ -505,8 +514,10 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
         conda: "workflow/envs/bcftools.yaml"
         shell:
             '''
+for i in {1..22}; do echo "chr$i $i"; done > reference/chr_name_conv.txt;
 bcftools norm -m- {input.vcf} --threads 2 | \
 bcftools view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
+bcftools annotate --rename-chrs reference/chr_name_conv.txt --threads 2 | \
 bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output.vcf}
 bcftools index -ft {output.vcf}
 '''
@@ -917,15 +928,15 @@ plink --keep-allele-order --bfile {params.indat} \
             "{dataout}/{sample}_IBDQC.all.popfilt.kingfiles"
         params:
             indat = "{dataout}/{sample}_IBDQC.all",
-            dataout = DATAOUT
         conda: "workflow/envs/r.yaml"
-        shell:
-            r'''
-Rscript workflow/scripts/filterKing.R {params.indat} {input.exclude}
-if test -n "$(find {params.dataout} -name "{wildcards.sample}_IBDQC.all.popfilt.kin*")"; then
-  find {params.dataout} -name "{wildcards.sample}_IBDQC.all.popfilt.kin*" > {output}
-fi
-'''
+        script: "workflow/scripts/filterKing.R"
+#         shell:
+#             r'''
+# Rscript workflow/scripts/filterKing.R {params.indat} {input.exclude}
+# if test -n "$(find {params.dataout} -name "{wildcards.sample}_IBDQC.all.popfilt.kin*")"; then
+#   find {params.dataout} -name "{wildcards.sample}_IBDQC.all.popfilt.kin*" > {output}
+# fi
+# '''
 
     rule PCAPartitioning:
         input:

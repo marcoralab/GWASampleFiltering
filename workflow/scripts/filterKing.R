@@ -4,8 +4,9 @@ require(tibble)
 require(readr)
 require(dplyr)
 
-kingstem <- commandArgs(T)[1]
-exclude <- commandArgs(T)[2]
+kingstem <- snakemake@params[['indat']]
+exclude <- snakemake@input[['exclude']]
+outfile <- snakemake@output[[0]]
 
 excluded <- read_tsv(exclude, col_names = c("FID", "IID"), col_types = "cc")
 
@@ -30,8 +31,10 @@ if (file.exists(kinfile)) {
     anti_join(excluded, by = c("FID", "ID1" = "IID")) %>%
     anti_join(excluded, by = c("FID", "ID2" = "IID")) %>%
     write_tsv(paste0(kingstem, ".popfilt.kin"))
+  kinout <- paste0(kingstem, ".popfilt.kin")
 } else {
   message(sprintf("%s does not exist.", kin0file))
+  kinout <- ""
 }
 
 if (file.exists(kin0file)) {
@@ -53,7 +56,12 @@ if (file.exists(kin0file)) {
     anti_join(excluded, by = c("FID1" = "FID", "ID1" = "IID")) %>%
     anti_join(excluded, by = c("FID2" = "FID", "ID2" = "IID")) %>%
     write_tsv(paste0(kingstem, ".popfilt.kin0"))
+  kin0out <- paste0(kingstem, ".popfilt.kin0")
 } else {
   message(sprintf("%s does not exist.", kin0file))
+  kin0out <- ""
 }
 
+fileConn <- file(outfile)
+writeLines(c(kinout,kin0out), fileConn)
+close(fileConn)
