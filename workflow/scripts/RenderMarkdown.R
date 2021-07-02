@@ -1,6 +1,6 @@
 
 message("Render Final Report",
-        "\n markdown: ", snakemake@input[["markdown"]],
+        "\n markdown: ", paste0("workflow/scripts/", snakemake@params[["script"]]),
         "\n SexFile: ", snakemake@input[["SexFile"]],
         "\n hwe: ", snakemake@input[["hwe"]],
         "\n frq: ", snakemake@input[["frq"]],
@@ -24,53 +24,35 @@ message("Render Final Report",
         "\n partmethod: ", snakemake@params[["partmethod"]]
       )
 
-      rule GWAS_QC_Report:
-          input:
-              script = "scripts/GWAS_QC.Rmd",
-              SexFile = "{dataout}/{sample}_SexQC.sexcheck" if do_sexqc else '/dev/null',
-              hwe = "{dataout}/{sample}_SnpQc.hwe",
-              frq = "{dataout}/{sample}_SnpQc.frq",
-              frqx = "{dataout}/{sample}_SnpQc.frqx",
-              imiss = "{dataout}/{sample}_callRate.imiss",
-              HetFile = "{dataout}/{sample}_HetQC.het",
-              IBD_stats = "{dataout}/{sample}_IBDQC.Rdata",
-              PCA_rdat = "{dataout}/{sample}_pca.Rdata",
-              PopStrat_eigenval = "{dataout}/{sample}_filtered_PCA.eigenval",
-              PopStrat_eigenvec = "{dataout}/{sample}_filtered_PCA.eigenvec",
-              partmethod = rules.PCAPartitioning.output[1] if config["pcair"] else "/dev/null"
-          output:
-               "{dataout}/stats/{sample}_GWAS_QC.html"
-          params:
-              rwd = RWD,
-              Family = FAMILY,
-              pi_threshold = 0.1875,
-              output_dir = "{dataout}/stats",
-              idir = "{dataout}/stats/md/{sample}",
-              geno_miss = config['QC']['GenoMiss'],
-              samp_miss = config['QC']['SampMiss'],
-              MAF = config['QC']['MAF'],
-              HWE = config['QC']['HWE'],
-              superpop = config['superpop'],
-              partmethod = rules.PCAPartitioning.output[1] if config["pcair"] else "none"
-
-
 rmarkdown::render(
-  input = snakemake@input[["markdown"]],
+  input = paste0("workflow/scripts/", snakemake@params[["script"]]),
   clean = TRUE,
-  intermediates_dir = snakemake@params[["output_dir"]],
+  intermediates_dir = snakemake@params[["idir"]],
   output_file = snakemake@output[[1]],
   output_dir = snakemake@params[["output_dir"]],
   output_format = "all",
   params = list(
-    rwd = snakemake@params[['rwd']],
-    path = snakemake@params[["path"]],
-    chrom = snakemake@params[["chrom"]],
-    cohort = snakemake@params[["cohort"]],
-    maf = snakemake@params[["maf"]],
-    rsq = snakemake@params[["rsq"]],
-    rsq2 = snakemake@params[["rsq2"]],
-    sampsize = snakemake@params[["sampsize"]],
-    # out = snakemake@params[["out"]],
-    outpath = snakemake@params[["output_dir"]]
+    rwd = snakemake@params[["rwd"]],
+    Sample = snakemake@params[["sample"]],
+    # DataIn = snakemake@xxx[[xxx]],
+    Path_hwe = snakemake@input[["hwe"]],
+    Path_frq = snakemake@input[["frq"]],
+    Path_frqx = snakemake@input[["frqx"]],
+    Path_imiss = snakemake@input[["imiss"]],
+    Path_SexFile = snakemake@input[["SexFile"]],
+    Path_HetFile = snakemake@input[["HetFile"]],
+    Family = snakemake@params[["Family"]],
+    Path_IBD_stats = snakemake@input[["IBD_stats"]],
+    pi_threshold = snakemake@params[["pi_theshold"]],
+    Path_PCA_rdat = snakemake@input[["PCA_rdat"]],
+    Path_PopStrat_eigenvec = snakemake@input[["PopStrat_eigenvec"]],
+    Path_PopStrat_eigenval = snakemake@input[["PopStrat_eigenval"]],
+    auth = "Shea J. Andrews and Brian Fulton-Howard",
+    maf = snakemake@params[["MAF"]],
+    missing_geno = snakemake@params[["geno_miss"]],
+    missing_sample = snakemake@params[["samp_miss"]],
+    hwe = snakemake@params[["HWE"]],
+    superpop = snakemake@params[["superpop"]],
+    partmethod = snakemake@params[["partmethod"]]
   )
 )

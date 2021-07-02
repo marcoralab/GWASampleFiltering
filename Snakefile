@@ -1050,7 +1050,8 @@ rule GWAS_QC_Report:
     output:
          "{dataout}/stats/{sample}_GWAS_QC.html"
     params:
-        script = "scripts/GWAS_QC.Rmd",
+        sample = "{sample}"
+        script = "GWAS_QC.Rmd",
         rwd = RWD,
         Family = FAMILY,
         pi_threshold = 0.1875,
@@ -1063,21 +1064,22 @@ rule GWAS_QC_Report:
         superpop = config['superpop'],
         partmethod = rules.PCAPartitioning.output[1] if config["pcair"] else "none"
     conda: "workflow/envs/r.yaml"
-    shell:
-        '''
-R -e 'nm <- sample(c("Shea J. Andrews", "Brian Fulton-Howard"), \
-replace=F); nm <- paste(nm[1], "and", nm[2]); \
-rmarkdown::render("{params.script}", output_dir = "{params.output_dir}", \
-output_file = "{output}", intermediates_dir = "{params.idir}", \
-params = list(rwd = "{params.rwd}", Sample = "{wildcards.sample}", \
-auth = nm, Path_SexFile = "{input.SexFile}", Path_hwe = "{input.hwe}", \
-Path_frq = "{input.frq}", Path_frqx = "{input.frqx}", \
-Path_imiss = "{input.imiss}", Path_HetFile = "{input.HetFile}", \
-pi_threshold = {params.pi_threshold}, Family = {params.Family}, \
-Path_IBD_stats = "{input.IBD_stats}", Path_PCA_rdat = "{input.PCA_rdat}", \
-Path_PopStrat_eigenval = "{input.PopStrat_eigenval}", \
-Path_PopStrat_eigenvec = "{input.PopStrat_eigenvec}", maf = {params.MAF}, \
-hwe = {params.HWE}, missing_geno = {params.geno_miss}, \
-partmethod = "{params.partmethod}", \
-missing_sample = {params.samp_miss}, superpop = "{params.superpop}"))' --slave
-'''
+    script: "workflow/scripts/RenderMarkdown.R"
+#     shell:
+#         '''
+# R -e 'nm <- sample(c("Shea J. Andrews", "Brian Fulton-Howard"), \
+# replace=F); nm <- paste(nm[1], "and", nm[2]); \
+# rmarkdown::render("{params.script}", output_dir = "{params.output_dir}", \
+# output_file = "{output}", intermediates_dir = "{params.idir}", \
+# params = list(rwd = "{params.rwd}", Sample = "{wildcards.sample}", \
+# auth = nm, Path_SexFile = "{input.SexFile}", Path_hwe = "{input.hwe}", \
+# Path_frq = "{input.frq}", Path_frqx = "{input.frqx}", \
+# Path_imiss = "{input.imiss}", Path_HetFile = "{input.HetFile}", \
+# pi_threshold = {params.pi_threshold}, Family = {params.Family}, \
+# Path_IBD_stats = "{input.IBD_stats}", Path_PCA_rdat = "{input.PCA_rdat}", \
+# Path_PopStrat_eigenval = "{input.PopStrat_eigenval}", \
+# Path_PopStrat_eigenvec = "{input.PopStrat_eigenvec}", maf = {params.MAF}, \
+# hwe = {params.HWE}, missing_geno = {params.geno_miss}, \
+# partmethod = "{params.partmethod}", \
+# missing_sample = {params.samp_miss}, superpop = "{params.superpop}"))' --slave
+# '''

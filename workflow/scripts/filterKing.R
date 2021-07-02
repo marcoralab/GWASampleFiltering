@@ -6,7 +6,13 @@ require(dplyr)
 
 kingstem <- snakemake@params[['indat']]
 exclude <- snakemake@input[['exclude']]
-outfile <- snakemake@output[[0]]
+outfile <- snakemake@output[[1]]
+
+message(
+  "kingstem: ", kingstem, "\n",
+  "exclude: ", exclude, "\n",
+  "outfile: ", outfile, "\n"
+)
 
 excluded <- read_tsv(exclude, col_names = c("FID", "IID"), col_types = "cc")
 
@@ -61,6 +67,8 @@ if (file.exists(kin0file)) {
   message(sprintf("%s does not exist.", kin0file))
   kin0out <- ""
 }
+
+message( "Exporting... ", outfile)
 
 fileConn <- file(outfile)
 writeLines(c(kinout,kin0out), fileConn)

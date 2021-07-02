@@ -1,0 +1,71 @@
+---
+date: "`r Sys.Date()`"
+editor_options:
+  chunk_output_type: console
+output:
+  bookdown::html_document2:
+    base_format: rmarkdown::html_document
+    keep_md: yes
+    fig_caption: TRUE
+    split_by: none
+    self_contained: yes
+    theme: flatly
+    df_print: paged
+    toc: true
+    #number_sections: true
+    toc_depth: 4
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+params:
+    rwd: rwd
+    Sample: Sample
+    DataIn: DataIn
+    Path_hwe: Path_hwe
+    Path_frq: Path_frq
+    Path_frqx: Path_frqx
+    Path_imiss: Path_imiss
+    Path_SexFile: Path_SexFile
+    Path_HetFile: Path_HetFile
+    Family: Family
+    Path_IBD_stats:
+    pi_threshold: 0.1875
+    Path_PCA_rdat: Path_PCA_rdat
+    Path_PopStrat_eigenvec: Path_PopStrat_eigenvec
+    Path_PopStrat_eigenval: Path_PopStrat_eigenval
+    auth: "Shea J. Andrews and Brian Fulton-Howard"
+    maf: 0.01
+    missing_geno: 0.05
+    missing_sample: 0.05
+    hwe: 1e-6
+    superpop: "EUR"
+    partmethod: "none"
+title: "GWAS QC: `r params$Sample`"
+author: "`r params$auth`"
+---
+
+```{r setup, include=FALSE, echo=F, message=F, warning=F}
+knitr::opts_chunk$set(echo = TRUE)
+# knitr::opts_knit$set(root.dir = paste0(params$rwd, 'workflow/scripts'))
+sexcheck_tf = params$Path_SexFile != "/dev/null"
+```
+
+```{r child = 'call_rates.Rmd', eval = T}
+```
+
+```{r child = 'sexcheck_QC.Rmd', eval = sexcheck_tf}
+```
+
+```{r child = 'Heterozygosity_QC.Rmd', eval = T}
+```
+
+# Population and family structure
+
+```{r child = 'relatedness_QC.Rmd', eval = T}
+```
+
+```{r child = 'PCA_QC.Rmd'}
+```
+
+```{r child = 'population_stratification_QC.Rmd', eval = T}
+```
