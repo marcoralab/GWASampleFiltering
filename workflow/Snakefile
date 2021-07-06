@@ -1,6 +1,6 @@
 '''Snakefile for GWAS Variant and Sample QC Version 0.3.1'''
 # import ipdb; ipdb.set_trace()
-from workflow.scripts.parse_config_GWASampleFiltering import parser
+from scripts.parse_config_GWASampleFiltering import parser
 import socket
 import sys
 import getpass
@@ -121,7 +121,7 @@ rule snp_qc:
         miss = config['QC']['GenoMiss'],
         MAF = config['QC']['MAF'],
         HWE = config['QC']['HWE']
-    conda: "workflow/envs/plink.yaml"
+    conda: "envs/plink.yaml"
     shell:
         '''
 plink --keep-allele-order --bfile {params.stem} --freq --out {params.out}
@@ -141,7 +141,7 @@ rule sample_callRate:
         indat = rules.snp_qc.params.out if QC_snp else start['stem'],
         miss = config['QC']['SampMiss'],
         out = "{dataout}/{sample}_callRate"
-    conda: "workflow/envs/plink.yaml"
+    conda: "envs/plink.yaml"
     shell:
         '''
 plink --keep-allele-order --bfile {params.indat} --mind {params.miss} \
@@ -159,7 +159,7 @@ rule sexcheck_QC:
     params:
         indat = start['sex_stem'],
         out = "{dataout}/{sample}_SexQC",
-    conda: "workflow/envs/plink.yaml"
+    conda: "envs/plink.yaml"
     shell:
         '''
 plink --keep-allele-order --bfile {params.indat} \
@@ -169,8 +169,8 @@ plink --keep-allele-order --bfile {params.indat} \
 rule sex_sample_fail:
     input: rules.sexcheck_QC.output
     output: "{dataout}/{sample}_exclude.sexcheck"
-    conda: 'workflow/envs/r.yaml'
-    script: 'workflow/scripts/sexcheck_QC.R'
+    conda: 'envs/r.yaml'
+    script: 'scripts/sexcheck_QC.R'
 
 if QC_callRate:
     sexcheck_in_plink = rules.sample_callRate.output[0]
@@ -192,9 +192,9 @@ else:
 
 
 if config['mirror'] == 'ncbi':
-    tgbase = "ftps://ftp-trace.ncbi.nih.gov/1000genomes/ftp/"
+    tgbase = "http://ftp-trace.ncbi.nih.gov/1000genomes/ftp/"
 elif config['mirror'] == 'ebi':
-    tgbase = "ftps://ftp.1000genomes.ebi.ac.uk/vol1/ftp/"
+    tgbase = "http://ftp.1000genomes.ebi.ac.uk/vol1/ftp/"
 
 tgped = tgbase + "technical/working/20130606_sample_info/20130606_g1k.ped"
 
@@ -227,7 +227,7 @@ rule download_tg_fa:
     output:
         "reference/human_g1k_{gbuild}.fasta",
         "reference/human_g1k_{gbuild}.fasta.fai"
-    conda: 'workflow/envs/bcftools.yaml'
+    conda: 'envs/bcftools.yaml'
     shell:
         '''
 if [[ "{input[0]}" == *.gz ]]; then
@@ -296,7 +296,7 @@ if REF == '1kG' or creftype == 'vcfchr':
             vcf = "reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz" if REF == '1kG' else config['custom_ref'],
             tbi = "reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi" if REF == '1kG' else config['custom_ref'] + '.tbi'
         output: temp("reference/{refname}.{gbuild}.chr{chrom}.maxmiss{miss}.vcf.gz")
-        conda: "workflow/envs/bcftools.yaml"
+        conda: "envs/bcftools.yaml"
         shell:
             '''
 bcftools norm -m- {input.vcf} --threads 2 | \
@@ -312,7 +312,7 @@ bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
         output:
             vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
-        conda: "workflow/envs/bcftools.yaml"
+        conda: "envs/bcftools.yaml"
         shell:
             '''
 bcftools concat {input.vcfs} -Oz -o {output.vcf} --threads 2
@@ -326,7 +326,7 @@ elif creftype == 'vcf':
         output:
             vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
-        conda: "workflow/envs/bcftools.yaml"
+        conda: "envs/bcftools.yaml"
         shell:
             '''
 for i in {1..22}; do echo "chr$i $i"; done > reference/chr_name_conv.txt;
@@ -346,7 +346,7 @@ else: #PLINK fileset of all chromosomes
             fasta = expand("reference/human_g1k_{gbuild}.fasta", gbuild=BUILD)
         output:
             temp(expand("reference/{{refname}}_{{gbuild}}_flipped.{ext}", ext=BPLINK))
-        conda: "workflow/envs/flippyr.yaml"
+        conda: "envs/flippyr.yaml"
         shell:
             '''
 flippyr -p {input.fasta} \
@@ -359,7 +359,7 @@ flippyr -p {input.fasta} \
         output:
             bim = temp("reference/{refname}_{gbuild}_flipped_ChromPos.bim"),
             snplist = temp("reference/{refname}_{gbuild}_flipped_snplist")
-        conda: "workflow/envs/r.yaml"
+        conda: "envs/r.yaml"
         shell: "Rscript scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"
 
     # Recode sample plink file to vcf
@@ -372,7 +372,7 @@ flippyr -p {input.fasta} \
         params:
             out = "reference/{refname}_{gbuild}_unQC_maxmissUnfilt",
             inp = "reference/{refname}_{gbuild}_flipped"
-        conda: "workflow/envs/plink.yaml"
+        conda: "envs/plink.yaml"
         shell:
             '''
 plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
@@ -396,7 +396,7 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
             #gbuild = "hg19|GRCh38",
             #refname = "[a-zA-Z0-9-]",
             #miss = "[0-9.]",
-        conda: "workflow/envs/bcftools.yaml"
+        conda: "envs/bcftools.yaml"
         shell:
             '''
 for i in {1..22}; do echo "chr$i $i"; done > reference/chr_name_conv.txt;
@@ -413,7 +413,7 @@ if ereftype == 'vcfchr':
             vcf = config['extra_ref'],
             tbi = config['extra_ref'] + '.tbi'
         output: temp("{dataout}/extraref.{gbuild}.chr{chrom}.maxmiss{miss}.vcf.gz")
-        conda: "workflow/envs/bcftools.yaml"
+        conda: "envs/bcftools.yaml"
         shell:
             '''
 for i in {1..22}; do echo "chr$i $i"; done > reference/chr_name_conv.txt;
@@ -443,7 +443,7 @@ elif ereftype == 'vcf':
         output:
             vcf = "{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = "{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
-        conda: "workflow/envs/bcftools.yaml"
+        conda: "envs/bcftools.yaml"
         shell:
             '''
 for i in {1..22}; do echo "chr$i $i"; done > reference/chr_name_conv.txt;
@@ -463,7 +463,7 @@ elif ereftype != 'none': #PLINK fileset of all chromosomes
             fasta = expand("reference/human_g1k_{gbuild}.fasta", gbuild=BUILD)
         output:
             temp(expand("{{dataout}}/extraref_{{gbuild}}_flipped.{ext}", ext=BPLINK, dataout = DATAOUT))
-        conda: "workflow/envs/flippyr.yaml"
+        conda: "envs/flippyr.yaml"
         shell:"flippyr -p {input.fasta} -o {DATAOUT}/extraref_{wildcards.gbuild}_flipped {input.bim}"
 
     rule Ref_ChromPosRefAlt_extra:
@@ -472,7 +472,7 @@ elif ereftype != 'none': #PLINK fileset of all chromosomes
         output:
             bim = temp("{dataout}/extraref_{gbuild}_flipped_ChromPos.bim"),
             snplist = temp("{dataout}/extraref_{gbuild}_flipped_snplist")
-        conda: "workflow/envs/r.yaml"
+        conda: "envs/r.yaml"
         shell: "R scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"
 
     # Recode sample plink file to vcf
@@ -485,7 +485,7 @@ elif ereftype != 'none': #PLINK fileset of all chromosomes
         params:
             out = "{dataout}/extraref_{gbuild}_unQC_maxmissUnfilt",
             inp = "{dataout}/extraref_{gbuild}_flipped"
-        conda: "workflow/envs/plink.yaml"
+        conda: "envs/plink.yaml"
         shell:
             '''
 plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
@@ -496,7 +496,7 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
     rule Ref_IndexVcf_extra:
         input: "{dataout}/extraref_{gbuild}_unQC_maxmissUnfilt.vcf.gz"
         output: "{dataout}/extraref_{gbuild}_unQC_maxmissUnfilt.vcf.gz.csi"
-        conda: "workflow/envs/bcftools.yaml"
+        conda: "envs/bcftools.yaml"
         shell: 'bcftools index -f {input}'
 
     rule Reference_prep_extra:
@@ -506,7 +506,7 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
         output:
             vcf = "{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = "{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
-        conda: "workflow/envs/bcftools.yaml"
+        conda: "envs/bcftools.yaml"
         shell:
             '''
 for i in {1..22}; do echo "chr$i $i"; done > reference/chr_name_conv.txt;
@@ -532,7 +532,7 @@ rule Sample_Flip:
         multiext("{dataout}/{sample}_flipped", ".bim", ".bed", ".fam")
     params:
         dataout = DATAOUT
-    conda: "workflow/envs/flippyr.yaml"
+    conda: "envs/flippyr.yaml"
     shell: "flippyr -p {input.fasta} -o {params.dataout}/{wildcards.sample} {input.bim}"
 
 rule Sample_ChromPosRefAlt:
@@ -541,8 +541,8 @@ rule Sample_ChromPosRefAlt:
     output:
         bim = temp("{dataout}/{sample}_flipped_ChromPos.bim"),
         snplist = temp("{dataout}/{sample}_flipped_snplist")
-    conda: "workflow/envs/r.yaml"
-    script: "workflow/scripts/bim_ChromPosRefAlt.R"
+    conda: "envs/r.yaml"
+    script: "scripts/bim_ChromPosRefAlt.R"
 
 if config['union_panel'] and extraref:
     if extraref and ("union_extra" in config) and (config['union_extra'] != False):
@@ -562,7 +562,7 @@ rule get_panelvars:
         expand("reference/{{refname}}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
                gbuild=BUILD, miss=config['QC']['GenoMiss'], refname=REF)
     output: 'reference/panelvars_{refname}.snps' if erefc else DATAOUT + '/panelvars_all.snp'
-    conda: "workflow/envs/bcftools.yaml"
+    conda: "envs/bcftools.yaml"
     shell: "bcftools query -f '%ID\n' {input} > {output}"
 
 rule merge_panelvars:
@@ -588,7 +588,7 @@ rule PruneDupvar_snps:
         dupvar = "{dataout}/{sample}_nodup.dupvar",
         out = "{dataout}/{sample}_nodup",
         extract = extract_sample
-    conda: "workflow/envs/plink.yaml"
+    conda: "envs/plink.yaml"
     shell:
         '''
 plink --keep-allele-order --bfile {params.indat} -bim {input.bim} \
@@ -599,8 +599,8 @@ plink --keep-allele-order --bfile {params.indat} -bim {input.bim} \
 rule SelectDupvar_snps:
     input: rules.PruneDupvar_snps.output[0]
     output: "{dataout}/{sample}_nodup.dupvar.delete"
-    conda: "workflow/envs/r.yaml"
-    script: "workflow/scripts/DuplicateVars.R"
+    conda: "envs/r.yaml"
+    script: "scripts/DuplicateVars.R"
 
 # Prune sample dataset
 rule sample_prune:
@@ -615,7 +615,7 @@ rule sample_prune:
     params:
         indat = "{dataout}/{sample}_flipped",
         out = "{dataout}/{sample}_pruned"
-    conda: "workflow/envs/plink.yaml"
+    conda: "envs/plink.yaml"
     shell:
         '''
 plink --keep-allele-order --bfile {params.indat} --bim {input.bim} \
@@ -639,7 +639,7 @@ rule Reference_prune:
         tbi = temp("{dataout}/{sample}_{refname}pruned.vcf.gz.tbi")
     params:
         founders = "-S reference/20130606_g1k.founders " if REF == '1kG' else ''
-    conda: "workflow/envs/bcftools.yaml"
+    conda: "envs/bcftools.yaml"
     shell:
         '''
 bcftools view -i 'ID=@{input.prune}' {params.founders}\
@@ -655,7 +655,7 @@ rule Reference_prune_extra:
     output:
         vcf = temp("{dataout}/eref.{sample}pruned.vcf.gz"),
         tbi = temp("{dataout}/eref.{sample}pruned.vcf.gz.tbi")
-    conda: "workflow/envs/bcftools.yaml"
+    conda: "envs/bcftools.yaml"
     shell:
         '''
 bcftools view -i 'ID=@{input.prune}' \
@@ -678,7 +678,7 @@ rule Sample_Plink2Bcf:
     output: "{dataout}/{sample}_pruned.vcf.gz"
     params:
         out = "{dataout}/{sample}_pruned"
-    conda: "workflow/envs/plink.yaml"
+    conda: "envs/plink.yaml"
     shell:
         '''
 plink --bed {input.bed} --bim {input.bim} --fam {input.fam} --recode vcf bgz \
@@ -689,7 +689,7 @@ plink --bed {input.bed} --bim {input.bim} --fam {input.fam} --recode vcf bgz \
 rule Sample_IndexBcf:
     input: "{dataout}/{sample}_pruned.vcf.gz"
     output: "{dataout}/{sample}_pruned.vcf.gz.csi"
-    conda: "workflow/envs/bcftools.yaml"
+    conda: "envs/bcftools.yaml"
     shell: 'bcftools index -f {input}'
 
 # Merge ref and sample
@@ -706,7 +706,7 @@ rule Merge_RefenceSample:
         extra = "{dataout}/eref.{sample}pruned.vcf.gz" if extraref else ''
     output:
         out = "{dataout}/{sample}_{refname}_merged.vcf"
-    conda: "workflow/envs/bcftools.yaml"
+    conda: "envs/bcftools.yaml"
     shell:
         r'''
 bcftools merge -m none --threads 2 \
@@ -722,7 +722,7 @@ rule Plink_RefenceSample:
         expand("{{dataout}}/{{sample}}_{{refname}}_merged.{ext}", ext=BPLINK, dataout = DATAOUT)
     params:
         out = "{dataout}/{sample}_{refname}_merged"
-    conda: "workflow/envs/plink.yaml"
+    conda: "envs/plink.yaml"
     shell: "plink --keep-allele-order --vcf {input.vcf} --const-fid --make-bed --out {params.out}"
 
 rule fix_fam:
@@ -731,8 +731,8 @@ rule fix_fam:
         newfam = "{dataout}/{sample}_{refname}_merged.fam",
         tgped = tgped
     output: fixed = "{dataout}/{sample}_{refname}_merged_fixed.fam"
-    conda: "workflow/envs/r.yaml"
-    script: "workflow/scripts/fix_fam.R"
+    conda: "envs/r.yaml"
+    script: "scripts/fix_fam.R"
 
 rule merge_pops:
     input:
@@ -743,8 +743,8 @@ rule merge_pops:
         DATAOUT + '/{refname}_allpops_unique.txt'
     params:
         extra_ref_code = config['extra_ref_subpop']
-    conda: "workflow/envs/r.yaml"
-    script: "workflow/scripts/add_extraref_pops.R"
+    conda: "envs/r.yaml"
+    script: "scripts/add_extraref_pops.R"
 
 # PCA analysis to identify population outliers
 rule PcaPopulationOutliers:
@@ -758,7 +758,7 @@ rule PcaPopulationOutliers:
     params:
         indat_plink = "{dataout}/{sample}_{refname}_merged",
         out = "{dataout}/{sample}_{refname}_merged"
-    conda: "workflow/envs/plink.yaml"
+    conda: "envs/plink.yaml"
     shell:
         '''
 plink --keep-allele-order --bfile {params.indat_plink} --fam {input.fam} \
@@ -779,8 +779,8 @@ rule ExcludePopulationOutliers:
         superpop = config['superpop'],
         extraref = 'none' if not extraref else config['extra_ref_subpop'],
         sd = pca_sd
-    conda: "workflow/envs/r.yaml"
-    script: "workflow/scripts/PCA_QC.R"
+    conda: "envs/r.yaml"
+    script: "scripts/PCA_QC.R"
     # shell:
     #     '''
     #     Rscript scripts/PCA_QC.R -s {wildcards.sample} -p {params.superpop} \
@@ -798,7 +798,7 @@ rule relatedness_sample_prep:
     params:
         indat_plink = sexcheck_in_plink_stem,
         out = "{dataout}/{sample}_IBDQCfilt"
-    conda: "workflow/envs/plink.yaml"
+    conda: "envs/plink.yaml"
     shell:
         '''
 plink --bfile {params.indat_plink} \
@@ -819,7 +819,7 @@ if config['king']:
         params:
             out = "{dataout}/{sample}_IBDQC",
             dataout = DATAOUT
-        conda: "workflow/envs/king.yaml"
+        conda: "envs/king.yaml"
         shell:
             '''
 king -b {input.bed} --related --degree 3 --prefix {params.out}
@@ -838,7 +838,7 @@ fi
         params:
             out = "{dataout}/{sample}_IBDQC.all",
             dataout = DATAOUT
-        conda: "workflow/envs/king.yaml"
+        conda: "envs/king.yaml"
         shell:
             '''
 king -b {input.bed} --kinship --ibs --prefix {params.out}
@@ -854,7 +854,7 @@ else:
         params:
             indat_plink = "{dataout}/{sample}_pruned",
             out = "{dataout}/{sample}_IBDQC"
-        conda: "workflow/envs/plink.yaml"
+        conda: "envs/plink.yaml"
         shell:
             '''
 plink --keep-allele-order --bfile {params.indat_plink} --genome --min 0.05 \
@@ -874,8 +874,8 @@ rule relatedness_sample_fail:
     output:
         out = "{dataout}/{sample}_exclude.relatedness",
         rdat = "{dataout}/{sample}_IBDQC.Rdata"
-    conda: "workflow/envs/r.yaml"
-    script: "workflow/scripts/relatedness_QC.R"
+    conda: "envs/r.yaml"
+    script: "scripts/relatedness_QC.R"
 
 # ---- Exclude Samples with outlying heterozigosity ----
 rule heterozygosity_QC:
@@ -884,14 +884,14 @@ rule heterozygosity_QC:
     params:
         indat_plink = rules.sample_prune.params.out,
         out = "{dataout}/{sample}_HetQC"
-    conda: "workflow/envs/plink.yaml"
+    conda: "envs/plink.yaml"
     shell: "plink --keep-allele-order --bfile {params.indat_plink} --het --out {params.out}"
 
 rule heterozygosity_sample_fail:
     input: rules.heterozygosity_QC.output
     output: "{dataout}/{sample}_exclude.heterozigosity"
-    conda: "workflow/envs/r.yaml"
-    script: 'workflow/scripts/heterozygosity_QC.R'
+    conda: "envs/r.yaml"
+    script: 'scripts/heterozygosity_QC.R'
 
 # Run PCA to control for population stratification
 if config['pcair']:
@@ -907,7 +907,7 @@ if config['pcair']:
         params:
             indat = "{dataout}/{sample}_pruned",
             plinkout = "{dataout}/{sample}_filtered_PCApre"
-        conda: "workflow/envs/plink.yaml"
+        conda: "envs/plink.yaml"
         shell:
             r'''
 plink --keep-allele-order --bfile {params.indat} \
@@ -923,8 +923,8 @@ plink --keep-allele-order --bfile {params.indat} \
             "{dataout}/{sample}_IBDQC.all.popfilt.kingfiles"
         params:
             indat = "{dataout}/{sample}_IBDQC.all",
-        conda: "workflow/envs/r.yaml"
-        script: "workflow/scripts/filterKing.R"
+        conda: "envs/r.yaml"
+        script: "scripts/filterKing.R"
 #         shell:
 #             r'''
 # Rscript workflow/scripts/filterKing.R {params.indat} {input.exclude}
@@ -943,8 +943,8 @@ plink --keep-allele-order --bfile {params.indat} \
         params:
             stem = rules.ancestryFilt.params.plinkout,
             king = rules.filterKING.params.indat + ".popfilt"
-        conda: "workflow/envs/r.yaml"
-        script: "workflow/scripts/PartitionPCAiR.R"
+        conda: "envs/r.yaml"
+        script: "scripts/PartitionPCAiR.R"
 
     rule stratFrq:
         input:
@@ -954,7 +954,7 @@ plink --keep-allele-order --bfile {params.indat} \
         params:
             indat = rules.ancestryFilt.params.plinkout,
             out = "{dataout}/{sample}_filtered_PCAfreq"
-        conda: "workflow/envs/plink.yaml"
+        conda: "envs/plink.yaml"
         shell:
             '''
 plink --keep-allele-order --bfile {params.indat} --freqx \
@@ -972,7 +972,7 @@ plink --keep-allele-order --bfile {params.indat} --freqx \
         params:
             indat = rules.ancestryFilt.params.plinkout,
             out = "{dataout}/{sample}_filtered_PCA"
-        conda: "workflow/envs/plink.yaml"
+        conda: "envs/plink.yaml"
         shell:
             '''
 plink --keep-allele-order --bfile {params.indat} --read-freq {input.frq} --pca 10 \
@@ -990,7 +990,7 @@ else:
         params:
             indat = "{dataout}/{sample}_pruned",
             out = "{dataout}/{sample}_filtered_PCA"
-        conda: "workflow/envs/plink.yaml"
+        conda: "envs/plink.yaml"
         shell:
             '''
 plink --keep-allele-order --bfile {params.indat} --remove {input.exclude}
@@ -1007,8 +1007,8 @@ rule SampleExclusion:
     output:
         out = "{dataout}/{sample}_exclude.samples",
         out_distinct = "{dataout}/{sample}_exclude.distinct_samples"
-    conda: "workflow/envs/r.yaml"
-    script: "workflow/scripts/sample_QC.R"
+    conda: "envs/r.yaml"
+    script: "scripts/sample_QC.R"
 
 rule Exclude_failed:
     input:
@@ -1020,7 +1020,7 @@ rule Exclude_failed:
     params:
         indat_plink = sexcheck_in_plink_stem,
         out = "{dataout}/{sample}_Excluded"
-    conda: "workflow/envs/plink.yaml"
+    conda: "envs/plink.yaml"
     shell:
         '''
 cat {input.indat_exclude} | sed '1d' | cut -d' ' -f1,2 > {output.excl}
@@ -1045,7 +1045,6 @@ rule GWAS_QC_Report:
     output:
          "{dataout}/stats/{sample}_GWAS_QC.html"
     params:
-        sample = "{sample}"
         script = "GWAS_QC.Rmd",
         rwd = RWD,
         Family = FAMILY,
@@ -1058,8 +1057,8 @@ rule GWAS_QC_Report:
         HWE = config['QC']['HWE'],
         superpop = config['superpop'],
         partmethod = rules.PCAPartitioning.output[1] if config["pcair"] else "none"
-    conda: "workflow/envs/r.yaml"
-    script: "workflow/scripts/RenderMarkdown.R"
+    conda: "envs/r.yaml"
+    script: "scripts/RenderMarkdown.R"
 #     shell:
 #         '''
 # R -e 'nm <- sample(c("Shea J. Andrews", "Brian Fulton-Howard"), \

@@ -33,7 +33,7 @@ rmarkdown::render(
   output_format = "all",
   params = list(
     rwd = snakemake@params[["rwd"]],
-    Sample = snakemake@params[["sample"]],
+    Sample = snakemake@wildcards[["sample"]],
     # DataIn = snakemake@xxx[[xxx]],
     Path_hwe = snakemake@input[["hwe"]],
     Path_frq = snakemake@input[["frq"]],
