@@ -16,10 +16,10 @@ sample: false
 #   directory is provided, it will be scanned for plink files containing the
 #   same names. If another string is provided, it will be used at the end of
 #   the sample names.
-SexIn: original
+SexIn:
 
 # This is the directory with the input files:
-DataIn: postImpute
+DataIn: /sc/arion/projects/LOAD/Data/BioME/sample_QC/GWASampleFiltering/input
 
 # This is the directory with the output files:
 DataOut: output
@@ -39,21 +39,28 @@ QC:
 
 download_tg: true
 genome_build: hg19
-mirror: ebi # ncbi or ebi
+mirror: ncbi # ncbi or ebi
 
-union_panel: true #make sure population ref panel and sample snps all overlap
-union_extra: true #require snp overlap with extra ref if present
+# make sure population ref panel and sample snps all overlap?
+#   select "intersection" for full overlap, or
+#   select "union" to include any variant in either sample/panel
+#   "intersection" is recommended
+overlap_panel: intersection
+#   select "intersection" to ensure main and extra reference snps all overlap
+#   select "union" to include any variant in either main or extra reference
+#   "union" recommended for microarray, otherwise "intersection"
+overlap_extra: union
 
-# custom_ref_name: The name of a custom reference set, if using a custom main reference.
+custom_ref:
+# name: The name of a custom reference set, if using a custom main reference.
 #   This should be descriptive and not contain whitespace, underscores or periods
 #   DO NOT call it 1kG or extraref, as those are reserved names.
-custom_ref_name: false
-#fooby
-# custom_ref: the file, filestem or fileset with your custom reference, if using a custom ref.
+  name: false
+# file: the file, filestem or fileset with your custom reference, if using a custom ref.
 #   It can be the filestem for a binary PLINK fileset containing all chromosomes.
 #   for VCF references, give the filename. If there is a file for each chromosomem,
 #     {chrom} will be replaced with the chromosome number
-custom_ref: false
+  file: false
   #inputs/foo.bar_baz # inputs/foo.baz_bar.vcf.gz #inputs/foo.bar_baz_chr{chrom}.qux.vcf.gz
 # custom_pops: file with the header "FID IID Population"
 #   and FID, IID and subpopulation in each row.
@@ -61,13 +68,16 @@ custom_ref: false
 #   if you are using a VCF reference, FID should be the VCF sample ID befpre the first underscore,
 #     and IID shhould be everything after. If there are no underscores, FID and IID should both
 #     be the VCF sample ID.
-custom_pops: false
+  custom_pops: false
 
-
-# extra_ref: the file, filestem or fileset with your extra reference, if using an extra ref.
+# An optional extra reference for a subpopulation of
+#   one of your reference pop
+extra_ref:
+  name: false
+# file: the file, filestem or fileset with your extra reference, if using an extra ref.
 #   It can be the filestem for a binary PLINK fileset containing all chromosomes.
 #   for VCF references, give the filename. If there is a file for each chromosomem,
 #     {chrom} will be replaced with the chromosome number
-extra_ref: false
+  file: false
 # subpopulation code for your additional reference. It should be a subpopulation of the superpop or not be a 1kgp population
-extra_ref_subpop: false
+  subpop: false

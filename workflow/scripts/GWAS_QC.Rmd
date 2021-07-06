@@ -48,6 +48,9 @@ author: "`r params$auth`"
 knitr::opts_chunk$set(echo = TRUE)
 # knitr::opts_knit$set(root.dir = paste0(params$rwd, 'workflow/scripts'))
 sexcheck_tf = params$Path_SexFile != "/dev/null"
+hetcheck_tf = params$Path_HetFile != "/dev/null"
+relcheck_tf = params$Path_IBD_stats != "/dev/null"
+pcacheck_tf = params$Path_PCA_rdat != "/dev/null"
 ```
 
 ```{r child = 'call_rates.Rmd', eval = T}
@@ -56,15 +59,15 @@ sexcheck_tf = params$Path_SexFile != "/dev/null"
 ```{r child = 'sexcheck_QC.Rmd', eval = sexcheck_tf}
 ```
 
-```{r child = 'Heterozygosity_QC.Rmd', eval = T}
+```{r child = 'Heterozygosity_QC.Rmd', eval = hetcheck_tf}
 ```
 
 # Population and family structure
 
-```{r child = 'relatedness_QC.Rmd', eval = T}
+```{r child = 'relatedness_QC.Rmd', eval = relcheck_tf}
 ```
 
-```{r child = 'PCA_QC.Rmd'}
+```{r child = 'PCA_QC.Rmd', eval = pcacheck_tf}
 ```
 
 ```{r child = 'population_stratification_QC.Rmd', eval = T}
