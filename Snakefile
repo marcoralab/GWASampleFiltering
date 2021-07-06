@@ -38,12 +38,7 @@ isMinerva = "hpc.mssm.edu" in socket.getfqdn()
 configfile: "config/config.yaml"
 do_sexqc = config['do_sexqc']
 
-# shell.executable("/bin/bash")
-#
-# if isMinerva:
-#     anacondapath = sys.exec_prefix + "/bin"
-#     shell.prefix(". ~/.bashrc; PATH={}:$PATH; ".format(anacondapath))
-#
+shell.executable("/bin/bash")
 
 BPLINK = ["bed", "bim", "fam"]
 RWD = os.getcwd()
