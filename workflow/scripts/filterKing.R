@@ -33,11 +33,11 @@ if (file.exists(kinfile)) {
     N_SNP = col_integer()
   )
 
+  kinout <- paste0(kingstem, ".popfilt.kin")
   read_tsv(kinfile, col_types = kincols) %>%
     anti_join(excluded, by = c("FID", "ID1" = "IID")) %>%
     anti_join(excluded, by = c("FID", "ID2" = "IID")) %>%
-    write_tsv(paste0(kingstem, ".popfilt.kin"))
-  kinout <- paste0(kingstem, ".popfilt.kin")
+    write_tsv(kinout)
 } else {
   message(sprintf("%s does not exist.", kin0file))
   kinout <- ""
@@ -58,11 +58,11 @@ if (file.exists(kin0file)) {
     N_SNP = col_integer()
   )
 
+  kin0out <- paste0(kingstem, ".popfilt.kin0")
   read_tsv(kin0file, col_types = kin0cols) %>%
     anti_join(excluded, by = c("FID1" = "FID", "ID1" = "IID")) %>%
     anti_join(excluded, by = c("FID2" = "FID", "ID2" = "IID")) %>%
-    write_tsv(paste0(kingstem, ".popfilt.kin0"))
-  kin0out <- paste0(kingstem, ".popfilt.kin0")
+    write_tsv(kin0out)
 } else {
   message(sprintf("%s does not exist.", kin0file))
   kin0out <- ""
@@ -70,6 +70,10 @@ if (file.exists(kin0file)) {
 
 message( "Exporting... ", outfile)
 
-fileConn <- file(outfile)
-writeLines(c(kinout,kin0out), fileConn)
-close(fileConn)
+if (nchar(paste0(kinout, kin0out)) > 0) {
+  fileConn <- file(outfile)
+  writeLines(c(kinout,kin0out), fileConn)
+  close(fileConn)
+} else {
+  stop("No KING output files!")
+}

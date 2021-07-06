@@ -10,10 +10,14 @@ suppressMessages(require(magrittr))
 
 `%nin%` <- Negate(`%in%`)
 
+# .genome output file from PLINK
 genome.file <- snakemake@params[['geno']]
+# pi_hat threshold (0.1875 recommended)
 threshold <- as.numeric(snakemake@params[['threshold']])
+# Family based study, T/F
 Family <- as.logical(snakemake@params[['Family']])
 king <- as.logical(snakemake@params[['king']])
+# .tsv file to be output
 outfile <- snakemake@output[['out']]
 rdat <- snakemake@output[['rdat']]
 

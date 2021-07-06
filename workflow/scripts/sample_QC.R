@@ -4,21 +4,20 @@
 require(dplyr, quietly = T, warn.conflicts = F)
 require(readr, quietly = T, warn.conflicts = F)
 
-##  Arguments:
-# 1: call rate fail sample list
-# 2: heterozygocity fail sample list
-# 3: discordent sex sample list
-# 4: population outliers sample list
-# 5: duplicates/relatives sample list
-# 6: .txt file to be outputed
 
-irem.file = snakemake@input[['SampCallRate']]
-het.file = snakemake@input[['het']]
-sex.file = snakemake@input[['sex']]
-pca.file = snakemake@input[['pca']]
-rel.file = snakemake@input[['relat']]
-outfile = snakemake@output[['out']]
-outfile_d = snakemake@output[['out_distinct']]
+# 1: call rate fail sample list
+irem.file <- snakemake@input[['SampCallRate']]
+# 2: heterozygocity fail sample list
+het.file <- snakemake@input[['het']]
+# 3: discordent sex sample list
+sex.file <- snakemake@input[['sex']]
+# 4: population outliers sample list
+pca.file <- snakemake@input[['pca']]
+# 5: duplicates/relatives sample list
+rel.file <- snakemake@input[['relat']]
+# 6: .txt file to be outputed
+outfile <- snakemake@output[['out']]
+outfile_d <- snakemake@output[['out_distinct']]
 
 ##  ---- Read in sample exclusion files files ---- ##
 irem.raw <- read_tsv(irem.file, col_names = F, col_types = 'cc') %>%
