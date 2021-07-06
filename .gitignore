@@ -6,9 +6,9 @@ ftp-trace*/
 data/*
 temp/*
 stats/*
-scripts/GWAS_QC_cache/*
+workflow/scripts/GWAS_QC_cache/*
 output/*
-scripts/__pycache__/*
+workflow/scripts/__pycache__/*
 *.bk
 *.bed
 *.bim
