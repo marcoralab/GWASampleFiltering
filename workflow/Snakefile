@@ -71,6 +71,16 @@ if qc_type['variant'] or qc_type['callrate']:
         raise Exception("Sample call-rate QC cannot be run without variant QC")
     include: 'rules/variant_qc.smk'
 
+if qc_type['callrate']:
+    sampleqc_in_plink = rules.sample_callRate.output[0]
+    sampleqc_in_plink_stem = rules.sample_callRate.params.out
+elif qc_type['variant']:
+    sampleqc_in_plink = expand("{{dataout}}/{{sample}}_SnpQc.{ext}", ext=BPLINK)
+    sampleqc_in_plink_stem = rules.snp_qc.params.out
+else:
+    sampleqc_in_plink = start['files']
+    sampleqc_in_plink_stem = start['stem']
+
 if qc_type['ancestry']:
     include: 'rules/ancestry.smk'
 
@@ -110,16 +120,6 @@ rule sex_sample_fail:
     output: "{dataout}/{sample}_exclude.sexcheck"
     conda: 'envs/r.yaml'
     script: 'scripts/sexcheck_QC.R'
-
-if qc_type['callrate']:
-    sampleqc_in_plink = rules.sample_callRate.output[0]
-    sampleqc_in_plink_stem = rules.sample_callRate.params.out
-elif qc_type['variant']:
-    sampleqc_in_plink = expand("{{dataout}}/{{sample}}_SnpQc.{ext}", ext=BPLINK)
-    sampleqc_in_plink_stem = rules.snp_qc.params.out
-else:
-    sampleqc_in_plink = start['files']
-    sampleqc_in_plink_stem = start['stem']
 
 
 # ---- Exclude Samples with outlying heterozigosity ----
