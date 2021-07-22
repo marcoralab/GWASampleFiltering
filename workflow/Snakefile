@@ -182,7 +182,7 @@ rule GWAS_QC_Report:
         PCA_rdat = "{dataout}/{sample}_pca.Rdata" if qc_type['ancestry'] else '/dev/null',
         PopStrat_eigenval = "{dataout}/{sample}_filtered_PCA.eigenval" if qc_type['popstrat'] else '/dev/null',
         PopStrat_eigenvec = "{dataout}/{sample}_filtered_PCA.eigenvec" if qc_type['popstrat'] else '/dev/null',
-        partmethod = rules.PCAPartitioning.output[1] if config["pcair"] else "/dev/null"
+        partmethod = rules.PCAPartitioning.output[1] if qc_type['popstrat'] and config["pcair"] else "/dev/null"
     output:
          "{dataout}/stats/{sample}_GWAS_QC.html"
     params:
@@ -197,6 +197,6 @@ rule GWAS_QC_Report:
         MAF = config['QC']['MAF'],
         HWE = config['QC']['HWE'],
         superpop = config['superpop'],
-        partmethod = rules.PCAPartitioning.output[1] if config["pcair"] else "none"
+        partmethod = rules.PCAPartitioning.output[1] if qc_type['popstrat'] and config["pcair"] else "none"
     conda: "envs/r.yaml"
     script: "scripts/RenderMarkdown.R"
