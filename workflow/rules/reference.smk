@@ -26,28 +26,9 @@ else:
     FTP = dummyprovider
     HTTP = dummyprovider
 
-# FTP = FTPRemoteProvider() if iconnect else dummyprovider
-# HTTP = HTTPRemoteProvider() if iconnect else dummyprovider
-
-configfile: "config/config.yaml"
-
-shell.executable("/bin/bash")
-
 BPLINK = ["bed", "bim", "fam"]
 
-start, SAMPLE, DATAOUT = parser(config)
-
 localrules: download_tg_fa, download_tg_ped, download_tg_chrom
-
-
-def flatten(nested):
-    flat = []
-    for el in nested:
-        if not isinstance(el, list):
-            flat.append(el)
-        else:
-            flat += flatten(el)
-    return flat
 
 
 def detect_ref_type(reffile):
@@ -362,7 +343,7 @@ elif ereftype != 'none': #PLINK fileset of all chromosomes
         output:
             temp(expand("{{dataout}}/extraref_{{gbuild}}_flipped.{ext}", ext=BPLINK, dataout = DATAOUT))
         conda: "envs/flippyr.yaml"
-        shell:"flippyr -p {input.fasta} -o {DATAOUT}/extraref_{wildcards.gbuild}_flipped {input.bim}"
+        shell: "flippyr -p {input.fasta} -o {DATAOUT}/extraref_{wildcards.gbuild}_flipped {input.bim}"
 
     rule Ref_ChromPosRefAlt_extra:
         input:
