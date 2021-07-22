@@ -5,7 +5,15 @@
 outputs: [report, exclusions]
 #options are report, exclusions, and filtered
 nointernet: true
-do_sexqc: false
+
+qc:
+  variant: true
+  callrate: true
+  sex: true
+  heterozygosity: true
+  relatedness: true
+  ancestry: true
+  popstrat: true
 
 # Set to 'false' for automatic scanning of plink filesets,
 #   provide single sample, or provide list
@@ -28,7 +36,6 @@ DataOut: output
 family: false
 
 superpop: EUR
-king: true
 pcair: true
 
 QC:

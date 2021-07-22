@@ -2,9 +2,11 @@
 # import ipdb; ipdb.set_trace()
 from scripts.parse_config_GWASampleFiltering import parser
 import os
+import warnings
 
 configfile: "config/config.yaml"
-do_sexqc = config['do_sexqc']
+config['full_pipeline'] = True
+config['king'] = True
 
 shell.executable("/bin/bash")
 
@@ -16,10 +18,28 @@ start, SAMPLE, DATAOUT = parser(config)
 FAMILY = 'T' if config['family'] else 'F'
 istg = config['isTG'] if 'isTG' in config else False
 
-# QC Steps:
-QC_snp = True
-QC_callRate = True
 
+def enableqc(qc_type):
+    if 'qc' in config:
+        if (isinstance(config['qc'], list)
+                and all([isinstance(x, str) for x in config['qc']])):
+            return qc_type in config['qc']
+        elif isinstance(config['qc'], dict):
+            if (qc_type in config['qc']
+                    and isinstance(config['qc'][qc_type], bool)):
+                return config['qc'][qc_type]
+            else:
+                raise Exception(
+                    "Malformed QC dict: All supported QC must be present")
+        else:
+            raise Exception("Malformed QC list: Please provide dict OR list")
+    else:
+        return True
+
+
+qc_type = ['variant', 'callrate', 'sex', 'heterozygosity',
+           'relatedness', 'ancestry', 'popstrat']
+qc_type = {x: enableqc(x) for x in qc_type}
 
 def flatten(nested):
     flat = []
@@ -44,46 +64,20 @@ rule all:
     input:
         outputs
 
-# ---- Exlude SNPs with a high missing rate and low MAF----
-rule snp_qc:
-    input: start['files']
-    output:
-        temp(expand("{{dataout}}/{{sample}}_SnpQc.{ext}", ext=BPLINK)),
-        "{dataout}/{sample}_SnpQc.hwe",
-        "{dataout}/{sample}_SnpQc.frq",
-        "{dataout}/{sample}_SnpQc.frqx",
-    params:
-        stem = start['stem'],
-        out = "{dataout}/{sample}_SnpQc",
-        miss = config['QC']['GenoMiss'],
-        MAF = config['QC']['MAF'],
-        HWE = config['QC']['HWE']
-    conda: "envs/plink.yaml"
-    shell:
-        '''
-plink --keep-allele-order --bfile {params.stem} --freq --out {params.out}
-plink --keep-allele-order --bfile {params.stem} --freqx --out {params.out}
-plink --keep-allele-order --bfile {params.stem} --geno {params.miss} \
---maf {params.MAF} --hardy --hwe {params.HWE} --make-bed --out {params.out}
-'''
+if qc_type['variant'] or qc_type['callrate']:
+    include: 'workflow/variant_qc.smk'
 
-# ---- Exclude Samples with high missing rate ----
-rule sample_callRate:
-    input: expand("{{dataout}}/{{sample}}_SnpQc.{ext}", ext=BPLINK) if QC_snp else start['files']
-    output:
-        expand("{{dataout}}/{{sample}}_callRate.{ext}", ext=BPLINK, dataout = DATAOUT),
-        "{dataout}/{sample}_callRate.imiss",
-        touch("{dataout}/{sample}_callRate.irem")
-    params:
-        indat = rules.snp_qc.params.out if QC_snp else start['stem'],
-        miss = config['QC']['SampMiss'],
-        out = "{dataout}/{sample}_callRate"
-    conda: "envs/plink.yaml"
-    shell:
-        '''
-plink --keep-allele-order --bfile {params.indat} --mind {params.miss} \
-  --missing --make-bed --out {params.out}
-'''
+if qc_type['ancestry']:
+    include: 'rules/ancestry.smk'
+
+if qc_type['popstrat']:
+    include: 'rules/stratification.smk'
+    if config['pcair'] and not qc_type['relatedness']:
+        warnings.warn("PCAiR requires relatedness QC. Enabling.")
+        qc_type['relatedness'] = True
+
+if qc_type['relatedness']:
+    include: 'workflow/relatedness.smk'
 
 # ---- Exclude Samples with discordant sex ----
 #  Use ADNI hg18 data, as the liftover removed the x chromsome data
@@ -109,111 +103,23 @@ rule sex_sample_fail:
     conda: 'envs/r.yaml'
     script: 'scripts/sexcheck_QC.R'
 
-if QC_callRate:
-    sexcheck_in_plink = rules.sample_callRate.output[0]
-    sexcheck_in_plink_stem = rules.sample_callRate.params.out
-elif QC_snp:
-    sexcheck_in_plink = expand("{{dataout}}/{{sample}}_SnpQc.{ext}", ext=BPLINK)
-    sexcheck_in_plink_stem = rules.snp_qc.params.out
+if qc_type['callrate']:
+    sampleqc_in_plink = rules.sample_callRate.output[0]
+    sampleqc_in_plink_stem = rules.sample_callRate.params.out
+elif qc_type['variant']:
+    sampleqc_in_plink = expand("{{dataout}}/{{sample}}_SnpQc.{ext}", ext=BPLINK)
+    sampleqc_in_plink_stem = rules.snp_qc.params.out
 else:
-    sexcheck_in_plink = start['files']
-    sexcheck_in_plink_stem = start['stem']
+    sampleqc_in_plink = start['files']
+    sampleqc_in_plink_stem = start['stem']
 
-# ---- Exclude Samples with interealtedness ----
-rule relatedness_sample_prep:
-    input: sexcheck_in_plink
-    output:
-        bed = temp("{dataout}/{sample}_IBDQCfilt.bed"),
-        bim = temp("{dataout}/{sample}_IBDQCfilt.bim"),
-        fam = temp("{dataout}/{sample}_IBDQCfilt.fam")
-    params:
-        indat_plink = sexcheck_in_plink_stem,
-        out = "{dataout}/{sample}_IBDQCfilt"
-    conda: "envs/plink.yaml"
-    shell:
-        '''
-plink --bfile {params.indat_plink} \
-  --geno 0.02 \
-  --maf 0.02 \
-  --memory 6000 \
-  --make-bed --out {params.out}
-'''
-
-if config['king']:
-    rule relatedness_QC:
-        input:
-            bed = rules.relatedness_sample_prep.output.bed,
-            bim = rules.relatedness_sample_prep.output.bim,
-            fam = rules.relatedness_sample_prep.output.fam
-        output:
-            genome = "{dataout}/{sample}_IBDQC.kingfiles"
-        params:
-            out = "{dataout}/{sample}_IBDQC",
-            dataout = DATAOUT
-        conda: "envs/king.yaml"
-        shell:
-            '''
-king -b {input.bed} --related --degree 3 --prefix {params.out}
-if test -n "$(find {params.dataout} -name "{wildcards.sample}_IBDQC.kin*")"; then
-  find {params.dataout} -name "{wildcards.sample}_IBDQC.kin*" > {output.genome}
-fi
-'''
-
-    rule king_all:
-        input:
-            bed = rules.relatedness_sample_prep.output.bed,
-            bim = rules.relatedness_sample_prep.output.bim,
-            fam = rules.relatedness_sample_prep.output.fam
-        output:
-            genome = "{dataout}/{sample}_IBDQC.all.kingfiles",
-        params:
-            out = "{dataout}/{sample}_IBDQC.all",
-            dataout = DATAOUT
-        conda: "envs/king.yaml"
-        shell:
-            '''
-king -b {input.bed} --kinship --ibs --prefix {params.out}
-if test -n "$(find {params.dataout} -name "{wildcards.sample}_IBDQC.all.kin*")"; then
-  find {params.dataout} -name "{wildcards.sample}_IBDQC.all.kin*" > {output.genome}
-fi
-'''
-else:
-    rule relatedness_QC:
-        input: rules.sample_prune.output
-        output:
-            genome = "{dataout}/{sample}_IBDQC.genome"
-        params:
-            indat_plink = "{dataout}/{sample}_pruned",
-            out = "{dataout}/{sample}_IBDQC"
-        conda: "envs/plink.yaml"
-        shell:
-            '''
-plink --keep-allele-order --bfile {params.indat_plink} --genome --min 0.05 \
-  --out {params.out}
-'''
-
-rule relatedness_sample_fail:
-    input:
-        genome = rules.relatedness_QC.output.genome,
-        geno_all = rules.king_all.output if config['king'] else "/dev/null",
-        fam = sexcheck_in_plink_stem + ".fam"
-    params:
-        Family = FAMILY,
-        king = config['king'],
-        threshold = 0.1875,
-        geno = rules.relatedness_QC.params.out if config['king'] else rules.relatedness_QC.output.genome
-    output:
-        out = "{dataout}/{sample}_exclude.relatedness",
-        rdat = "{dataout}/{sample}_IBDQC.Rdata"
-    conda: "envs/r.yaml"
-    script: "scripts/relatedness_QC.R"
 
 # ---- Exclude Samples with outlying heterozigosity ----
 rule heterozygosity_QC:
-    input: rules.sample_prune.output
+    input: sampleqc_in_plink
     output: "{dataout}/{sample}_HetQC.het"
     params:
-        indat_plink = rules.sample_prune.params.out,
+        indat_plink = sampleqc_in_plink_stem,
         out = "{dataout}/{sample}_HetQC"
     conda: "envs/plink.yaml"
     shell: "plink --keep-allele-order --bfile {params.indat_plink} --het --out {params.out}"
@@ -224,117 +130,14 @@ rule heterozygosity_sample_fail:
     conda: "envs/r.yaml"
     script: 'scripts/heterozygosity_QC.R'
 
-# Run PCA to control for population stratification
-if config['pcair']:
-    assert config['king'], "You must use KING for relatedness if using PCAiR!"
-    rule ancestryFilt:
-        input:
-            plink = expand("{{dataout}}/{{sample}}_pruned.{ext}",
-                           ext=BPLINK, dataout = DATAOUT),
-            exclude = "{dataout}/{sample}_exclude.pca"
-        output:
-            temp(expand("{{dataout}}/{{sample}}_filtered_PCApre.{ext}",
-                 ext=BPLINK, dataout = DATAOUT)),
-        params:
-            indat = "{dataout}/{sample}_pruned",
-            plinkout = "{dataout}/{sample}_filtered_PCApre"
-        conda: "envs/plink.yaml"
-        shell:
-            r'''
-plink --keep-allele-order --bfile {params.indat} \
-  --remove {input.exclude} \
-  --make-bed --out {params.plinkout}
-'''
-
-    rule filterKING:
-        input:
-            king = "{dataout}/{sample}_IBDQC.all.kingfiles",
-            exclude = "{dataout}/{sample}_exclude.pca"
-        output:
-            "{dataout}/{sample}_IBDQC.all.popfilt.kingfiles"
-        params:
-            indat = "{dataout}/{sample}_IBDQC.all",
-        conda: "envs/r.yaml"
-        script: "scripts/filterKing.R"
-#         shell:
-#             r'''
-# Rscript workflow/scripts/filterKing.R {params.indat} {input.exclude}
-# if test -n "$(find {params.dataout} -name "{wildcards.sample}_IBDQC.all.popfilt.kin*")"; then
-#   find {params.dataout} -name "{wildcards.sample}_IBDQC.all.popfilt.kin*" > {output}
-# fi
-# '''
-
-    rule PCAPartitioning:
-        input:
-            plink = rules.ancestryFilt.output,
-            king = rules.filterKING.output,
-            iterative = rules.relatedness_sample_fail.output.out
-        output:
-            expand("{{dataout}}/{{sample}}_filtered_PCApre.{ext}",ext=['unrel', 'partition.log'], dataout = DATAOUT)
-        params:
-            stem = rules.ancestryFilt.params.plinkout,
-            king = rules.filterKING.params.indat + ".popfilt"
-        conda: "envs/r.yaml"
-        script: "scripts/PartitionPCAiR.R"
-
-    rule stratFrq:
-        input:
-            plink = rules.ancestryFilt.output,
-            unrel = rules.PCAPartitioning.output[0],
-        output: "{dataout}/{sample}_filtered_PCAfreq.frqx"
-        params:
-            indat = rules.ancestryFilt.params.plinkout,
-            out = "{dataout}/{sample}_filtered_PCAfreq"
-        conda: "envs/plink.yaml"
-        shell:
-            '''
-plink --keep-allele-order --bfile {params.indat} --freqx \
-  --within {input.unrel} --keep-cluster-names unrelated \
-  --out {params.out}
-'''
-
-    rule PopulationStratification:
-        input:
-            plink = rules.ancestryFilt.output,
-            unrel = rules.PCAPartitioning.output[0],
-            frq = rules.stratFrq.output
-        output:
-            expand("{{dataout}}/{{sample}}_filtered_PCA.{ext}", ext=['eigenval', 'eigenvec'], dataout = DATAOUT)
-        params:
-            indat = rules.ancestryFilt.params.plinkout,
-            out = "{dataout}/{sample}_filtered_PCA"
-        conda: "envs/plink.yaml"
-        shell:
-            '''
-plink --keep-allele-order --bfile {params.indat} --read-freq {input.frq} --pca 10 \
-  --within {input.unrel} --pca-cluster-names unrelated \
-  --out {params.out}
-'''
-else:
-    rule PopulationStratification:
-        input:
-            plink = expand("{{dataout}}/{{sample}}_pruned.{ext}",
-                           ext=BPLINK, dataout = DATAOUT),
-            exclude = "{dataout}/{sample}_exclude.pca"
-        output:
-            expand("{{dataout}}/{{sample}}_filtered_PCA.{ext}", ext=['eigenval', 'eigenvec'], dataout = DATAOUT)
-        params:
-            indat = "{dataout}/{sample}_pruned",
-            out = "{dataout}/{sample}_filtered_PCA"
-        conda: "envs/plink.yaml"
-        shell:
-            '''
-plink --keep-allele-order --bfile {params.indat} --remove {input.exclude}
-  --pca 10 --out {params.out}
-'''
 
 rule SampleExclusion:
     input:
         SampCallRate = "{dataout}/{sample}_callRate.irem",
-        het = "{dataout}/{sample}_exclude.heterozigosity" if 'heterozygosity' in do_qc else '/dev/null',
-        sex = "{dataout}/{sample}_exclude.sexcheck" if 'sex' in do_qc else '/dev/null',
-        pca = "{dataout}/{sample}_exclude.pca" if 'ancestry' in do_qc else '/dev/null',
-        relat = "{dataout}/{sample}_exclude.relatedness" if 'relatedness' in do_qc else '/dev/null'
+        het = "{dataout}/{sample}_exclude.heterozigosity" if qc_type['heterozygosity'] else '/dev/null',
+        sex = "{dataout}/{sample}_exclude.sexcheck" if qc_type['sex'] else '/dev/null',
+        pca = "{dataout}/{sample}_exclude.pca" if qc_type['ancestry'] else '/dev/null',
+        relat = "{dataout}/{sample}_exclude.relatedness" if qc_type['relatedness'] else '/dev/null'
     output:
         out = "{dataout}/{sample}_exclude.samples",
         out_distinct = "{dataout}/{sample}_exclude.distinct_samples"
@@ -343,13 +146,13 @@ rule SampleExclusion:
 
 rule Exclude_failed:
     input:
-        plink = sexcheck_in_plink,
+        plink = sampleqc_in_plink,
         indat_exclude = rules.SampleExclusion.output.out_distinct
     output:
         temp(expand("{{dataout}}/{{sample}}_Excluded.{ext}", ext=BPLINK, dataout = DATAOUT)),
         excl = temp('{dataout}/{sample}_exclude.plink')
     params:
-        indat_plink = sexcheck_in_plink_stem,
+        indat_plink = sampleqc_in_plink_stem,
         out = "{dataout}/{sample}_Excluded"
     conda: "envs/plink.yaml"
     shell:
@@ -359,19 +162,18 @@ plink --keep-allele-order --bfile {params.indat_plink} --remove {output.excl} \
 --make-bed --out {params.out}
 '''
 
-
 rule GWAS_QC_Report:
     input:
-        SexFile = "{dataout}/{sample}_SexQC.sexcheck" if 'sex' in do_qc else '/dev/null',
+        SexFile = "{dataout}/{sample}_SexQC.sexcheck" if qc_type['sex'] else '/dev/null',
         hwe = "{dataout}/{sample}_SnpQc.hwe",
         frq = "{dataout}/{sample}_SnpQc.frq",
         frqx = "{dataout}/{sample}_SnpQc.frqx",
         imiss = "{dataout}/{sample}_callRate.imiss",
-        HetFile = "{dataout}/{sample}_HetQC.het" if 'heterozygosity' in do_qc else '/dev/null',
-        IBD_stats = "{dataout}/{sample}_IBDQC.Rdata" if 'relatedness' in do_qc else '/dev/null'
-        PCA_rdat = "{dataout}/{sample}_pca.Rdata" if 'ancestry' in do_qc else '/dev/null'
-        PopStrat_eigenval = "{dataout}/{sample}_filtered_PCA.eigenval",
-        PopStrat_eigenvec = "{dataout}/{sample}_filtered_PCA.eigenvec",
+        HetFile = "{dataout}/{sample}_HetQC.het" if qc_type['heterozygosity'] else '/dev/null',
+        IBD_stats = "{dataout}/{sample}_IBDQC.Rdata" if qc_type['relatedness'] else '/dev/null',
+        PCA_rdat = "{dataout}/{sample}_pca.Rdata" if qc_type['ancestry'] else '/dev/null',
+        PopStrat_eigenval = "{dataout}/{sample}_filtered_PCA.eigenval" if qc_type['popstrat'] else '/dev/null',
+        PopStrat_eigenvec = "{dataout}/{sample}_filtered_PCA.eigenvec" if qc_type['popstrat'] else '/dev/null',
         partmethod = rules.PCAPartitioning.output[1] if config["pcair"] else "/dev/null"
     output:
          "{dataout}/stats/{sample}_GWAS_QC.html"

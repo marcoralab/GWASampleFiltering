@@ -1,32 +1,75 @@
 '''Snakefile for GWAS Variant and Sample QC Version 0.3.1'''
 
-from scripts.parse_config_GWASampleFiltering import parser
+if not config['full_pipeline']:
+    from scripts.parse_config_GWASampleFiltering import parser
 
-configfile: "config/config.yaml"
-do_sexqc = config['do_sexqc']
+    configfile: "config/config.yaml"
 
-shell.executable("/bin/bash")
+    shell.executable("/bin/bash")
 
-BPLINK = ["bed", "bim", "fam"]
+    BPLINK = ["bed", "bim", "fam"]
 
-start, SAMPLE, DATAOUT = parser(config)
+    start, SAMPLE, DATAOUT = parser(config)
+
+
+    def flatten(nested):
+        flat = []
+        for el in nested:
+            if not isinstance(el, list):
+                flat.append(el)
+            else:
+                flat += flatten(el)
+        return flat
+
+    outs = {
+        "exclude": expand("{dataout}/{sample}_exclude.pca",
+                          sample=SAMPLE, dataout=DATAOUT),
+        "repdata": expand("{dataout}/{sample}_pca.Rdata",
+                          sample=SAMPLE, dataout=DATAOUT)
+        }
+
+    outputs = [outs[x] for x in ['exclude', 'repdata']]
+    outputs = flatten(outputs)
+
+    rule all:
+        input:
+            outputs
+
+    include: 'variant_qc.smk'
+
+
+def enableqc(qc_type):
+    if 'qc' in config:
+        if (isinstance(config['qc'], list)
+                and all([isinstance(x, str) for x in config['qc']])):
+            return qc_type in config['qc']
+        elif isinstance(config['qc'], dict):
+            if (qc_type in config['qc']
+                    and isinstance(config['qc'][qc_type], bool)):
+                return config['qc'][qc_type]
+            else:
+                raise Exception(
+                    "Malformed QC dict: All supported QC must be present")
+        else:
+            raise Exception("Malformed QC list: Please provide dict OR list")
+    else:
+        return True
+
+
+qc_type_relate = ['variant', 'callrate', 'ancestry']
+qc_type_relate = {x: enableqc(x) for x in qc_type_relate}
+
+if qc_type_relate['callrate']:
+    sampleqc_in_plink = rules.sample_callRate.output[0]
+    sampleqc_in_plink_stem = rules.sample_callRate.params.out
+elif qc_type_relate['variant']:
+    sampleqc_in_plink = expand("{{dataout}}/{{sample}}_SnpQc.{ext}", ext=BPLINK)
+    sampleqc_in_plink_stem = rules.snp_qc.params.out
+else:
+    sampleqc_in_plink = start['files']
+    sampleqc_in_plink_stem = start['stem']
 
 istg = config['isTG'] if 'isTG' in config else False
-
-# QC Steps:
-QC_snp = True
-QC_callRate = True
-
-
-def flatten(nested):
-    flat = []
-    for el in nested:
-        if not isinstance(el, list):
-            flat.append(el)
-        else:
-            flat += flatten(el)
-    return flat
-
 
 default_ref = (("custom_ref" not in config)
                or (config['custom_ref'] is False)
@@ -49,104 +92,17 @@ if "pca_sd" in config:
 else:
     pca_sd = 6
 
-outs = {
-    "exclude": expand("{dataout}/{sample}_exclude.pca",
-                      sample=SAMPLE, dataout=DATAOUT),
-    "repdata": expand("{dataout}/{sample}_pca.Rdata",
-                      sample=SAMPLE, dataout=DATAOUT)
-    }
 
-outputs = [outs[x] for x in ['exclude', 'repdata']]
-outputs = flatten(outputs)
-
-rule all:
-    input:
-        outputs
-
-# ---- Exlude SNPs with a high missing rate and low MAF----
-rule snp_qc:
-    input: start['files']
-    output:
-        temp(expand("{{dataout}}/{{sample}}_SnpQc.{ext}", ext=BPLINK)),
-        "{dataout}/{sample}_SnpQc.hwe",
-        "{dataout}/{sample}_SnpQc.frq",
-        "{dataout}/{sample}_SnpQc.frqx",
-    params:
-        stem = start['stem'],
-        out = "{dataout}/{sample}_SnpQc",
-        miss = config['QC']['GenoMiss'],
-        MAF = config['QC']['MAF'],
-        HWE = config['QC']['HWE']
-    conda: "envs/plink.yaml"
-    shell:
-        '''
-plink --keep-allele-order --bfile {params.stem} --freq --out {params.out}
-plink --keep-allele-order --bfile {params.stem} --freqx --out {params.out}
-plink --keep-allele-order --bfile {params.stem} --geno {params.miss} \
---maf {params.MAF} --hardy --hwe {params.HWE} --make-bed --out {params.out}
-'''
-
-# ---- Exclude Samples with high missing rate ----
-rule sample_callRate:
-    input: expand("{{dataout}}/{{sample}}_SnpQc.{ext}", ext=BPLINK) if QC_snp else start['files']
-    output:
-        expand("{{dataout}}/{{sample}}_callRate.{ext}", ext=BPLINK, dataout = DATAOUT),
-        "{dataout}/{sample}_callRate.imiss",
-        touch("{dataout}/{sample}_callRate.irem")
-    params:
-        indat = rules.snp_qc.params.out if QC_snp else start['stem'],
-        miss = config['QC']['SampMiss'],
-        out = "{dataout}/{sample}_callRate"
-    conda: "envs/plink.yaml"
-    shell:
-        '''
-plink --keep-allele-order --bfile {params.indat} --mind {params.miss} \
-  --missing --make-bed --out {params.out}
-'''
-
-# ---- Exclude Samples with discordant sex ----
-#  Use ADNI hg18 data, as the liftover removed the x chromsome data
-
-
-rule sexcheck_QC:
-    input: start['sex']
-    output:
-        "{dataout}/{sample}_SexQC.sexcheck"
-    params:
-        indat = start['sex_stem'],
-        out = "{dataout}/{sample}_SexQC",
-    conda: "envs/plink.yaml"
-    shell:
-        '''
-plink --keep-allele-order --bfile {params.indat} \
-  --check-sex --aec --out {params.out}
-'''
-
-rule sex_sample_fail:
-    input: rules.sexcheck_QC.output
-    output: "{dataout}/{sample}_exclude.sexcheck"
-    conda: 'envs/r.yaml'
-    script: 'scripts/sexcheck_QC.R'
-
-if QC_callRate:
-    sexcheck_in_plink = rules.sample_callRate.output[0]
-    sexcheck_in_plink_stem = rules.sample_callRate.params.out
-elif QC_snp:
-    sexcheck_in_plink = expand("{{dataout}}/{{sample}}_SnpQc.{ext}", ext=BPLINK)
-    sexcheck_in_plink_stem = rules.snp_qc.params.out
-else:
-    sexcheck_in_plink = start['files']
-    sexcheck_in_plink_stem = start['stem']
 
 # ---- Prune SNPs, autosome only ----
-#  Pruned SNP list is used for IBD, PCA and heterozigosity calculations
+#  Pruned SNP list is used for IBD and PCA calculations
 
 # align sample to fasta refrence
 rule Sample_Flip:
     input:
-        bim = sexcheck_in_plink_stem + '.bim',
-        bed = sexcheck_in_plink_stem + '.bed',
-        fam = sexcheck_in_plink_stem + '.fam',
+        bim = sampleqc_in_plink_stem + '.bim',
+        bed = sampleqc_in_plink_stem + '.bed',
+        fam = sampleqc_in_plink_stem + '.fam',
         fasta = expand("reference/human_g1k_{gbuild}.fasta", gbuild=BUILD)
     output:
         multiext("{dataout}/{sample}_flipped", ".bim", ".bed", ".fam")
