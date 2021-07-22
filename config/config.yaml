@@ -4,7 +4,7 @@
 
 outputs: [report, exclusions]
 #options are report, exclusions, and filtered
-nointernet: true
+nointernet: false
 
 qc:
   variant: true

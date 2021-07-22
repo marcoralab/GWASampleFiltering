@@ -128,7 +128,15 @@ rule Sample_ChromPosRefAlt:
 p_intersect = (('overlap_panel' in config)
                and (config['overlap_panel'] == 'intersection'))
 
-panel_variants = '{dataout}/panelvars_all.snp' if p_intersect else '/dev/null'
+if extraref:
+    panel_variants = '{dataout}/panelvars_all.snp'
+else:
+    panel_variants = expand(
+        '{dataout}/panelvars_{refname}_{gbuild}_allChr_maxmiss{miss}.snps',
+        gbuild=BUILD, miss=config['QC']['GenoMiss'], refname=REF,
+        dataout=DATAOUT)
+
+panel_variants = panel_variants if p_intersect else '/dev/null'
 extract_sample = '--extract {} '.format(panel_variants) if p_intersect else ''
 
 rule PruneDupvar_snps:
