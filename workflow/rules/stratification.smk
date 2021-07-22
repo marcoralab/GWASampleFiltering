@@ -40,6 +40,9 @@ if not config['full_pipeline']:
     qc_type = ['variant', 'callrate', 'popstrat', 'ancestry']
     qc_type = {x: enableqc(x) for x in qc_type}
 
+    if config['pcair']:
+        include: 'relatedness.smk'
+
 
 if qc_type['ancestry']:
     if not config['full_pipeline']:
@@ -88,7 +91,7 @@ plink --keep-allele-order --bfile {params.indat} \
             expand("{{dataout}}/{{sample}}_filtered_PCApre.{ext}",ext=['unrel', 'partition.log'], dataout = DATAOUT)
         params:
             stem = rules.ancestryFilt.params.plinkout if qc_type['ancestry'] else rules.sample_prune_noancestry.params.out,
-            king = rules.filterKING.params.indat + ".popfilt" qc_type['ancestry'] else rules.filterKING.params.indat
+            king = rules.filterKING.params.indat + ".popfilt" if qc_type['ancestry'] else rules.filterKING.params.indat
         conda: "envs/r.yaml"
         script: "scripts/PartitionPCAiR.R"
 

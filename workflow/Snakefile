@@ -64,20 +64,26 @@ rule all:
     input:
         outputs
 
+relatedness_included = False
+
 if qc_type['variant'] or qc_type['callrate']:
-    include: 'workflow/variant_qc.smk'
+    include: 'rules/variant_qc.smk'
 
 if qc_type['ancestry']:
     include: 'rules/ancestry.smk'
 
 if qc_type['popstrat']:
+    if config['pcair']:
+        if not qc_type['relatedness']:
+            warnings.warn("PCAiR requires relatedness QC. Enabling.")
+            qc_type['relatedness'] = True
+        include: 'rules/relatedness.smk'
+        relatedness_included = True
     include: 'rules/stratification.smk'
-    if config['pcair'] and not qc_type['relatedness']:
-        warnings.warn("PCAiR requires relatedness QC. Enabling.")
-        qc_type['relatedness'] = True
 
-if qc_type['relatedness']:
-    include: 'workflow/relatedness.smk'
+if qc_type['relatedness'] and not relatedness_included:
+    include: 'rules/relatedness.smk'
+    relatedness_included = True
 
 # ---- Exclude Samples with discordant sex ----
 #  Use ADNI hg18 data, as the liftover removed the x chromsome data

@@ -92,7 +92,12 @@ if "pca_sd" in config:
 else:
     pca_sd = 6
 
+include: 'reference.smk'
 
+if config['genome_build'] in ['hg19', 'hg37', 'GRCh37', 'grch37', 'GRCH37']:
+    BUILD = 'hg19'
+elif config['genome_build'] in ['hg38', 'GRCh38', 'grch38', 'GRCH38']:
+    BUILD = 'GRCh38'
 
 # ---- Prune SNPs, autosome only ----
 #  Pruned SNP list is used for IBD and PCA calculations
@@ -120,7 +125,7 @@ rule Sample_ChromPosRefAlt:
     conda: "envs/r.yaml"
     script: "scripts/bim_ChromPosRefAlt.R"
 
-p_intersect = ((overlap_panel in config)
+p_intersect = (('overlap_panel' in config)
                and (config['overlap_panel'] == 'intersection'))
 
 panel_variants = '{dataout}/panelvars_all.snp' if p_intersect else '/dev/null'
@@ -293,7 +298,7 @@ rule merge_pops:
         DATAOUT + '/{refname}_allpops.txt',
         DATAOUT + '/{refname}_allpops_unique.txt'
     params:
-        extra_ref_code = config['extra_ref_subpop']
+        extra_ref_code = config['extra_ref']['subpop']
     conda: "envs/r.yaml"
     script: "scripts/add_extraref_pops.R"
 
