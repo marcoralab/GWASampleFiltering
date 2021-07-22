@@ -7,8 +7,8 @@ outputs: [report, exclusions]
 nointernet: false
 
 qc:
-  variant: true
-  callrate: true
+  variant: false
+  callrate: false
   sex: true
   heterozygosity: true
   relatedness: true

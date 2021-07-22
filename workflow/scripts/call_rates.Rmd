@@ -83,10 +83,6 @@ freqx.raw <- read_tsv(params$Path_frqx, col_names = T,
 )
 )
 
-# ---- readin plink .imiss ---- ##
-message("reading plink individual missingness file")
-imiss.raw <- read_table2(params$Path_imiss, col_names = T)
-
 # ---- readin plink .hwe ---- ##
 message("reading plink hwe file")
 hwe.raw <- read_table2(params$Path_hwe, col_types = cols(
@@ -223,9 +219,17 @@ plink_1.9 --bfile raw-GWA-data  \
 <br>
 
 ```{r, echo=FALSE}
-imiss <- imiss.raw %>%
-  mutate(call = F_MISS > params$missing_sample) %>%
-  as_tibble()
+if (params$Path_imiss != "/dev/null") {
+  # ---- readin plink .imiss ---- ##
+  message("reading plink individual missingness file")
+  imiss.raw <- read_table2(params$Path_imiss, col_names = T)
+  imiss <- imiss.raw %>%
+    mutate(call = F_MISS > params$missing_sample) %>%
+    as_tibble()
+} else {
+  imiss.raw <- "not used"
+  cat("Sample call-rate checking was not performed.")
+}
 
 ```
 

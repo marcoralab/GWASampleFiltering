@@ -67,6 +67,8 @@ rule all:
 relatedness_included = False
 
 if qc_type['variant'] or qc_type['callrate']:
+    if qc_type['callrate'] and not qc_type['variant']:
+        raise Exception("Sample call-rate QC cannot be run without variant QC")
     include: 'rules/variant_qc.smk'
 
 if qc_type['ancestry']:
@@ -139,7 +141,7 @@ rule heterozygosity_sample_fail:
 
 rule SampleExclusion:
     input:
-        SampCallRate = "{dataout}/{sample}_callRate.irem",
+        SampCallRate = "{dataout}/{sample}_callRate.irem" if qc_type['callrate'] else '/dev/null',
         het = "{dataout}/{sample}_exclude.heterozigosity" if qc_type['heterozygosity'] else '/dev/null',
         sex = "{dataout}/{sample}_exclude.sexcheck" if qc_type['sex'] else '/dev/null',
         pca = "{dataout}/{sample}_exclude.pca" if qc_type['ancestry'] else '/dev/null',
@@ -171,10 +173,10 @@ plink --keep-allele-order --bfile {params.indat_plink} --remove {output.excl} \
 rule GWAS_QC_Report:
     input:
         SexFile = "{dataout}/{sample}_SexQC.sexcheck" if qc_type['sex'] else '/dev/null',
-        hwe = "{dataout}/{sample}_SnpQc.hwe",
-        frq = "{dataout}/{sample}_SnpQc.frq",
-        frqx = "{dataout}/{sample}_SnpQc.frqx",
-        imiss = "{dataout}/{sample}_callRate.imiss",
+        hwe = "{dataout}/{sample}_SnpQc.hwe" if qc_type['variant'] else '/dev/null',
+        frq = "{dataout}/{sample}_SnpQc.frq" if qc_type['variant'] else '/dev/null',
+        frqx = "{dataout}/{sample}_SnpQc.frqx" if qc_type['variant'] else '/dev/null',
+        imiss = "{dataout}/{sample}_callRate.imiss" if qc_type['callrate'] else '/dev/null',
         HetFile = "{dataout}/{sample}_HetQC.het" if qc_type['heterozygosity'] else '/dev/null',
         IBD_stats = "{dataout}/{sample}_IBDQC.Rdata" if qc_type['relatedness'] else '/dev/null',
         PCA_rdat = "{dataout}/{sample}_pca.Rdata" if qc_type['ancestry'] else '/dev/null',

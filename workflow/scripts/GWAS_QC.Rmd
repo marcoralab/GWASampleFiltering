@@ -47,13 +47,14 @@ author: "`r params$auth`"
 ```{r setup, include=FALSE, echo=F, message=F, warning=F}
 knitr::opts_chunk$set(echo = TRUE)
 # knitr::opts_knit$set(root.dir = paste0(params$rwd, 'workflow/scripts'))
-sexcheck_tf = params$Path_SexFile != "/dev/null"
-hetcheck_tf = params$Path_HetFile != "/dev/null"
-relcheck_tf = params$Path_IBD_stats != "/dev/null"
-pcacheck_tf = params$Path_PCA_rdat != "/dev/null"
+cr_tf <- params$Path_imiss != "/dev/null" || params$Path_frq != "/dev/null"
+sexcheck_tf <- params$Path_SexFile != "/dev/null"
+hetcheck_tf <- params$Path_HetFile != "/dev/null"
+relcheck_tf <- params$Path_IBD_stats != "/dev/null"
+pcacheck_tf <- params$Path_PCA_rdat != "/dev/null"
 ```
 
-```{r child = 'call_rates.Rmd', eval = T}
+```{r child = 'call_rates.Rmd', eval = cr_tf}
 ```
 
 ```{r child = 'sexcheck_QC.Rmd', eval = sexcheck_tf}
