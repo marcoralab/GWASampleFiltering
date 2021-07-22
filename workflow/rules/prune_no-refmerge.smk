@@ -1,4 +1,7 @@
-if !("sampleqc_in_plink" in locals()):
+if not config['full_pipeline']:
+    include: 'variant_qc.smk'
+
+if "sampleqc_in_plink" not in locals():
     if qc_type['callrate']:
         sampleqc_in_plink = rules.sample_callRate.output[0]
         sampleqc_in_plink_stem = rules.sample_callRate.params.out
@@ -9,9 +12,6 @@ if !("sampleqc_in_plink" in locals()):
     else:
         sampleqc_in_plink = start['files']
         sampleqc_in_plink_stem = start['stem']
-
-if not config['full_pipeline']:
-    include: 'variant_qc.smk'
 
 # ---- Prune SNPs, autosome only ----
 
