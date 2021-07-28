@@ -123,7 +123,7 @@ rule Sample_ChromPosRefAlt:
         bim = temp("{dataout}/{sample}_flipped_ChromPos.bim"),
         snplist = temp("{dataout}/{sample}_flipped_snplist")
     conda: "../envs/r.yaml"
-    script: "scripts/bim_ChromPosRefAlt.R"
+    script: '../scripts/bim_ChromPosRefAlt.R'
 
 p_intersect = (('overlap_panel' in config)
                and (config['overlap_panel'] == 'intersection'))
@@ -165,7 +165,7 @@ rule SelectDupvar_snps:
     input: rules.PruneDupvar_snps.output[0]
     output: "{dataout}/{sample}_nodup.dupvar.delete"
     conda: "../envs/r.yaml"
-    script: "scripts/DuplicateVars.R"
+    script: '../scripts/DuplicateVars.R'
 
 # Prune sample dataset
 rule sample_prune:
@@ -296,7 +296,7 @@ rule fix_fam:
         tgped = tgped
     output: fixed = "{dataout}/{sample}_{refname}_merged_fixed.fam"
     conda: "../envs/r.yaml"
-    script: "scripts/fix_fam.R"
+    script: '../scripts/fix_fam.R'
 
 rule merge_pops:
     input:
@@ -308,7 +308,7 @@ rule merge_pops:
     params:
         extra_ref_code = config['extra_ref']['subpop']
     conda: "../envs/r.yaml"
-    script: "scripts/add_extraref_pops.R"
+    script: '../scripts/add_extraref_pops.R'
 
 # PCA analysis to identify population outliers
 rule PcaPopulationOutliers:
@@ -344,4 +344,4 @@ rule ExcludePopulationOutliers:
         extraref = 'none' if not extraref else config['extra_ref_subpop'],
         sd = pca_sd
     conda: "../envs/r.yaml"
-    script: "scripts/PCA_QC.R"
+    script: '../scripts/PCA_QC.R'

@@ -80,7 +80,7 @@ plink --keep-allele-order --bfile {params.indat} \
         params:
             indat = "{dataout}/{sample}_IBDQC.all",
         conda: "../envs/r.yaml"
-        script: "scripts/filterKing.R"
+        script: '../scripts/filterKing.R'
 
     rule PCAPartitioning:
         input:
@@ -93,7 +93,7 @@ plink --keep-allele-order --bfile {params.indat} \
             stem = rules.ancestryFilt.params.plinkout if qc_type['ancestry'] else rules.sample_prune_noancestry.params.out,
             king = rules.filterKING.params.indat + ".popfilt" if qc_type['ancestry'] else rules.filterKING.params.indat
         conda: "../envs/r.yaml"
-        script: "scripts/PartitionPCAiR.R"
+        script: '../scripts/PartitionPCAiR.R'
 
     rule stratFrq:
         input:

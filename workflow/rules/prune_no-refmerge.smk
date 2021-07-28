@@ -36,7 +36,7 @@ rule SelectDupvar_snps_noancestry:
     input: rules.PruneDupvar_snps_noancestry.output[0]
     output: "{dataout}/{sample}_nodup_noancestry.dupvar.delete"
     conda: "../envs/r.yaml"
-    script: "scripts/DuplicateVars.R"
+    script: '../scripts/DuplicateVars.R'
 
 # Prune sample dataset
 rule sample_prune_noancestry:

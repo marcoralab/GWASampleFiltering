@@ -70,4 +70,4 @@ rule relatedness_sample_fail:
         out = "{dataout}/{sample}_exclude.relatedness",
         rdat = "{dataout}/{sample}_IBDQC.Rdata"
     conda: "../envs/r.yaml"
-    script: "scripts/relatedness_QC.R"
+    script: '../scripts/relatedness_QC.R'
