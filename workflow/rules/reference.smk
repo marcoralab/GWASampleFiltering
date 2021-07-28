@@ -106,6 +106,7 @@ rule download_tg_fa:
         "reference/human_g1k_{gbuild}.fasta",
         "reference/human_g1k_{gbuild}.fasta.fai"
     conda: 'envs/bcftools.yaml'
+    cache: True
     shell:
         '''
 if [[ "{input[0]}" == *.gz ]]; then
@@ -124,6 +125,7 @@ rule download_tg_ped:
         HTTP.remote(tgped),
     output:
         "reference/20130606_g1k.ped",
+    cache: True
     shell: "cp {input} {output}"
 
 tgped = "reference/20130606_g1k.ped"
@@ -138,6 +140,7 @@ if REF == '1kG':
         input: tgped
         output:
             "reference/20130606_g1k.founders"
+        cache: True
         shell:
             r'''
 awk -F "\t" '!($12 != 0 || $10 != 0 || $9 != 0 || $3 != 0 || $4 != 0) {{print $2}}' \
@@ -149,6 +152,7 @@ awk -F "\t" '!($12 != 0 || $10 != 0 || $9 != 0 || $3 != 0 || $4 != 0) {{print $2
         output:
             "reference/1kG_pops.txt",
             "reference/1kG_pops_unique.txt"
+        cache: True
         shell:
             '''
 awk 'BEGIN {{print "FID","IID","Population"}} NR>1 {{print $1,$2,$7}}' \
@@ -161,6 +165,7 @@ else:
         output:
             "reference/{refname}_pops.txt",
             "reference/{refname}_pops_unique.txt"
+        cache: True
         shell:
             '''
 cp {input} {output[0]}
@@ -190,6 +195,7 @@ bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
         output:
             vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
+        cache: True
         conda: "envs/bcftools.yaml"
         shell:
             '''
@@ -204,6 +210,7 @@ elif creftype == 'vcf':
         output:
             vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
+        cache: True
         conda: "envs/bcftools.yaml"
         shell:
             '''
@@ -261,6 +268,7 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
     rule Ref_IndexVcf:
         input: "reference/{refname}_{gbuild}_unQC_maxmissUnfilt.vcf.gz"
         output: "reference/{refname}_{gbuild}_unQC_maxmissUnfilt.vcf.gz.csi"
+        cache: True
         shell: 'bcftools index -f {input}'
 
     rule Reference_prep:
@@ -274,6 +282,7 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
             #gbuild = "hg19|GRCh38",
             #refname = "[a-zA-Z0-9-]",
             #miss = "[0-9.]",
+        cache: True
         conda: "envs/bcftools.yaml"
         shell:
             '''
