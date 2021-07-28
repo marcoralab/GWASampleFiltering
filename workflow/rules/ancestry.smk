@@ -113,7 +113,7 @@ rule Sample_Flip:
         multiext("{dataout}/{sample}_flipped", ".bim", ".bed", ".fam")
     params:
         dataout = DATAOUT
-    conda: "envs/flippyr.yaml"
+    conda: "../envs/flippyr.yaml"
     shell: "flippyr -p {input.fasta} -o {params.dataout}/{wildcards.sample} {input.bim}"
 
 rule Sample_ChromPosRefAlt:
@@ -122,7 +122,7 @@ rule Sample_ChromPosRefAlt:
     output:
         bim = temp("{dataout}/{sample}_flipped_ChromPos.bim"),
         snplist = temp("{dataout}/{sample}_flipped_snplist")
-    conda: "envs/r.yaml"
+    conda: "../envs/r.yaml"
     script: "scripts/bim_ChromPosRefAlt.R"
 
 p_intersect = (('overlap_panel' in config)
@@ -153,7 +153,7 @@ rule PruneDupvar_snps:
         dupvar = "{dataout}/{sample}_nodup.dupvar",
         out = "{dataout}/{sample}_nodup",
         extract = extract_sample
-    conda: "envs/plink.yaml"
+    conda: "../envs/plink.yaml"
     shell:
         '''
 plink --keep-allele-order --bfile {params.indat} -bim {input.bim} \
@@ -164,7 +164,7 @@ plink --keep-allele-order --bfile {params.indat} -bim {input.bim} \
 rule SelectDupvar_snps:
     input: rules.PruneDupvar_snps.output[0]
     output: "{dataout}/{sample}_nodup.dupvar.delete"
-    conda: "envs/r.yaml"
+    conda: "../envs/r.yaml"
     script: "scripts/DuplicateVars.R"
 
 # Prune sample dataset
@@ -179,7 +179,7 @@ rule sample_prune:
     params:
         indat = "{dataout}/{sample}_flipped",
         out = "{dataout}/{sample}_pruned"
-    conda: "envs/plink.yaml"
+    conda: "../envs/plink.yaml"
     shell:
         '''
 plink --keep-allele-order --bfile {params.indat} --bim {input.bim} \
@@ -203,7 +203,7 @@ rule Reference_prune:
         tbi = temp("{dataout}/{sample}_{refname}pruned.vcf.gz.tbi")
     params:
         founders = "-S reference/20130606_g1k.founders " if REF == '1kG' else ''
-    conda: "envs/bcftools.yaml"
+    conda: "../envs/bcftools.yaml"
     shell:
         '''
 bcftools view -i 'ID=@{input.prune}' {params.founders}\
@@ -219,7 +219,7 @@ rule Reference_prune_extra:
     output:
         vcf = temp("{dataout}/eref.{sample}pruned.vcf.gz"),
         tbi = temp("{dataout}/eref.{sample}pruned.vcf.gz.tbi")
-    conda: "envs/bcftools.yaml"
+    conda: "../envs/bcftools.yaml"
     shell:
         '''
 bcftools view -i 'ID=@{input.prune}' \
@@ -242,7 +242,7 @@ rule Sample_Plink2Bcf:
     output: "{dataout}/{sample}_pruned.vcf.gz"
     params:
         out = "{dataout}/{sample}_pruned"
-    conda: "envs/plink.yaml"
+    conda: "../envs/plink.yaml"
     shell:
         '''
 plink --bed {input.bed} --bim {input.bim} --fam {input.fam} --recode vcf bgz \
@@ -253,7 +253,7 @@ plink --bed {input.bed} --bim {input.bim} --fam {input.fam} --recode vcf bgz \
 rule Sample_IndexBcf:
     input: "{dataout}/{sample}_pruned.vcf.gz"
     output: "{dataout}/{sample}_pruned.vcf.gz.csi"
-    conda: "envs/bcftools.yaml"
+    conda: "../envs/bcftools.yaml"
     shell: 'bcftools index -f {input}'
 
 # Merge ref and sample
@@ -270,7 +270,7 @@ rule Merge_RefenceSample:
         extra = "{dataout}/eref.{sample}pruned.vcf.gz" if extraref else ''
     output:
         out = "{dataout}/{sample}_{refname}_merged.vcf"
-    conda: "envs/bcftools.yaml"
+    conda: "../envs/bcftools.yaml"
     shell:
         r'''
 bcftools merge -m none --threads 2 \
@@ -286,7 +286,7 @@ rule Plink_RefenceSample:
         expand("{{dataout}}/{{sample}}_{{refname}}_merged.{ext}", ext=BPLINK)
     params:
         out = "{dataout}/{sample}_{refname}_merged"
-    conda: "envs/plink.yaml"
+    conda: "../envs/plink.yaml"
     shell: "plink --keep-allele-order --vcf {input.vcf} --const-fid --make-bed --out {params.out}"
 
 rule fix_fam:
@@ -295,7 +295,7 @@ rule fix_fam:
         newfam = "{dataout}/{sample}_{refname}_merged.fam",
         tgped = tgped
     output: fixed = "{dataout}/{sample}_{refname}_merged_fixed.fam"
-    conda: "envs/r.yaml"
+    conda: "../envs/r.yaml"
     script: "scripts/fix_fam.R"
 
 rule merge_pops:
@@ -307,7 +307,7 @@ rule merge_pops:
         DATAOUT + '/{refname}_allpops_unique.txt'
     params:
         extra_ref_code = config['extra_ref']['subpop']
-    conda: "envs/r.yaml"
+    conda: "../envs/r.yaml"
     script: "scripts/add_extraref_pops.R"
 
 # PCA analysis to identify population outliers
@@ -322,7 +322,7 @@ rule PcaPopulationOutliers:
     params:
         indat_plink = "{dataout}/{sample}_{refname}_merged",
         out = "{dataout}/{sample}_{refname}_merged"
-    conda: "envs/plink.yaml"
+    conda: "../envs/plink.yaml"
     shell:
         '''
 plink --keep-allele-order --bfile {params.indat_plink} --fam {input.fam} \
@@ -343,5 +343,5 @@ rule ExcludePopulationOutliers:
         superpop = config['superpop'],
         extraref = 'none' if not extraref else config['extra_ref_subpop'],
         sd = pca_sd
-    conda: "envs/r.yaml"
+    conda: "../envs/r.yaml"
     script: "scripts/PCA_QC.R"

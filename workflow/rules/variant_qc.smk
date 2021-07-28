@@ -12,7 +12,7 @@ rule snp_qc:
         miss = config['QC']['GenoMiss'],
         MAF = config['QC']['MAF'],
         HWE = config['QC']['HWE']
-    conda: "envs/plink.yaml"
+    conda: "../envs/plink.yaml"
     shell:
         '''
 plink --keep-allele-order --bfile {params.stem} --freq --out {params.out}
@@ -32,7 +32,7 @@ rule sample_callRate:
         indat = rules.snp_qc.params.out if qc_type['variant'] else start['stem'],
         miss = config['QC']['SampMiss'],
         out = "{dataout}/{sample}_callRate"
-    conda: "envs/plink.yaml"
+    conda: "../envs/plink.yaml"
     shell:
         '''
 plink --keep-allele-order --bfile {params.indat} --mind {params.miss} \

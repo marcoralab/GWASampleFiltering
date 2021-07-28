@@ -63,7 +63,7 @@ if config['pcair']:
         params:
             indat = "{dataout}/{sample}_pruned",
             plinkout = "{dataout}/{sample}_filtered_PCApre"
-        conda: "envs/plink.yaml"
+        conda: "../envs/plink.yaml"
         shell:
             r'''
 plink --keep-allele-order --bfile {params.indat} \
@@ -79,7 +79,7 @@ plink --keep-allele-order --bfile {params.indat} \
             "{dataout}/{sample}_IBDQC.all.popfilt.kingfiles"
         params:
             indat = "{dataout}/{sample}_IBDQC.all",
-        conda: "envs/r.yaml"
+        conda: "../envs/r.yaml"
         script: "scripts/filterKing.R"
 
     rule PCAPartitioning:
@@ -92,7 +92,7 @@ plink --keep-allele-order --bfile {params.indat} \
         params:
             stem = rules.ancestryFilt.params.plinkout if qc_type['ancestry'] else rules.sample_prune_noancestry.params.out,
             king = rules.filterKING.params.indat + ".popfilt" if qc_type['ancestry'] else rules.filterKING.params.indat
-        conda: "envs/r.yaml"
+        conda: "../envs/r.yaml"
         script: "scripts/PartitionPCAiR.R"
 
     rule stratFrq:
@@ -103,7 +103,7 @@ plink --keep-allele-order --bfile {params.indat} \
         params:
             indat = rules.ancestryFilt.params.plinkout if qc_type['ancestry'] else rules.sample_prune_noancestry.params.out,
             out = "{dataout}/{sample}_filtered_PCAfreq"
-        conda: "envs/plink.yaml"
+        conda: "../envs/plink.yaml"
         shell:
             '''
 plink --keep-allele-order --bfile {params.indat} --freqx \
@@ -122,7 +122,7 @@ plink --keep-allele-order --bfile {params.indat} --freqx \
         params:
             indat = rules.ancestryFilt.params.plinkout if qc_type['ancestry'] else rules.sample_prune_noancestry.params.out,
             out = "{dataout}/{sample}_filtered_PCA"
-        conda: "envs/plink.yaml"
+        conda: "../envs/plink.yaml"
         shell:
             '''
 plink --keep-allele-order --bfile {params.indat} --read-freq {input.frq} --pca 10 \
@@ -140,7 +140,7 @@ elif qc_type['ancestry']:
         params:
             indat = "{dataout}/{sample}_pruned",
             out = "{dataout}/{sample}_filtered_PCA"
-        conda: "envs/plink.yaml"
+        conda: "../envs/plink.yaml"
         shell:
             '''
 plink --keep-allele-order --bfile {params.indat} --remove {input.exclude} \
@@ -155,7 +155,7 @@ else:
         params:
             indat = rules.ancestryFilt.params.plinkout if qc_type['ancestry'] else rules.sample_prune_noancestry.params.out,
             out = "{dataout}/{sample}_filtered_PCA"
-        conda: "envs/plink.yaml"
+        conda: "../envs/plink.yaml"
         shell:
             '''
 plink --keep-allele-order --bfile {params.indat} \

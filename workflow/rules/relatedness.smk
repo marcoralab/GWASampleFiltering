@@ -8,7 +8,7 @@ rule relatedness_sample_prep:
     params:
         indat_plink = sampleqc_in_plink_stem,
         out = "{dataout}/{sample}_IBDQCfilt"
-    conda: "envs/plink.yaml"
+    conda: "../envs/plink.yaml"
     shell:
         '''
 plink --bfile {params.indat_plink} \
@@ -28,7 +28,7 @@ rule relatedness_QC:
     params:
         out = "{dataout}/{sample}_IBDQC",
         dataout = DATAOUT
-    conda: "envs/king.yaml"
+    conda: "../envs/king.yaml"
     shell:
         '''
 king -b {input.bed} --related --degree 3 --prefix {params.out}
@@ -47,7 +47,7 @@ rule king_all:
     params:
         out = "{dataout}/{sample}_IBDQC.all",
         dataout = DATAOUT
-    conda: "envs/king.yaml"
+    conda: "../envs/king.yaml"
     shell:
         '''
 king -b {input.bed} --kinship --ibs --prefix {params.out}
@@ -69,5 +69,5 @@ rule relatedness_sample_fail:
     output:
         out = "{dataout}/{sample}_exclude.relatedness",
         rdat = "{dataout}/{sample}_IBDQC.Rdata"
-    conda: "envs/r.yaml"
+    conda: "../envs/r.yaml"
     script: "scripts/relatedness_QC.R"

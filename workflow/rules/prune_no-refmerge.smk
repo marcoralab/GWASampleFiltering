@@ -24,7 +24,7 @@ rule PruneDupvar_snps_noancestry:
     params:
         indat = sampleqc_in_plink_stem,
         out = "{dataout}/{sample}_nodup_noancestry"
-    conda: "envs/plink.yaml"
+    conda: "../envs/plink.yaml"
     shell:
         '''
 plink --keep-allele-order --bfile {params.indat} \
@@ -35,7 +35,7 @@ plink --keep-allele-order --bfile {params.indat} \
 rule SelectDupvar_snps_noancestry:
     input: rules.PruneDupvar_snps_noancestry.output[0]
     output: "{dataout}/{sample}_nodup_noancestry.dupvar.delete"
-    conda: "envs/r.yaml"
+    conda: "../envs/r.yaml"
     script: "scripts/DuplicateVars.R"
 
 # Prune sample dataset
@@ -49,7 +49,7 @@ rule sample_prune_noancestry:
     params:
         indat = sampleqc_in_plink_stem,
         out = "{dataout}/{sample}_pruned_noancestry"
-    conda: "envs/plink.yaml"
+    conda: "../envs/plink.yaml"
     shell:
         '''
 plink --keep-allele-order --bfile {params.indat} \

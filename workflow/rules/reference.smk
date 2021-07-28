@@ -105,7 +105,7 @@ rule download_tg_fa:
     output:
         "reference/human_g1k_{gbuild}.fasta",
         "reference/human_g1k_{gbuild}.fasta.fai"
-    conda: 'envs/bcftools.yaml'
+    conda: '../envs/bcftools.yaml'
     cache: True
     shell:
         '''
@@ -179,7 +179,7 @@ if REF == '1kG' or creftype == 'vcfchr':
             vcf = "reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz" if REF == '1kG' else config['custom_ref']['file'],
             tbi = "reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi" if REF == '1kG' else config['custom_ref']['file'] + '.tbi'
         output: temp("reference/{refname}.{gbuild}.chr{chrom}.maxmiss{miss}.vcf.gz")
-        conda: "envs/bcftools.yaml"
+        conda: "../envs/bcftools.yaml"
         shell:
             '''
 bcftools norm -m- {input.vcf} --threads 2 | \
@@ -196,7 +196,7 @@ bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
             vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
         cache: True
-        conda: "envs/bcftools.yaml"
+        conda: "../envs/bcftools.yaml"
         shell:
             '''
 bcftools concat {input.vcfs} -Oz -o {output.vcf} --threads 2
@@ -211,7 +211,7 @@ elif creftype == 'vcf':
             vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
         cache: True
-        conda: "envs/bcftools.yaml"
+        conda: "../envs/bcftools.yaml"
         shell:
             '''
 for i in {1..22}; do echo "chr$i $i"; done > reference/chr_name_conv.txt;
@@ -231,7 +231,7 @@ else: #PLINK fileset of all chromosomes
             fasta = expand("reference/human_g1k_{gbuild}.fasta", gbuild=BUILD)
         output:
             temp(expand("reference/{{refname}}_{{gbuild}}_flipped.{ext}", ext=BPLINK))
-        conda: "envs/flippyr.yaml"
+        conda: "../envs/flippyr.yaml"
         shell:
             '''
 flippyr -p {input.fasta} \
@@ -244,7 +244,7 @@ flippyr -p {input.fasta} \
         output:
             bim = temp("reference/{refname}_{gbuild}_flipped_ChromPos.bim"),
             snplist = temp("reference/{refname}_{gbuild}_flipped_snplist")
-        conda: "envs/r.yaml"
+        conda: "../envs/r.yaml"
         shell: "Rscript scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"
 
     # Recode sample plink file to vcf
@@ -257,7 +257,7 @@ flippyr -p {input.fasta} \
         params:
             out = "reference/{refname}_{gbuild}_unQC_maxmissUnfilt",
             inp = "reference/{refname}_{gbuild}_flipped"
-        conda: "envs/plink.yaml"
+        conda: "../envs/plink.yaml"
         shell:
             '''
 plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
@@ -283,7 +283,7 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
             #refname = "[a-zA-Z0-9-]",
             #miss = "[0-9.]",
         cache: True
-        conda: "envs/bcftools.yaml"
+        conda: "../envs/bcftools.yaml"
         shell:
             '''
 for i in {1..22}; do echo "chr$i $i"; done > reference/chr_name_conv.txt;
@@ -300,7 +300,7 @@ if ereftype == 'vcfchr':
             vcf = config['extra_ref']['file'],
             tbi = config['extra_ref']['file'] + '.tbi'
         output: temp("{dataout}/extraref.{gbuild}.chr{chrom}.maxmiss{miss}.vcf.gz")
-        conda: "envs/bcftools.yaml"
+        conda: "../envs/bcftools.yaml"
         shell:
             '''
 for i in {1..22}; do echo "chr$i $i"; done > reference/chr_name_conv.txt;
@@ -331,7 +331,7 @@ elif ereftype == 'vcf':
         output:
             vcf = "{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = "{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
-        conda: "envs/bcftools.yaml"
+        conda: "../envs/bcftools.yaml"
         shell:
             '''
 for i in {1..22}; do echo "chr$i $i"; done > reference/chr_name_conv.txt;
@@ -351,7 +351,7 @@ elif ereftype != 'none': #PLINK fileset of all chromosomes
             fasta = expand("reference/human_g1k_{gbuild}.fasta", gbuild=BUILD)
         output:
             temp(expand("{{dataout}}/extraref_{{gbuild}}_flipped.{ext}", ext=BPLINK, dataout = DATAOUT))
-        conda: "envs/flippyr.yaml"
+        conda: "../envs/flippyr.yaml"
         shell: "flippyr -p {input.fasta} -o {DATAOUT}/extraref_{wildcards.gbuild}_flipped {input.bim}"
 
     rule Ref_ChromPosRefAlt_extra:
@@ -360,7 +360,7 @@ elif ereftype != 'none': #PLINK fileset of all chromosomes
         output:
             bim = temp("{dataout}/extraref_{gbuild}_flipped_ChromPos.bim"),
             snplist = temp("{dataout}/extraref_{gbuild}_flipped_snplist")
-        conda: "envs/r.yaml"
+        conda: "../envs/r.yaml"
         shell: "R scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"
 
     # Recode sample plink file to vcf
@@ -373,7 +373,7 @@ elif ereftype != 'none': #PLINK fileset of all chromosomes
         params:
             out = "{dataout}/extraref_{gbuild}_unQC_maxmissUnfilt",
             inp = "{dataout}/extraref_{gbuild}_flipped"
-        conda: "envs/plink.yaml"
+        conda: "../envs/plink.yaml"
         shell:
             '''
 plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
@@ -384,7 +384,7 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
     rule Ref_IndexVcf_extra:
         input: "{dataout}/extraref_{gbuild}_unQC_maxmissUnfilt.vcf.gz"
         output: "{dataout}/extraref_{gbuild}_unQC_maxmissUnfilt.vcf.gz.csi"
-        conda: "envs/bcftools.yaml"
+        conda: "../envs/bcftools.yaml"
         shell: 'bcftools index -f {input}'
 
     rule Reference_prep_extra:
@@ -394,7 +394,7 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
         output:
             vcf = "{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = "{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
-        conda: "envs/bcftools.yaml"
+        conda: "../envs/bcftools.yaml"
         shell:
             '''
 for i in {1..22}; do echo "chr$i $i"; done > reference/chr_name_conv.txt;
@@ -414,13 +414,13 @@ union_extraref = (extraref
 rule get_panelvars:
     input: "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz"
     output: '{dataout}/panelvars_{refname}_{gbuild}_allChr_maxmiss{miss}.snps'
-    conda: "envs/bcftools.yaml"
+    conda: "../envs/bcftools.yaml"
     shell: "bcftools query -f '%ID\n' {input} > {output}"
 
 rule get_extravars:
     input: '{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz'
     output: '{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.snps'
-    conda: "envs/bcftools.yaml"
+    conda: "../envs/bcftools.yaml"
     shell: "bcftools query -f '%ID\n' {input} > {output}"
 
 rule union_panelvars:
@@ -445,7 +445,7 @@ rule intersection_panelvars:
                       gbuild=BUILD, miss=config['QC']['GenoMiss'],
                       dataout=DATAOUT)
     output: '{dataout}/panelvars_all.snp' if not union_extraref else "do.not"
-    conda: "envs/miller.yaml"
+    conda: "../envs/miller.yaml"
     shell:
         '''
 mlr --tsv --implicit-csv-header --headerless-csv-output \
