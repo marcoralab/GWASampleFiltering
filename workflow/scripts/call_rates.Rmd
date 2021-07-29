@@ -137,7 +137,7 @@ snps <- freq.raw %>%
   mutate(Call.rate = 1 - (missing / c(AA + AB + BB + missing))) %>%
   mutate(Call = Call.rate >= 1 - as.numeric(params$missing_geno)) %>%
   mutate(Call.maf = MAF < params$maf) %>%
-  mutate(hwe = P > params$hwe) %>%
+  mutate(hwe = P > as.numeric(params$hwe)) %>%
   as_tibble()
 ```
 
@@ -173,33 +173,19 @@ Figure \@ref(fig:hwe) displays a ternary plot for the genotype frequency of all 
 
 ```{r hwe, echo=F, warning=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='SNPs that are in Hardy Weinberg Equilibrium'}
 suppressPackageStartupMessages(library(ggtern))
-# tern_add <- function (filtsnps, col) {
-#   to_plot <- filtsnps %>%
-#     select(AB, BB, AA) %>%
-#     drop_na %>%
-#     filter(AA+AB+BB != 0 & is.numeric(AA+BB+AB))
-#   if(nrow(to_plot) != 0) {
-#     AddToTernary(points, to_plot, col=adjustcolor(col, alpha.f = 0.3), pch=16, cex=0.3)
-#   }
-# }
-#
-#
-# par(mar=c(0,0,0,0))
-# TernaryPlot('AB', 'BB', 'AA', grid.minor.lty=0)
-#
-# legend("topleft", legend=c('Pass', 'Fail'), bty="n",
-#        col=c(adjustcolor("blue", alpha.f = 0.3),
-#              adjustcolor("red", alpha.f = 0.3)),
-#        pch=16, horiz=F, title="HWE Test:", cex=0.8)
-#
-# snps %>% filter(hwe) %>% tern_add("blue")
-# snps %>% filter(!hwe) %>% tern_add("red")
 
-ggtern::ggtern(data=snps, aes(AA,AB,BB, colour = hwe)) +
- geom_point(size = 0.5, aes(alpha = hwe))  +
- scale_colour_manual(name= 'Hardy Weinberg \n Equilibrium', values = c( "#E41A1C", "#377EB8")) +
- scale_alpha_discrete(name= 'Hardy Weinberg \n Equilibrium', range = c(0.8, 0.2)) +
- theme_bw() + theme(legend.position = 'bottom')
+save.image(paste0(params$Path_hwe, ".Rdata"))
+
+snps %>%
+  filter(!is.na(P)) %>%
+  mutate(alph = ifelse(hwe, 0.2, 0.8),
+         hwe = ifelse(hwe, "Pass", "Fail")) %>%
+  ggtern::ggtern(aes(x = AA, y = AB, z = BB, colour = hwe, alpha = alph)) +
+   geom_point(size = 0.5)  +
+   scale_colour_manual(name= 'Hardy Weinberg \n Equilibrium',
+                       values = c(Pass = "#377EB8", Fail = "#E41A1C")) +
+   scale_alpha_continuous(guide = "none", range = c(0.8, 0.2)) +
+   theme_bw() + theme(legend.position = 'bottom')
 
 
 detach("package:ggtern", unload=TRUE)
