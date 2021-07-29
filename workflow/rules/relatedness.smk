@@ -18,11 +18,32 @@ plink --bfile {params.indat_plink} \
   --make-bed --out {params.out}
 '''
 
-rule relatedness_QC:
+rule relatedness_sample_prep_remnoncc:
     input:
         bed = rules.relatedness_sample_prep.output.bed,
         bim = rules.relatedness_sample_prep.output.bim,
         fam = rules.relatedness_sample_prep.output.fam
+    output:
+        bed = temp("{dataout}/{sample}_IBDQCfilt_rm-non-cc.bed"),
+        bim = temp("{dataout}/{sample}_IBDQCfilt_rm-non-cc.bim"),
+        fam = temp("{dataout}/{sample}_IBDQCfilt_rm-non-cc.fam")
+    params:
+        indat_plink = rules.relatedness_sample_prep.params.out,
+        out = "{dataout}/{sample}_IBDQCfilt_rm-non-cc"
+    conda: "../envs/plink.yaml"
+    shell:
+        '''
+cp {input.bed} {output.bed}
+cp {input.bim} {output.bim}
+awk 'BEGIN {{OFS="\t"}} $6 !~ "^[12]$" {{$6=-9}}1{{print $1,$2,$3,$4,$5,$6}}' \
+  {input.fam} > {output.fam}
+'''
+
+rule relatedness_QC:
+    input:
+        bed = rules.relatedness_sample_prep_remnoncc.output.bed,
+        bim = rules.relatedness_sample_prep_remnoncc.output.bim,
+        fam = rules.relatedness_sample_prep_remnoncc.output.fam
     output:
         genome = "{dataout}/{sample}_IBDQC.kingfiles"
     params:
@@ -31,7 +52,7 @@ rule relatedness_QC:
     conda: "../envs/king.yaml"
     shell:
         '''
-king -b {input.bed} --related --degree 3 --prefix {params.out}
+king -b {input.bed} --related --degree 4 --prefix {params.out}
 if test -n "$(find {params.dataout} -name "{wildcards.sample}_IBDQC.kin*")"; then
   find {params.dataout} -name "{wildcards.sample}_IBDQC.kin*" > {output.genome}
 fi
@@ -39,9 +60,9 @@ fi
 
 rule king_all:
     input:
-        bed = rules.relatedness_sample_prep.output.bed,
-        bim = rules.relatedness_sample_prep.output.bim,
-        fam = rules.relatedness_sample_prep.output.fam
+        bed = rules.relatedness_sample_prep_remnoncc.output.bed,
+        bim = rules.relatedness_sample_prep_remnoncc.output.bim,
+        fam = rules.relatedness_sample_prep_remnoncc.output.fam
     output:
         genome = "{dataout}/{sample}_IBDQC.all.kingfiles",
     params:
