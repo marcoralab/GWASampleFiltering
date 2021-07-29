@@ -137,7 +137,8 @@ else:
         dataout=DATAOUT)
 
 panel_variants = panel_variants if p_intersect else '/dev/null'
-extract_sample = '--extract {} '.format(panel_variants) if p_intersect else ''
+extract_sample = '--extract {} '.format(panel_variants[0]) if p_intersect else ''
+
 
 rule PruneDupvar_snps:
     input:
