@@ -1,0 +1,30 @@
+channels:
+    - bioconda
+    - conda-forge
+    - r
+dependencies:
+    - r-base=4.0.5
+    - r-tibble=3.1.3
+    - r-magrittr=2.0.1
+    - r-ggplot2=3.3.5
+    - r-tidyr=1.1.3
+    - r-purrr=0.3.4
+    - r-stringr=1.4.0
+    - r-forcats=0.5.1
+    - r-dplyr=1.0.7
+    - r-readr=1.4.0
+    - r-here=1.0.1
+    - r-ggtern=3.3.5
+    #- bioconductor-genesis=2.22.1
+    - r-bookdown=0.22
+    - r-codetools=0.2_18
+    - r-knitr=1.33
+    - r-dt=0.18
+    - r-scales=1.1.1
+    - r-ggally=2.1.2
+    - r-ggforce=0.3.3
+    - r-plotly=4.9.4
+    - r-gridextra=2.3
+    - r-kableextra=1.3.4
+    - r-vroom=1.5.3
+    - r-gdata=2.18.0

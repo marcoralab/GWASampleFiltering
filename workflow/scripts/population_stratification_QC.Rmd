@@ -31,7 +31,9 @@ knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(root.dir = params$rwd)
 
 ## ---- Load Required R packages ---- ##
-library(tidyverse)  ## for data wrangling
+library(readr)
+library(dplyr)
+library(tidyr)      ## for data wrangling
 library(ggplot2)    ## For ploting
 library(ggforce)    ## for zoom plots
 library(GGally)     ## For Pairs plot

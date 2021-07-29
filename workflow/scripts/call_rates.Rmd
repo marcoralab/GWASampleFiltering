@@ -174,9 +174,7 @@ Figure \@ref(fig:hwe) displays a ternary plot for the genotype frequency of all 
 ```{r hwe, echo=F, warning=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='SNPs that are in Hardy Weinberg Equilibrium'}
 suppressPackageStartupMessages(library(ggtern))
 
-save.image(paste0(params$Path_hwe, ".Rdata"))
-
-snps %>%
+hweplot <- snps %>%
   filter(!is.na(P)) %>%
   mutate(alph = ifelse(hwe, 0.2, 0.8),
          hwe = ifelse(hwe, "Pass", "Fail")) %>%
@@ -187,6 +185,7 @@ snps %>%
    scale_alpha_continuous(guide = "none", range = c(0.8, 0.2)) +
    theme_bw() + theme(legend.position = 'bottom')
 
+hweplot
 
 detach("package:ggtern", unload=TRUE)
 ```

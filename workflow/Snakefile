@@ -198,5 +198,5 @@ rule GWAS_QC_Report:
         HWE = config['QC']['HWE'],
         superpop = config['superpop'],
         partmethod = rules.PCAPartitioning.output[1] if qc_type['popstrat'] and config["pcair"] else "none"
-    conda: "envs/r.yaml"
+    conda: "envs/rmd.yaml"
     script: "scripts/RenderMarkdown.R"

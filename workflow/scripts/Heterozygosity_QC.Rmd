@@ -33,7 +33,9 @@ knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(root.dir = params$rwd)
 
 ## ---- Load Pacakges ---- ##
-library(tidyverse)
+library(readr)
+library(dplyr)
+library(tidyr)
 library(ggplot2)
 library(knitr)
 library(DT)
