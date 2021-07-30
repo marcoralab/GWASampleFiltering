@@ -29,7 +29,7 @@ params:
     Path_HetFile: Path_HetFile
     Family: Family
     Path_IBD_stats:
-    pi_threshold: 0.1875
+    Pi_threshold: 0.1875
     Path_PCA_rdat: Path_PCA_rdat
     Path_PopStrat_eigenvec: Path_PopStrat_eigenvec
     Path_PopStrat_eigenval: Path_PopStrat_eigenval
