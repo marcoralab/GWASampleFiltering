@@ -203,24 +203,29 @@ plink_1.9 --bfile raw-GWA-data  \
 ```
 <br>
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, include=FALSE}
 if (params$Path_imiss != "/dev/null") {
+  imiss_tf <- T
   # ---- readin plink .imiss ---- ##
   message("reading plink individual missingness file")
   imiss.raw <- read_table2(params$Path_imiss, col_names = T)
   imiss <- imiss.raw %>%
     mutate(call = F_MISS > params$missing_sample) %>%
     as_tibble()
+  caption_table <- tabcap("highmiss", sprintf("Samples with a call rate < %i%%",
+    round((1 - params$missing_sample)*100)))
 } else {
+  imiss_tf <- F
   imiss.raw <- "not used"
   cat("Sample call-rate checking was not performed.")
+  caption_table <- ""
 }
 
 ```
 
 Figure \@ref(fig:samplecallrate) shows the distribution of sample call rates across all individules in the study, with the dashed line denoting the call rate QC threshold (typicaly ≥ 95%). Table \@ref(tab:highmiss) lists the samples that were excluded based on call rate.
 
-```{r samplecallrate, echo=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Sample call rate distribution'}
+```{r samplecallrate, echo=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Sample call rate distribution', eval = imiss_tf}
 ggplot(data = imiss, aes(x = as.factor(1), y = F_MISS, colour = call, shape = call)) +
   geom_sina(size = 1.5) +
   geom_hline(yintercept = 0.05, linetype = 2, colour = 'red') +
@@ -235,9 +240,9 @@ ggplot(data = imiss, aes(x = as.factor(1), y = F_MISS, colour = call, shape = ca
 ```
 <br>
 
-`r tabcap("highmiss", sprintf("Samples with a call rate < %i%%", round((1 - params$missing_sample)*100)))`
+`r caption_table`
 
-```{r sample excluded table, echo=F}
+```{r sample excluded table, echo=F, eval = imiss_tf}
 imiss %>%
   filter(call == T) %>%
   select(FID, IID, N_MISS, N_GENO, F_MISS) %>%
