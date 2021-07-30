@@ -116,6 +116,7 @@ use_pcair <- function(fam, kingstem) {
   }
   FIDIID <- fam %>%
     select(FID, IID)
+  if (is.null(raws$rels)) raws$rels <- c("")
   rel <- raws$rels %>%
     tibble(IID = .) %>%
     inner_join(FIDIID, by = "IID") %>%

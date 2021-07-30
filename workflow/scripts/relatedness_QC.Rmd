@@ -42,22 +42,15 @@ disptab <- function(x) {
 ```{r readData, echo=F, warning=F, message=F}
 ## ---- Read in Data ----##
 Pi_threshold <- params$pi_threshold
-dat.inter.raw <- load(params$Path_IBD_stats)
-if ( king ) {
-  mv(from = "dat.inter.all", to = "dat.forplots")
-  plot2Ydesc <- "kinship coefficient"
-  plot2Y <- "Kinship Coefficient"
-  plot2Ycol <- "Kinship"
-  plot2Xcol <- "IBS0"
-  package <- "KING"
-} else {
-  dat.forplots <- dat.inter
-  plot2Ydesc <- "proportion of loci sharing one allele IBD (Z1)"
-  plot2Y <- "IBD Z1"
-  plot2Ycol <- "Z1"
-  plot2Xcol <- "Z0"
-  package <- "PLINK"
-}
+dat_inter_raw <- load(params$Path_IBD_stats)
+
+mv(from = "dat_inter_all", to = "dat_forplots")
+plot2Ydesc <- "kinship coefficient"
+plot2Y <- "Kinship Coefficient"
+plot2Ycol <- "Kinship"
+plot2Xcol <- "IBS0"
+package <- "KING"
+
 ```
 
 ## Cryptic Relatedness
@@ -91,9 +84,9 @@ This produces a file containing the pariwise IBS estimates for all pairs of indi
 The following histogram (Fig. \@ref(fig:kinplot)) shows the distribution of proportion of IBD sharing (pi-hat in PLINK; PropIBD in KING) between all pairs.
 
 ```{r kinplot, echo=FALSE, fig.width=4.7, fig.height=4.7, fig.align='center', fig.cap='Distribution of pairwise kinship coefficients'}
-ggplot(dat.forplots, aes(x = PI_HAT)) +
+ggplot(dat_forplots, aes(x = PI_HAT)) +
   geom_histogram(binwidth = 0.01, fill = "#377EB8") +
-  coord_cartesian(xlim = c(min(dat.forplots$PI_HAT) - 0.05, 1)) +
+  coord_cartesian(xlim = c(min(dat_forplots$PI_HAT) - 0.05, 1)) +
   theme_bw() + labs(x = 'IBD Sharing (pi-hat in PLINK)') +
   geom_vline(xintercept = Pi_threshold, colour = 'red', linetype = 2)
 
@@ -111,9 +104,8 @@ rel_tab %>% kable(caption = "IBD relationships", booktabs = TRUE) %>%
 The following plot (Fig. \@ref(fig:relplot)) shows the `r plot2Ydesc` by the proportion of loci where individules share zero alleles (Z0), where the proportion of IBD sharing is greater than 0.05. In family based studies, pairs are coloured by IBD relationship. Table \@ref(tab:ibdfail) displays the individules where the kinship coefficent was greather than `r Pi_threshold` in population based studies OR how were duplicates in family based studies.
 ```{r relplot, echo=FALSE, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Pairs of individules plotted by their degree of relatedness'}
 
-
-if(params$Family == F) {
-  dat.forplots %>%
+if(params$Family == "F" || params$Family == F) {
+  dat_forplots %>%
     select(-FID1, -IID1, -FID2, -IID2) %>%
     mutate(related = PI_HAT > Pi_threshold) %>%
     ggplot(aes(colour = related)) +
@@ -124,7 +116,7 @@ if(params$Family == F) {
       coord_cartesian(xlim = c(0,1), ylim = c(0,1)) + theme_bw() +
       theme(legend.position = "bottom")
 } else {
-  ggplot(dat.inter, aes(colour = relationship)) +
+  ggplot(dat_inter, aes(colour = relationship)) +
     geom_point(aes_string(x = plot2Xcol, y = plot2Ycol)) +
     coord_cartesian(xlim = c(0,1), ylim = c(0,1)) +
     labs(x = 'IBD Z0', y = plot2Y) +
@@ -147,7 +139,6 @@ fam_table %>% disptab
 ```
 
 ```{r cleanup_rel, include=F}
-rm(fam_table, dat.forplots, dat.inter, dat.inter.raw, ibd_tab, rel_tab,
-   king, package, plot2Xcol, plot2Y, plot2Ycol, plot2Ydesc, Pi_threshold,
-   dat.inter.raw)
+rm(fam_table, dat_forplots, dat_inter, dat_inter_raw, ibd_tab, rel_tab,
+   package, plot2Xcol, plot2Y, plot2Ycol, plot2Ydesc)
 ```
