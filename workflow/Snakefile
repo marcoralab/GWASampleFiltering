@@ -527,13 +527,15 @@ rule Sample_Flip:
         bim = sexcheck_in_plink_stem + '.bim',
         bed = sexcheck_in_plink_stem + '.bed',
         fam = sexcheck_in_plink_stem + '.fam',
-        fasta = expand("reference/human_g1k_{gbuild}.fasta", gbuild=BUILD)
+        fasta = expand("reference/human_g1k_{gbuild}.fasta", gbuild=BUILD),
+        script = "/sc/arion/projects/LOAD/shea/bin/flippyr/flippyr.py"
     output:
         multiext("{dataout}/{sample}_flipped", ".bim", ".bed", ".fam")
     params:
         dataout = DATAOUT
-    conda: "envs/flippyr.yaml"
-    shell: "flippyr -p {input.fasta} -o {params.dataout}/{wildcards.sample} {input.bim}"
+    conda: "envs/flippyr2.yaml"
+    # shell: "flippyr -p {input.fasta} -o {params.dataout}/{wildcards.sample} {input.bim}"
+    shell: "{input.script} -p {input.fasta} -o {params.dataout}/{wildcards.sample} {input.bim}"
 
 rule Sample_ChromPosRefAlt:
     input:
@@ -592,7 +594,7 @@ rule PruneDupvar_snps:
     shell:
         '''
 plink --keep-allele-order --bfile {params.indat} -bim {input.bim} \
-  {params.extract}--autosome --indep 50 5 1.5 \
+  {params.extract} --autosome --indep 50 5 1.5 \
   --list-duplicate-vars --out {params.out}
 '''
 
