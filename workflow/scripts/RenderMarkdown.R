@@ -25,7 +25,7 @@ message("Render Final Report",
       )
 
 rmarkdown::render(
-  input = paste0("workflow/scripts/", snakemake@params[["script"]]),
+  input = paste0("/sc/arion/projects/LOAD/shea/bin/GWASampleFiltering/workflow/scripts/", snakemake@params[["script"]]),
   clean = TRUE,
   intermediates_dir = snakemake@params[["idir"]],
   output_file = snakemake@output[[1]],

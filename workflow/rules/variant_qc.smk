@@ -2,7 +2,7 @@
 rule snp_qc:
     input: start['files']
     output:
-        temp(expand("{{dataout}}/{{sample}}_SnpQc.{ext}", ext=BPLINK)),
+        temp(multiext("{dataout}/{sample}_SnpQc", '.bed', '.bim', '.fam')),
         "{dataout}/{sample}_SnpQc.hwe",
         "{dataout}/{sample}_SnpQc.frq",
         "{dataout}/{sample}_SnpQc.frqx",
@@ -23,9 +23,9 @@ plink --keep-allele-order --bfile {params.stem} --geno {params.miss} \
 
 # ---- Exclude Samples with high missing rate ----
 rule sample_callRate:
-    input: expand("{{dataout}}/{{sample}}_SnpQc.{ext}", ext=BPLINK) if qc_type['variant'] else start['files']
+    input: multiext("{dataout}/{sample}_SnpQc", '.bed', '.bim', '.fam') if qc_type['variant'] else start['files']
     output:
-        expand("{{dataout}}/{{sample}}_callRate.{ext}", ext=BPLINK, dataout = DATAOUT),
+        multiext("{dataout}/{sample}_callRate", '.bed', '.bim', '.fam'),
         "{dataout}/{sample}_callRate.imiss",
         touch("{dataout}/{sample}_callRate.irem")
     params:

@@ -180,6 +180,7 @@ rule GWAS_QC_Report:
         HetFile = "{dataout}/{sample}_HetQC.het" if qc_type['heterozygosity'] else '/dev/null',
         IBD_stats = "{dataout}/{sample}_IBDQC.Rdata" if qc_type['relatedness'] else '/dev/null',
         PCA_rdat = "{dataout}/{sample}_pca.Rdata" if qc_type['ancestry'] else '/dev/null',
+        cluster_pops = "{dataout}/{sample}_cluster_pops.tsv" if qc_type['ancestry'] else '/dev/null',
         PopStrat_eigenval = "{dataout}/{sample}_filtered_PCA.eigenval" if qc_type['popstrat'] else '/dev/null',
         PopStrat_eigenvec = "{dataout}/{sample}_filtered_PCA.eigenvec" if qc_type['popstrat'] else '/dev/null',
         partmethod = rules.PCAPartitioning.output[1] if qc_type['popstrat'] and config["pcair"] else "/dev/null"

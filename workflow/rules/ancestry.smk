@@ -63,7 +63,7 @@ if qc_type_relate['callrate']:
     sampleqc_in_plink = rules.sample_callRate.output[0]
     sampleqc_in_plink_stem = rules.sample_callRate.params.out
 elif qc_type_relate['variant']:
-    sampleqc_in_plink = expand("{{dataout}}/{{sample}}_SnpQc.{ext}", ext=BPLINK)
+    sampleqc_in_plink = multiext("{dataout}/{sample}_SnpQc", '.bed', '.bim', '.fam')
     sampleqc_in_plink_stem = rules.snp_qc.params.out
 else:
     sampleqc_in_plink = start['files']
@@ -108,12 +108,13 @@ rule Sample_Flip:
         bim = sampleqc_in_plink_stem + '.bim',
         bed = sampleqc_in_plink_stem + '.bed',
         fam = sampleqc_in_plink_stem + '.fam',
-        fasta = expand("reference/human_g1k_{gbuild}.fasta", gbuild=BUILD)
+        fasta = expand("reference/human_g1k_{gbuild}.fasta", gbuild=BUILD),
+        script = "/sc/arion/projects/LOAD/shea/bin/flippyr/flippyr.py"
     output:
         multiext("{dataout}/{sample}_flipped", ".bim", ".bed", ".fam")
     params:
         dataout = DATAOUT
-    conda: "../envs/flippyr.yaml"
+    container: 'docker://befh/flippyr:0.4.0'
     shell: "flippyr -p {input.fasta} -o {params.dataout}/{wildcards.sample} {input.bim}"
 
 rule Sample_ChromPosRefAlt:
@@ -147,8 +148,7 @@ rule PruneDupvar_snps:
         pvars = panel_variants
     output:
         "{dataout}/{sample}_nodup.dupvar",
-        expand("{{dataout}}/{{sample}}_nodup.{ext}",
-               ext=['prune.in', 'prune.out'], dataout=DATAOUT),
+        multiext("{dataout}/{sample}_nodup", '.prune.in', '.prune.out'),
     params:
         indat = "{dataout}/{sample}_flipped",
         dupvar = "{dataout}/{sample}_nodup.dupvar",
@@ -176,7 +176,7 @@ rule sample_prune:
         prune = "{dataout}/{sample}_nodup.prune.in",
         dupvar = rules.SelectDupvar_snps.output
     output:
-        temp(expand("{{dataout}}/{{sample}}_pruned.{ext}", ext=BPLINK))
+        temp(multiext("{dataout}/{sample}_pruned", '.bed', '.bim', '.fam'))
     params:
         indat = "{dataout}/{sample}_flipped",
         out = "{dataout}/{sample}_pruned"
@@ -207,8 +207,8 @@ rule Reference_prune:
     conda: "../envs/bcftools.yaml"
     shell:
         '''
-bcftools view -i 'ID=@{input.prune}' {params.founders}\
-  -Oz -o {output.vcf} --force-samples {input.vcf} --threads 4
+bcftools view -i 'ID=@{input.prune}' {params.founders} {input.vcf} --force-samples --threads 4 | \
+    bcftools view -s ^NA20299,NA20314,NA20274,HG01880 -Oz -o {output.vcf} --force-samples --threads 4
 bcftools index -ft {output.vcf}
 '''
 
@@ -284,7 +284,7 @@ rule Plink_RefenceSample:
     input:
         vcf = "{dataout}/{sample}_{refname}_merged.vcf"
     output:
-        expand("{{dataout}}/{{sample}}_{{refname}}_merged.{ext}", ext=BPLINK)
+        multiext("{dataout}/{sample}_{refname}_merged", '.bed', '.bim', '.fam')
     params:
         out = "{dataout}/{sample}_{refname}_merged"
     conda: "../envs/plink.yaml"
@@ -314,12 +314,12 @@ rule merge_pops:
 # PCA analysis to identify population outliers
 rule PcaPopulationOutliers:
     input:
-        plink = expand("{{dataout}}/{{sample}}_{{refname}}_merged.{ext}", ext=BPLINK),
+        plink = multiext("{dataout}/{sample}_{refname}_merged", '.bed', '.bim', '.fam'),
         fam = rules.fix_fam.output,
         ref = DATAOUT + '/{refname}_allpops.txt' if extraref else "reference/{refname}_pops.txt",
         clust = DATAOUT + '/{refname}_allpops_unique.txt' if extraref else "reference/{refname}_pops_unique.txt"
     output:
-        expand("{{dataout}}/{{sample}}_{{refname}}_merged.{ext}", ext=['eigenval', 'eigenvec'])
+        multiext("{dataout}/{sample}_{refname}_merged", '.eigenval', '.eigenvec')
     params:
         indat_plink = "{dataout}/{sample}_{refname}_merged",
         out = "{dataout}/{sample}_{refname}_merged"
@@ -330,13 +330,23 @@ plink --keep-allele-order --bfile {params.indat_plink} --fam {input.fam} \
   --pca 10 --within {input.ref} --pca-clusters {input.clust} --out {params.out}
 '''
 
+rule cluster_pops:
+    input:
+        eigenvec = expand("{{dataout}}/{{sample}}_{refname}_merged.eigenvec", refname=REF),
+        ref_pops = expand("reference/{refname}_pops.txt", refname=REF),
+    output:
+        pcs_pops = "{dataout}/{sample}_cluster_pops.tsv"
+    conda: '../envs/r.yaml'
+    script: '../scripts/pop_assignment.R'
+
 # Rscript to identify population outliers
 rule ExcludePopulationOutliers:
     input:
         eigenval = expand("{{dataout}}/{{sample}}_{refname}_merged.eigenval", refname=REF),
         eigenvec = expand("{{dataout}}/{{sample}}_{refname}_merged.eigenvec", refname=REF),
         fam = rules.Sample_Plink2Bcf.input.fam,
-        pops = expand(DATAOUT + '/{refname}_allpops.txt' if extraref else "reference/{refname}_pops.txt", refname=REF)
+        pops = expand(DATAOUT + '/{refname}_allpops.txt' if extraref else "reference/{refname}_pops.txt", refname=REF),
+        cluster_pops = rules.cluster_pops.output.pcs_pops
     output:
         excl = "{dataout}/{sample}_exclude.pca",
         rmd = "{dataout}/{sample}_pca.Rdata"
