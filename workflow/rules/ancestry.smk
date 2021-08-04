@@ -108,8 +108,7 @@ rule Sample_Flip:
         bim = sampleqc_in_plink_stem + '.bim',
         bed = sampleqc_in_plink_stem + '.bed',
         fam = sampleqc_in_plink_stem + '.fam',
-        fasta = expand("reference/human_g1k_{gbuild}.fasta", gbuild=BUILD),
-        script = "/sc/arion/projects/LOAD/shea/bin/flippyr/flippyr.py"
+        fasta = expand("reference/human_g1k_{gbuild}.fasta", gbuild=BUILD)
     output:
         multiext("{dataout}/{sample}_flipped", ".bim", ".bed", ".fam")
     params:
@@ -330,14 +329,6 @@ plink --keep-allele-order --bfile {params.indat_plink} --fam {input.fam} \
   --pca 10 --within {input.ref} --pca-clusters {input.clust} --out {params.out}
 '''
 
-rule cluster_pops:
-    input:
-        eigenvec = expand("{{dataout}}/{{sample}}_{refname}_merged.eigenvec", refname=REF),
-        ref_pops = expand("reference/{refname}_pops.txt", refname=REF),
-    output:
-        pcs_pops = "{dataout}/{sample}_cluster_pops.tsv"
-    conda: '../envs/r.yaml'
-    script: '../scripts/pop_assignment.R'
 
 # Rscript to identify population outliers
 rule ExcludePopulationOutliers:
@@ -345,11 +336,11 @@ rule ExcludePopulationOutliers:
         eigenval = expand("{{dataout}}/{{sample}}_{refname}_merged.eigenval", refname=REF),
         eigenvec = expand("{{dataout}}/{{sample}}_{refname}_merged.eigenvec", refname=REF),
         fam = rules.Sample_Plink2Bcf.input.fam,
-        pops = expand(DATAOUT + '/{refname}_allpops.txt' if extraref else "reference/{refname}_pops.txt", refname=REF),
-        cluster_pops = rules.cluster_pops.output.pcs_pops
+        pops = expand(DATAOUT + '/{refname}_allpops.txt' if extraref else "reference/{refname}_pops.txt", refname=REF)
     output:
         excl = "{dataout}/{sample}_exclude.pca",
-        rmd = "{dataout}/{sample}_pca.Rdata"
+        rmd = "{dataout}/{sample}_pca.Rdata",
+        pcs_pops = "{dataout}/{sample}_cluster_pops.tsv"
     params:
         superpop = config['superpop'],
         extraref = 'none' if not extraref else config['extra_ref_subpop'],

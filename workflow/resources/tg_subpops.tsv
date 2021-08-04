@@ -1,0 +1,27 @@
+pop	spop	description_spop	description_pop
+GBR	EUR	European	British in England and Scotland
+FIN	EUR	European	Finnish in Finland
+IBS	EUR	European	Iberian Population in Spain
+CEU	EUR	European	Utah Residents (CEPH) with Northern and Western European Ancestry
+TSI	EUR	European	Toscani in Italia
+CHS	EAS	East Asian	Southern Han Chinese
+CDX	EAS	East Asian	Chinese Dai in Xishuangbanna, China
+KHV	EAS	East Asian	Kinh in Ho Chi Minh City, Vietnam
+CHB	EAS	East Asian	Han Chinese in Beijing, China
+JPT	EAS	East Asian	Japanese in Tokyo, Japan
+PJL	SAS	South Asian	Punjabi from Lahore, Pakistan
+BEB	SAS	South Asian	Bengali from Bangladesh
+GIH	SAS	South Asian	Gujarati Indian from Houston, Texas
+STU	SAS	South Asian	Sri Lankan Tamil from the UK
+ITU	SAS	South Asian	Indian Telugu from the UK
+PUR	AMR	Ad Mixed American	Puerto Ricans from Puerto Rico
+PEL	AMR	Ad Mixed American	Peruvians from Lima, Peru
+CLM	AMR	Ad Mixed American	Colombians from Medellin, Colombia
+MXL	AMR	Ad Mixed American	Mexican Ancestry from Los Angeles USA
+ACB	AFR	African	African Caribbeans in Barbados (ACB)
+GWD	AFR	African	Gambian in Western Divisions in the Gambia
+ESN	AFR	African	Esan in Nigeria
+MSL	AFR	African	Mende in Sierra Leone
+LWK	AFR	African	Luhya in Webuye, Kenya
+YRI	AFR	African	Yoruba in Ibadan, Nigeria
+ASW	AFR	African	Americans of African Ancestry in SW USA
