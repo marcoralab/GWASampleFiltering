@@ -35,7 +35,7 @@ plink --keep-allele-order --bfile {params.indat} \
 rule SelectDupvar_snps_noancestry:
     input: rules.PruneDupvar_snps_noancestry.output[0]
     output: "{dataout}/{sample}_nodup_noancestry.dupvar.delete"
-    conda: "../envs/r.yaml"
+    container: 'docker://befh/r_env_gwasamplefilt:2'
     script: '../scripts/DuplicateVars.R'
 
 # Prune sample dataset

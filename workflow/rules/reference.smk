@@ -244,7 +244,7 @@ flippyr -p {input.fasta} \
         output:
             bim = temp("reference/{refname}_{gbuild}_flipped_ChromPos.bim"),
             snplist = temp("reference/{refname}_{gbuild}_flipped_snplist")
-        conda: "../envs/r.yaml"
+        container: 'docker://befh/r_env_gwasamplefilt:2'
         shell: "Rscript scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"
 
     # Recode sample plink file to vcf
@@ -360,7 +360,7 @@ elif ereftype != 'none': #PLINK fileset of all chromosomes
         output:
             bim = temp("{dataout}/extraref_{gbuild}_flipped_ChromPos.bim"),
             snplist = temp("{dataout}/extraref_{gbuild}_flipped_snplist")
-        conda: "../envs/r.yaml"
+        container: 'docker://befh/r_env_gwasamplefilt:2'
         shell: "R scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"
 
     # Recode sample plink file to vcf
