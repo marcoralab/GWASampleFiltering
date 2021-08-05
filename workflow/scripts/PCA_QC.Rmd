@@ -105,5 +105,5 @@ GGally::ggpairs(pca, columns = paste0('PC', 1:PC.inc),
                 aes(color = superpop, shape = cohort)) + theme_bw()
 ```
 
-```{r child = 'PCA_QC_sdfilt.Rmd', eval = report_settings$sd}
+```{r child = 'PCA_QC_sdfilt.Rmd', eval = report_settings$filter_sd}
 ```

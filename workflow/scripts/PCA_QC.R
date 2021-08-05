@@ -56,7 +56,7 @@ sdev <- snakemake@params[["sd"]]
 pcs_out_path <- snakemake@output[["pcs_pops"]]
 save.image(file = paste0(output, ".params.Rdata"))
 
-#load("/sc/arion/projects/LOAD/Brian/src/GWASampleFiltering/output/ADGC/x_present_AA/ADC8-AA_exclude.pca.params.Rdata")
+#load("output/ADGC/x_present_AA/ADC8-AA_exclude.pca.params.Rdata")
 
 if (tolower(population) == "all") {
   all_pops <- T
@@ -210,7 +210,7 @@ if (all_pops) {
     mutate(pop_outliers = F)
   tab_pop_exclusions <- tibble(Exclusions = "None")
 } else if (!is.numeric(sdev)) {
-  report_settings$filter_interence <- T
+  report_settings$filter_inference <- T
   tab_1 <- as.data.frame(clusters)
   pca_sample <- pca %>%
     filter(cohort != "Reference") %>%
