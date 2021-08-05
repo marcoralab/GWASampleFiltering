@@ -1,24 +1,14 @@
 #!/usr/bin/env Rscript
-## ---- Load Required R packages ---- ##
-import <- Vectorize(function(x) {
-  suppressWarnings(suppressMessages(require(x, character.only = T, quietly = T,
-    warn.conflicts = F)))
-})
 
 message("Loading packages")
 
-status <- import(c(
-  "dplyr",
-  "readr",
-  "magrittr",
-  "argparse",
-  "tidyr",
-  "stringr",
-  "tibble",
-  "purrr"
-  ))
-
-`%nin%` <- Negate(`%in%`)
+suppressPackageStartupMessages(library(dplyr))
+library(readr)
+library(magrittr)
+suppressPackageStartupMessages(library(tidyr))
+library(stringr)
+library(tibble)
+suppressPackageStartupMessages(library(purrr))
 
 # Get geometric median
 ## rdocumentation.org/packages/bigutilsr/versions/0.3.3/topics/geometric_median
@@ -42,14 +32,15 @@ geometric_median <- function(u, tol = 1e-10, maxiter = 1000, by_grp = NULL) {
 
 # assign sample to cluster
 ## https://www.biorxiv.org/content/10.1101/2020.10.06.328203v2.full
-## http://adomingues.github.io/2015/09/24/finding-closest-element-to-a-number-in-a-list/
+## adomingues.github.io/2015/09/24/finding-closest-element-to-a-number-in-a-list
+
 find_cluster <- function(df, clusters) {
   superpops <- clusters$superpop
   samp_pcs <- select(df, starts_with("PC"))
   mat <- bind_rows(clusters, samp_pcs) %>% {suppressWarnings(dist(.))}
   # mat
-  clus <- as.matrix(mat)[6, 1:5] %>% which.min()
-  df %>% mutate(superpop_infered = superpops[clus])
+  clus <- which.min(as.matrix(mat)[6, 1:5])
+  dplyr::mutate(df, superpop_infered = superpops[clus])
 }
 
 vec <- snakemake@input[["eigenvec"]]
@@ -66,6 +57,12 @@ pcs_out_path <- snakemake@output[["pcs_pops"]]
 save.image(file = paste0(output, ".params.Rdata"))
 
 #load("/sc/arion/projects/LOAD/Brian/src/GWASampleFiltering/output/ADGC/x_present_AA/ADC8-AA_exclude.pca.params.Rdata")
+
+if (tolower(population) == "all") {
+  all_pops <- T
+} else {
+  all_pops <- F
+}
 
 ##---- Read in Data ----##
 message("Reading data files")
@@ -153,7 +150,7 @@ if (remove_tg) {
 }
 
 # fix improperly split FID_IID
-pca_FIDIID <- pca_orig %>%
+pca_fidiid <- pca_orig %>%
   unite("FIDIID", FID, IID, sep = "_")
 
 
@@ -163,84 +160,28 @@ both_pops <- target_pops %>%
   ##### FIX BAD FID_IID SPLIT #####
   unite("FIDIID", FID, IID, sep = "_", remove = F)
 
-pca <- pca_FIDIID %>%
+pca_corrected <- pca_fidiid %>%
   left_join(both_pops, by = "FIDIID") %>%
   select(any_of(names(both_pops)), everything(), -FIDIID) %>%
   mutate(FID = str_remove(FID, "^1000g___"))
 
 ## Colours for plots
-pca_col <- pca %>%
+pca_col <- pca_corrected %>%
   count(superpop) %>%
-  mutate(colour = ifelse(superpop == sample_s, "black", NA)) %>%
-  mutate(colour = ifelse(superpop == "AFR", "#E41A1C", colour)) %>%
-  mutate(colour = ifelse(superpop == "AMR", "#377EB8", colour)) %>%
-  mutate(colour = ifelse(superpop == "EAS", "#4DAF4A", colour)) %>%
-  mutate(colour = ifelse(superpop == "EUR", "#984EA3", colour)) %>%
-  mutate(colour = ifelse(superpop == "SAS", "#FF7F00", colour))
-
-# ---- Population Outliers ---- #
-# Calculate the mean and ± specified number of sd for each PC of 1000 Genomes EUR population
-
-message("Table 1")
-
-chosen_pca <- pca %>%
-  gather(key = "PC", value = "eigenvalue", !!paste0("PC", 1:n_eig)) %>%
-  filter(superpop == population) %>%
-  group_by(superpop, PC) %>%
-  dplyr::summarize(mean = mean(eigenvalue), sd = sd(eigenvalue),
-                   .groups = "drop") %>%
-  mutate(lower = mean - sd * sdev, upper = mean + sd * sdev) %>%
-  mutate(PC = factor(PC, levels = paste0("PC", 1:n_eig))) %>%
-  arrange(PC)
-
-#***Table 1:*** Mean and SD of PC in chosen population
-tab_1 <- as.data.frame(chosen_pca)
-
-# For each individual in the sample, determine if ± specified SD from the chosen population
-# for each principal component
-
-message("Table 2")
-
-pca_range <- function(PC, vals) {
-  lower <- chosen_pca[chosen_pca$PC == PC, "lower"] %>% unlist %>% unname
-  upper <- chosen_pca[chosen_pca$PC == PC, "upper"] %>% unlist %>% unname
-  sapply( vals, function(x) {x < lower | x > upper} ) %>% as.logical
-}
-
-mut_pca <- function(df, PC, PC_use) {
-  PC <- 1:PC
-  Po_use <- paste0("PC", PC, ".outliers")[1:PC_use]
-  for (i in paste0("PC", PC)) {
-    df %<>% mutate(`!!`(paste0(i, ".outliers")) := pca_range(i, .[, i]))
-  }
-  df %>% dplyr::mutate(pop.outliers = rowSums(dplyr::select(., !!Po_use)) > 0)
-}
-
-sample.pca <- pca %>%
-  filter(superpop == sample_s) %>%
-  mut_pca(n_eig, 10)
-
-n_outliers <- sum(sample.pca$pop.outliers)
-no_outliers <- n_outliers == 0
-
-# ***Table 2:*** Population Outliers for each PC
-
-outlier_cols <- paste0("PC", 1:n_eig, ".outliers")
-outlier_cols_rename <- outlier_cols
-names(outlier_cols_rename) <- paste0("PC", 1:n_eig)
-
-tab_2 <- as.data.frame(
-  sample.pca %>%
-  select(FID, IID, !!outlier_cols, pop.outliers) %>%
-  filter(pop.outliers == T) %>%
-  dplyr::rename(!!!outlier_cols_rename, Outlier = pop.outliers)
-)
+  mutate(color = ifelse(superpop == sample_s, "black", NA)) %>%
+  mutate(color = ifelse(superpop == "AFR", "#E69F00", color)) %>%
+  mutate(color = ifelse(superpop == "AMR", "#0072B2", color)) %>%
+  mutate(color = ifelse(superpop == "EAS", "#009E73", color)) %>%
+  mutate(color = ifelse(superpop == "EUR", "#CC79A7", color)) %>%
+  mutate(color = ifelse(superpop == "SAS", "#D55E00", color)) %>%
+  mutate(color = ifelse(superpop == "MID", "#56B4E9", color)) %>%
+  mutate(color = ifelse(superpop == "SAS", "#F0E442", color))
 
 # ternary plot and assignment:
 
 message("Ternary Plots")
 
-pca_geomed <- pca_orig %>%
+pca_geomed <- pca_corrected %>%
   left_join(both_pops, by = c("FID", "IID")) %>%
   mutate(superpop = ifelse(is.na(superpop), "sample", superpop),
        Population = ifelse(is.na(Population), "sample", Population))
@@ -255,17 +196,101 @@ clusters <-
   as_tibble(rownames = "superpop")
 
 # extract sample information and assign to cluster
-pcs_geomed <- pca_geomed %>%
+pcs <- pca_geomed %>%
   group_split(IID) %>%
   map_df(find_cluster, clusters)
 
-write_tsv(pcs_geomed, pcs_out_path)
+write_tsv(pca, pcs_out_path)
+
+report_settings <- list(
+  all_pops = all_pops,
+  filter_inference = F,
+  filter_sd = F
+)
+
+if (all_pops) {
+  tab_1 <- as.data.frame(clusters)
+  pca_sample <- pcs %>%
+    filter(cohort != "Reference") %>%
+    mutate(pop_outliers = F)
+  tab_pop_exclusions <- tibble(Exclusions = "None")
+} else if (!is.numeric(sdev)) {
+  report_settings$filter_interence <- T
+  tab_1 <- as.data.frame(clusters)
+  pca_sample <- pcs %>%
+    filter(cohort != "Reference") %>%
+    mutate(pop_outliers = !(superpop_infered %in% population))
+  tab_pop_exclusions <- pca_sample %>%
+    filter(pop_outliers) %>%
+    select(FID, IID, "Infered Superpopulation" = superpop_infered)
+} else {
+  report_settings$filter_sd <- T
+  # ---- Population Outliers ---- #
+  # Calculate the mean and ± specified number of sd for each PC of ref pop
+
+  message("Table 1")
+
+  chosen_pca <- pca_corrected %>%
+    gather(key = "PC", value = "eigenvalue", !!paste0("PC", 1:n_eig)) %>%
+    filter(superpop == population) %>%
+    group_by(superpop, PC) %>%
+    dplyr::summarize(mean = mean(eigenvalue), sd = sd(eigenvalue),
+                     .groups = "drop") %>%
+    mutate(lower = mean - sd * sdev, upper = mean + sd * sdev) %>%
+    mutate(PC = factor(PC, levels = paste0("PC", 1:n_eig))) %>%
+    arrange(PC)
+
+  #***Table 1:*** Mean and SD of PC in chosen population
+  tab_1 <- as.data.frame(chosen_pca)
+
+  # For each sample individual, determine if ± specified SD from chosen pop
+  # for each principal component
+
+  message("Table 2")
+
+  pca_range <- function(pc, vals) {
+    lower <- chosen_pca[chosen_pca$PC == pc, "lower"] %>% unlist %>% unname
+    upper <- chosen_pca[chosen_pca$PC == pc, "upper"] %>% unlist %>% unname
+    sapply(vals, function(x) x < lower | x > upper) %>% as.logical
+  }
+
+  mut_pca <- function(df, pc, pc_use) {
+    pc <- 1:pc
+    pc_use <- paste0("PC", pc, ".outliers")[1:pc_use]
+    for (i in paste0("PC", pc)) {
+      df %<>% mutate(`!!`(paste0(i, ".outliers")) := pca_range(i, .[, i]))
+    }
+    dplyr::mutate(df, pop_outliers = rowSums(dplyr::select(df, !!pc_use)) > 0)
+  }
+
+  pca_sample <- pca_corrected %>%
+    filter(superpop == sample_s) %>%
+    mut_pca(n_eig, 10)
+
+  # ***Table 2:*** Population Outliers for each PC
+
+  outlier_cols <- paste0("PC", 1:n_eig, ".outliers")
+  outlier_cols_rename <- outlier_cols
+  names(outlier_cols_rename) <- paste0("PC", 1:n_eig)
+
+  replace_tf <- function(x) ifelse(x == T, "Yes", ifelse(x == F, "No", x))
+
+  tab_pop_exclusions <- pca_sample %>%
+    select(FID, IID, !!outlier_cols, pop_outliers) %>%
+    filter(pop_outliers == T) %>%
+    dplyr::rename(!!!outlier_cols_rename) %>%
+    select(-pop_outliers) %>%
+    transmute_all(replace_tf)
+}
 
 # ---- Write out outliers ---- #
-exclude_pop_outliers <- sample.pca %>%
-  filter(pop.outliers == TRUE) %>%
+
+no_outliers <- sum(pca_sample$pop_outliers) == 0
+exclude_pop_outliers <- pca_sample %>%
+  filter(pop_outliers == TRUE) %>%
   select(FID, IID)
 
 write_tsv(exclude_pop_outliers, output, col_names = F)
-save(tab_1, tab_2, no_outliers, pca, sample.pca, eigenval, pca_col, sdev,
-     pcs_geomed, file = rmd)
+
+save(tab_1, tab_pop_exclusions, no_outliers, pca, pca_sample, eigenval,
+     pca_col, sdev, pcs_geomed, report_settings, file = rmd)
