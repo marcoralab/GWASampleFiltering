@@ -181,13 +181,8 @@ pca_col <- pca_corrected %>%
 
 message("Ternary Plots")
 
-pca_geomed <- pca_corrected %>%
-  left_join(both_pops, by = c("FID", "IID")) %>%
-  mutate(superpop = ifelse(is.na(superpop), "sample", superpop),
-       Population = ifelse(is.na(Population), "sample", Population))
-
 # Pull out 1000 genomes samples
-kg <- filter(pca_geomed, cohort == "Reference")
+kg <- filter(pca_corrected, cohort == "Reference")
 
 # find geometric median of each PC for each cluster
 clusters <-
@@ -196,7 +191,7 @@ clusters <-
   as_tibble(rownames = "superpop")
 
 # extract sample information and assign to cluster
-pcs <- pca_geomed %>%
+pca <- pca_corrected %>%
   group_split(IID) %>%
   map_df(find_cluster, clusters)
 
@@ -210,14 +205,14 @@ report_settings <- list(
 
 if (all_pops) {
   tab_1 <- as.data.frame(clusters)
-  pca_sample <- pcs %>%
+  pca_sample <- pca %>%
     filter(cohort != "Reference") %>%
     mutate(pop_outliers = F)
   tab_pop_exclusions <- tibble(Exclusions = "None")
 } else if (!is.numeric(sdev)) {
   report_settings$filter_interence <- T
   tab_1 <- as.data.frame(clusters)
-  pca_sample <- pcs %>%
+  pca_sample <- pca %>%
     filter(cohort != "Reference") %>%
     mutate(pop_outliers = !(superpop_infered %in% population))
   tab_pop_exclusions <- pca_sample %>%
@@ -293,4 +288,4 @@ exclude_pop_outliers <- pca_sample %>%
 write_tsv(exclude_pop_outliers, output, col_names = F)
 
 save(tab_1, tab_pop_exclusions, no_outliers, pca, pca_sample, eigenval,
-     pca_col, sdev, pcs_geomed, report_settings, file = rmd)
+     pca_col, sdev, report_settings, file = rmd)

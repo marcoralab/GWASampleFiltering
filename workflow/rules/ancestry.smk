@@ -88,7 +88,10 @@ extraref = (("extra_ref" in config)
             and (config['extra_ref']['name'] is not False))
 
 if "pca_sd" in config:
-    pca_sd = int(config["pca_sd"])
+    if config["pca_sd"]:
+        pca_sd = int(config["pca_sd"])
+    else:
+        pca_sd = False
 else:
     pca_sd = 6
 
