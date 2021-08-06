@@ -173,9 +173,11 @@ pca_col <- pca_corrected %>%
   mutate(color = ifelse(superpop == "AMR", "#0072B2", color)) %>%
   mutate(color = ifelse(superpop == "EAS", "#009E73", color)) %>%
   mutate(color = ifelse(superpop == "EUR", "#CC79A7", color)) %>%
+  mutate(color = ifelse(superpop == "NFE", "#CC79A7", color)) %>%
+  mutate(color = ifelse(superpop == "FIN", "#960018", color)) %>%
   mutate(color = ifelse(superpop == "SAS", "#D55E00", color)) %>%
   mutate(color = ifelse(superpop == "MID", "#56B4E9", color)) %>%
-  mutate(color = ifelse(superpop == "SAS", "#F0E442", color))
+  mutate(color = ifelse(superpop == "AMI", "#F0E442", color))
 
 # ternary plot and assignment:
 
