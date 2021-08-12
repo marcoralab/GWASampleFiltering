@@ -20,12 +20,11 @@ message("Render Final Report",
         "\n geno_miss: ", snakemake@params[["geno_miss"]],
         "\n MAF: ", snakemake@params[["MAF"]],
         "\n HWE: ", snakemake@params[["HWE"]],
-        "\n superpop: ", snakemake@params[["superpop"]],
-        "\n partmethod: ", snakemake@params[["partmethod"]]
+        "\n superpop: ", snakemake@params[["superpop"]]
       )
 
 rmarkdown::render(
-  input = paste0("/sc/arion/projects/LOAD/shea/bin/GWASampleFiltering/workflow/scripts/", snakemake@params[["script"]]),
+  input = snakemake@params[["script"]],
   clean = TRUE,
   intermediates_dir = snakemake@params[["idir"]],
   output_file = snakemake@output[[1]],
