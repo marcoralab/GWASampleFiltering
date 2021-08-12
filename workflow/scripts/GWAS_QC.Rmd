@@ -52,7 +52,7 @@ sexcheck_tf <- params$Path_SexFile != "/dev/null"
 hetcheck_tf <- params$Path_HetFile != "/dev/null"
 relcheck_tf <- params$Path_IBD_stats != "/dev/null"
 pcacheck_tf <- params$Path_PCA_rdat != "/dev/null"
-strat_tf <- Path_PopStrat_eigenvec != "/dev/null"
+strat_tf <- params$Path_PopStrat_eigenvec != "/dev/null"
 ```
 
 ```{r child = 'call_rates.Rmd', eval = cr_tf}
