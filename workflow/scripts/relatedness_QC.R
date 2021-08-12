@@ -222,11 +222,13 @@ if (norel) {
   }
 }
 
+dat_forplots <- dat_inter_all
+
 ##  write out samples to be excluded
 write_tsv(exclude_samples, outfile, col_names = T)
 if (norel) {
-  save(norel, dat_inter_all, rel_tab, fam_table, ibd_tab, file = rdat)
+  save(norel, dat_forplots, rel_tab, fam_table, ibd_tab, file = rdat)
 } else {
-  save(norel, dat_inter, dat_inter_all, rel_tab, fam_table, ibd_tab,
+  save(norel, dat_inter, dat_forplots, rel_tab, fam_table, ibd_tab,
     file = rdat)
 }

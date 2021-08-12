@@ -25,7 +25,7 @@ library(magrittr)
 library(knitr)
 library(kableExtra)
 library(DT)
-library(gdata)
+
 tabcap <- function (name, caption) {
   sprintf("<table width=\"100%%\"><caption>(#tab:%s) %s </caption></table>", name, caption)
 }
@@ -41,10 +41,8 @@ disptab <- function(x) {
 
 ```{r readData, echo=F, warning=F, message=F}
 ## ---- Read in Data ----##
-#TODO: Fix params$Pi_threshold being null
 dat_inter_raw <- load(params$Path_IBD_stats)
 
-mv(from = "dat_inter_all", to = "dat_forplots")
 plot2Ydesc <- "kinship coefficient"
 plot2Y <- "Kinship Coefficient"
 plot2Ycol <- "Kinship"
