@@ -9,8 +9,11 @@ library(cowplot)
 library(ggtern)
 library(colorspace)
 library(plotly)
+library(here)
+library(kableExtra)
 
 tg_labs <- "workflow/resources/tg_subpops.tsv" %>%
+  here() %>%
   read_tsv(col_types = cols(.default = "c")) %>%
   arrange(spop, pop)
 
@@ -27,7 +30,7 @@ sp_desc <- tg_labs %>%
   chop(desc) %>%
   mutate(desc = sapply(desc, paste_pretty))
 
-load("output/ADGC/x_present_AA/ADC8-AA_pca.Rdata")
+#load("output/ADGC/x_present_AA/ADC8-AA_pca.Rdata" %>% here)
 
 ```
 
@@ -35,16 +38,17 @@ load("output/ADGC/x_present_AA/ADC8-AA_pca.Rdata")
 
 Populations have been inferred based on minimum distance from the geometric median of the first 10 principle components.
 
+```{r pcastats, echo=F}
+tab_1 %>%
+  mutate(across(where(is.double), ~ round(.x, digits = 3))) %>%
+  kable(booktabs = T, caption = "Geometric medians of each PC in reference superpopulations") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
 The following plots show the population structure of `r params$Sample` (Black Triangles) based on the first three principal components. In Fig. \@ref(fig:2PCstaticSuperPops), the reference and projected samples are displayed on a ternary plot. Fig. \@ref(fig:3PCinteractiveSuperPops) contains the same data as an interactive 3d plot.
 
-```{r ternplots assign, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Ancestry assignment viewed on PCs 1-3'}
-##  Plot superpops, PC1 + PC2
+```{r ternplots assign, echo=F, fig.width=7.5, fig.height=3.4, fig.align='center', fig.cap='Ancestry assignment viewed on PCs 1-3'}
 
-# pops <- pca %>%
-#   filter(cohort == "Reference") %>%
-#   arrange(superpop_infered) %>%
-#   distinct(superpop_infered) %>%
-#   pull()
 
 # Format data for ploting ternery PCA
 dat_tern <- select(pca, PC1, PC2, PC3) %>%
@@ -105,40 +109,17 @@ p1 <- plot_grid(
   ggplotGrob(p_sample + theme(plot.margin=unit(c(-15,-7,-7,-7), "mm"))),
   legend,
   labels = c('Reference', 'Sample'), label_size = 12, ncol = 3,
-  rel_widths = c(1, 1, 0.25)
+  rel_widths = c(1, 1, 0.4)
   )
 
-ggsave("plot.pdf", plot = p1, width = 7.5, height = 4.7, unit = "in")
+ggsave("plot.pdf", plot = p1, width = 7.5, height = 3.4, unit = "in")
 
 p1
 ```
 
-```{r 3PCinteractiveSuperPops, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Tridimensional plot of ancestery clustering of PC 1, 2 & 3'}
+The following plots are interactive so that outliers can be identified graphically for further removal. Geometric medians are applied across all `r as.character(nrow(eigenval))` principle componants, so some of the clusters used to distinguish ancestries may not be visible on the plot.
 
-# Plotly drops colors with only one point
-fix_plotly_drops <- function(df) {
-  singletons <- df %>%
-    group_by(superpop_infered) %>%
-    filter(n() == 1) %>%
-    ungroup
-  bind_rows(df, singletons)
-}
-
-##  Plot superpops, PC1 + PC2 + PC3
-plot_ly(pca %>% mark_refs %>% fix_plotly_drops,
-        x = ~PC2, y = ~PC1, z = ~PC3, color = ~superpop_infered,
-  type = 'scatter3d', mode = 'markers', marker = list(size = 3),
-  colors = unlist(pca_col2), hoverinfo = 'text',
-  text = ~paste('</br> ID: ', IID, '</br> Population: ', superpop_infered,
-                '</br> PC1: ', round(PC1, 2), '</br> PC2: ', round(PC2, 2),
-                '</br> PC3: ', round(PC3, 2)))
-
-#load("temp.Rdata")
-#p_sample_dat %>% filter(IID == "NACC419063")
-
-```
-
-```{r 3PCinteractiveSuperPops_tern, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Tridimensional plot of ancestery clustering of PC 1, 2 & 3'}
+```{r 3PCinteractiveSuperPops_tern, echo=F, fig.width=7.5, fig.height=5, fig.align='center', fig.cap='Tridimensional plot of ancestery clustering of PC 1, 2 & 3'}
 
 axis <- function(title) {
   list(
@@ -183,6 +164,32 @@ plot_tern_interact %>%
 
 ```
 
+A 3D version follows for further exploration.
+
+```{r 3PCinteractiveSuperPops, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Tridimensional plot of ancestery clustering of PC 1, 2 & 3'}
+
+# Plotly drops colors with only one point
+fix_plotly_drops <- function(df) {
+  singletons <- df %>%
+    group_by(superpop_infered) %>%
+    filter(n() == 1) %>%
+    ungroup
+  bind_rows(df, singletons)
+}
+
+##  Plot superpops, PC1 + PC2 + PC3
+plot_ly(pca %>% mark_refs %>% fix_plotly_drops,
+        x = ~PC2, y = ~PC1, z = ~PC3, color = ~superpop_infered,
+  type = 'scatter3d', mode = 'markers', marker = list(size = 3),
+  colors = unlist(pca_col2), hoverinfo = 'text',
+  text = ~paste('</br> ID: ', IID, '</br> Population: ', superpop_infered,
+                '</br> PC1: ', round(PC1, 2), '</br> PC2: ', round(PC2, 2),
+                '</br> PC3: ', round(PC3, 2)))
+
+```
+
+
+
 ### Population Outliers
 
 ```{r early_exit, echo=F, results='asis', eval=no_outliers}
@@ -192,11 +199,10 @@ knitr::knit_exit()
 
 Individuals not in the selected ancestry(s) based on the above inference were removed.
 
-```{r pcastats, echo=F}
-tab_1 %>% kable(booktabs = T, caption = sprintf("Mean and SD of PCs in %s population", params$superpop)) %>%
-  kable_styling(bootstrap_options = c("striped", "hover"))
-```
+`r tabcap("popoutliers", "Population outliers")`
 
-
+```{r, population outliers table, echo=F, results='asis'}
+tab_pop_exclusions %>%
   disptab
 ```
+
