@@ -106,9 +106,13 @@ plink --keep-allele-order --bfile {params.indat} \
         conda: "../envs/plink.yaml"
         shell:
             '''
-plink --keep-allele-order --bfile {params.indat} --freqx \
-  --within {input.unrel} --keep-cluster-names unrelated \
-  --out {params.out}
+if [ -f {params.indat}.pcair.eigenval ]; then
+  echo "SNPRelate used instead." > {output}
+else
+  plink --keep-allele-order --bfile {params.indat} --freqx \
+    --within {input.unrel} --keep-cluster-names unrelated \
+    --out {params.out}
+fi
 '''
 
     rule PopulationStratification:
@@ -125,9 +129,14 @@ plink --keep-allele-order --bfile {params.indat} --freqx \
         conda: "../envs/plink.yaml"
         shell:
             '''
-plink --keep-allele-order --bfile {params.indat} --read-freq {input.frq} --pca 10 \
-  --within {input.unrel} --pca-cluster-names unrelated \
-  --out {params.out}
+if [ -f {params.indat}.pcair.eigenval ]; then
+  ln -s {params.indat}.pcair.eigenval {params.out}.eigenval
+  ln -s {params.indat}.pcair.eigenvec {params.out}.eigenvec
+else
+  plink --keep-allele-order --bfile {params.indat} --read-freq {input.frq} --pca 10 \
+    --within {input.unrel} --pca-cluster-names unrelated \
+    --out {params.out}
+fi
 '''
 elif qc_type['ancestry']:
     rule PopulationStratification:

@@ -46,7 +46,6 @@ disptab <- function(x) {
 ```{r, Load sample PCA, message=F, warning=F, echo=F}
 ##---- Read in Data ----##
 load(params$Path_PCA_rdat)
-load("output/ADGC/x_present_AA/ADC8-AA_pca.Rdata")
 captions <- list(fig1 = paste("Scree Plot of PVE for 10 Principal Components",
                 "(left) and cumaltive PVE for 10 Principal Components (right)"),
                  fig2 = 'Population Structure Pairs Plots')

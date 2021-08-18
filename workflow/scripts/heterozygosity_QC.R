@@ -3,7 +3,6 @@
 ## Heterozygosity check for GWAS data
 
 ## ---- Load Pacakges ---- ##
-library(tidyverse)
 library(dplyr)
 library(tibble)
 library(readr)
@@ -11,7 +10,7 @@ library(readr)
 het.file = snakemake@input[[1]]
 outfile = snakemake@output[[1]]
 
-het.raw <- as.tibble(read.table(het.file, header = TRUE, check.names = FALSE, as.is = TRUE, colClasses = c("character","character","numeric","numeric","numeric","numeric")))
+het.raw <- as_tibble(read.table(het.file, header = TRUE, check.names = FALSE, as.is = TRUE, colClasses = c("character","character","numeric","numeric","numeric","numeric")))
 
 ## caluclate heterozygosity
 het <- het.raw %>%

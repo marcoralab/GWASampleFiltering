@@ -1,7 +1,9 @@
 #!/usr/bin/env Rscript
 ## File for identifing sex discordance
 
-require(tidyverse, quietly = T)
+require(dplyr, quietly = T)
+require(tibble, quietly = T)
+require(readr, quietly = T)
 
 ##  Arguments:
 # .sexcheck output file from PLINK

@@ -24,7 +24,7 @@ rdat <- snakemake@output[["rdat"]]
 ##  Read in Data
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
 
-norel <- read_lines(snakemake@input[["genome"]]) == "norel"
+norel <- any(read_lines(snakemake@input[["genome"]]) == "norel")
 
 kin0 <- F
 kin <- F

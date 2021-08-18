@@ -30,7 +30,6 @@ sp_desc <- tg_labs %>%
   chop(desc) %>%
   mutate(desc = sapply(desc, paste_pretty))
 
-#load("output/ADGC/x_present_AA/ADC8-AA_pca.Rdata" %>% here)
 
 ```
 
@@ -45,9 +44,9 @@ tab_1 %>%
   kable_styling(bootstrap_options = c("striped", "hover"))
 ```
 
-The following plots show the population structure of `r params$Sample` (Black Triangles) based on the first three principal components. In Fig. \@ref(fig:2PCstaticSuperPops), the reference and projected samples are displayed on a ternary plot. Fig. \@ref(fig:3PCinteractiveSuperPops) contains the same data as an interactive 3d plot.
+The following plots show the population structure of `r params$Sample` (Black Triangles) based on the first three principal components. In Fig. \@ref(fig:ternplots_assign), the reference and projected samples are displayed on a ternary plot. Fig. \@ref(fig:3PCinteractiveSuperPops) contains the same data as an interactive 3d plot.
 
-```{r ternplots assign, echo=F, fig.width=7.5, fig.height=3.4, fig.align='center', fig.cap='Ancestry assignment viewed on PCs 1-3'}
+```{r ternplots_assign, echo=F, fig.width=7.5, fig.height=3.4, fig.align='center', fig.cap='Ancestry assignment viewed on PCs 1-3'}
 
 
 # Format data for ploting ternery PCA
@@ -121,6 +120,15 @@ The following plots are interactive so that outliers can be identified graphical
 
 ```{r 3PCinteractiveSuperPops_tern, echo=F, fig.width=7.5, fig.height=5, fig.align='center', fig.cap='Tridimensional plot of ancestery clustering of PC 1, 2 & 3'}
 
+# Plotly drops colors with only one point
+fix_plotly_drops <- function(df) {
+  singletons <- df %>%
+    group_by(superpop_infered) %>%
+    filter(n() == 1) %>%
+    ungroup
+  bind_rows(df, singletons)
+}
+
 axis <- function(title) {
   list(
     title = title,
@@ -167,15 +175,6 @@ plot_tern_interact %>%
 A 3D version follows for further exploration.
 
 ```{r 3PCinteractiveSuperPops, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Tridimensional plot of ancestery clustering of PC 1, 2 & 3'}
-
-# Plotly drops colors with only one point
-fix_plotly_drops <- function(df) {
-  singletons <- df %>%
-    group_by(superpop_infered) %>%
-    filter(n() == 1) %>%
-    ungroup
-  bind_rows(df, singletons)
-}
 
 ##  Plot superpops, PC1 + PC2 + PC3
 plot_ly(pca %>% mark_refs %>% fix_plotly_drops,
