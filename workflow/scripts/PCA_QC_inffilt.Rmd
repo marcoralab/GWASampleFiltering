@@ -114,6 +114,8 @@ p1 <- plot_grid(
 ggsave("plot.pdf", plot = p1, width = 7.5, height = 3.4, unit = "in")
 
 p1
+
+detach("package:ggtern", unload=TRUE)
 ```
 
 The following plots are interactive so that outliers can be identified graphically for further removal. Geometric medians are applied across all `r as.character(nrow(eigenval))` principle componants, so some of the clusters used to distinguish ancestries may not be visible on the plot.
@@ -204,4 +206,3 @@ Individuals not in the selected ancestry(s) based on the above inference were re
 tab_pop_exclusions %>%
   disptab
 ```
-
