@@ -79,7 +79,7 @@ plink --keep-allele-order --bfile {params.indat} \
             "{dataout}/{sample}_IBDQC.all.popfilt.kingfiles"
         params:
             indat = "{dataout}/{sample}_IBDQC.all",
-        container: 'docker://befh/r_env_gwasamplefilt:2'
+        container: 'docker://befh/r_env_gwasamplefilt:3'
         script: '../scripts/filterKing.R'
 
     rule PCAPartitioning:
@@ -93,7 +93,7 @@ plink --keep-allele-order --bfile {params.indat} \
             stem = rules.ancestryFilt.params.plinkout if qc_type['ancestry'] else rules.sample_prune_noancestry.params.out,
             king = rules.filterKING.params.indat + ".popfilt" if qc_type['ancestry'] else rules.filterKING.params.indat
         container: 'docker://befh/genesis_env_gwasamplefilt:2.1'
-        script: '../scripts/PartitionPCAiR.R'
+        script: '../scripts/RunPCAiR.R'
 
     rule stratFrq:
         input:

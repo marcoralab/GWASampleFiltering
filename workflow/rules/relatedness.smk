@@ -89,5 +89,5 @@ rule relatedness_sample_fail:
     output:
         out = "{dataout}/{sample}_exclude.relatedness",
         rdat = "{dataout}/{sample}_IBDQC.Rdata"
-    container: 'docker://befh/r_env_gwasamplefilt:2'
+    container: 'docker://befh/r_env_gwasamplefilt:3'
     script: '../scripts/relatedness_QC.R'

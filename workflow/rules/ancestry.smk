@@ -125,7 +125,7 @@ rule Sample_ChromPosRefAlt:
     output:
         bim = temp("{dataout}/{sample}_flipped_ChromPos.bim"),
         snplist = temp("{dataout}/{sample}_flipped_snplist")
-    container: 'docker://befh/r_env_gwasamplefilt:2'
+    container: 'docker://befh/r_env_gwasamplefilt:3'
     script: '../scripts/bim_ChromPosRefAlt.R'
 
 p_intersect = (('overlap_panel' in config)
@@ -167,7 +167,7 @@ plink --keep-allele-order --bfile {params.indat} -bim {input.bim} \
 rule SelectDupvar_snps:
     input: rules.PruneDupvar_snps.output[0]
     output: "{dataout}/{sample}_nodup.dupvar.delete"
-    container: 'docker://befh/r_env_gwasamplefilt:2'
+    container: 'docker://befh/r_env_gwasamplefilt:3'
     script: '../scripts/DuplicateVars.R'
 
 # Prune sample dataset
@@ -298,7 +298,7 @@ rule fix_fam:
         newfam = "{dataout}/{sample}_{refname}_merged.fam",
         tgped = tgped
     output: fixed = "{dataout}/{sample}_{refname}_merged_fixed.fam"
-    container: 'docker://befh/r_env_gwasamplefilt:2'
+    container: 'docker://befh/r_env_gwasamplefilt:3'
     script: '../scripts/fix_fam.R'
 
 rule merge_pops:
@@ -310,7 +310,7 @@ rule merge_pops:
         DATAOUT + '/{refname}_allpops_unique.txt'
     params:
         extra_ref_code = config['extra_ref']['subpop']
-    container: 'docker://befh/r_env_gwasamplefilt:2'
+    container: 'docker://befh/r_env_gwasamplefilt:3'
     script: '../scripts/add_extraref_pops.R'
 
 # PCA analysis to identify population outliers
@@ -348,5 +348,5 @@ rule ExcludePopulationOutliers:
         superpop = config['superpop'],
         extraref = 'none' if not extraref else config['extra_ref_subpop'],
         sd = pca_sd
-    container: 'docker://befh/r_env_gwasamplefilt:2'
+    container: 'docker://befh/r_env_gwasamplefilt:3'
     script: '../scripts/PCA_QC.R'
