@@ -110,13 +110,14 @@ PC.inc <-  findInterval(0.95, cumsum(eigenval$PVE)) + 1
 p1 <- ggplot(data = eigenval, aes(x = PC, y = PVE, group = factor(1))) +
   geom_point(colour = '#377EB8') + geom_path(colour = '#377EB8') +
   labs(x = 'Principal Components') +
-  theme_bw() + coord_cartesian(ylim = c(0,1))
+  theme_bw() + coord_cartesian(ylim = c(0,1), default = T)
 
 
 p2 <- ggplot(data = eigenval, aes(x=PC, y=cumsum(PVE), group = factor(1))) +
   geom_point(colour = '#377EB8') + geom_path(colour = '#377EB8') +
   labs(x = 'Principal Components', y = 'cumulative PVE') +
-  theme_bw() + coord_cartesian(ylim = c(0,1)) + geom_hline(yintercept = 0.95, colour = '#E41A1C', linetype = 2)
+  theme_bw() + coord_cartesian(ylim = c(0,1), default = T) +
+  geom_hline(yintercept = 0.95, colour = '#E41A1C', linetype = 2)
 
 grid.arrange(p1, p2, ncol = 2)
 ```
