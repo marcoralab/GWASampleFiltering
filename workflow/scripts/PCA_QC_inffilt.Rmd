@@ -14,7 +14,7 @@ library(kableExtra)
 
 tg_subpop <- "workflow/resources/tg_subpops.tsv"
 
-if (!file.exists(here(tg_subpop))) here <- function(x) paste0(rwd, "/", x)
+if (!file.exists(here(tg_subpop))) here <- function(x) paste0(params$rwd, "/", x)
 
 tg_labs <- tg_subpop %>%
   here() %>%
