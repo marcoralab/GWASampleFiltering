@@ -130,8 +130,8 @@ fi
         shell:
             '''
 if [ -f {params.indat}.pcair.eigenval ]; then
-  ln -s {params.indat}.pcair.eigenval {params.out}.eigenval
-  ln -s {params.indat}.pcair.eigenvec {params.out}.eigenvec
+  ln -s $(readlink -e {params.indat}.pcair.eigenval) {params.out}.eigenval
+  ln -s $(readlink -e {params.indat}.pcair.eigenvec) {params.out}.eigenvec
 else
   plink --keep-allele-order --bfile {params.indat} --read-freq {input.frq} --pca 10 \
     --within {input.unrel} --pca-cluster-names unrelated \
