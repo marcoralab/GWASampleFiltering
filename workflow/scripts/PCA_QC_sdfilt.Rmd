@@ -5,7 +5,11 @@ library(tibble)
 library(tidyr)
 library(purrr)
 
-tg_labs <- "workflow/resources/tg_subpops.tsv" %>%
+tg_subpop <- "workflow/resources/tg_subpops.tsv"
+
+if (!file.exists(here(tg_subpop))) here <- function(x) paste0(rwd, "/", x)
+
+tg_labs <- tg_subpop %>%
   read_tsv(col_types = cols(.default = "c")) %>%
   arrange(spop, pop)
 
