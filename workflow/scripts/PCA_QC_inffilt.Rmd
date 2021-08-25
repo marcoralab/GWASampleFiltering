@@ -122,6 +122,24 @@ p1
 detach("package:ggtern", unload=TRUE)
 ```
 
+```{r umap, echo=F, include=F, eval=F, fig.width=7.5, fig.height=3.4, fig.align='center', fig.cap='Ancestry assignment viewed on PCs 1-3'}
+# pca_umap <- select(pca, starts_with("PC")) %>%
+#   umap() %$%
+#   set_colnames(layout, c("UMPC1", "UMPC2")) %>%
+#   as_tibble() %>%
+#   bind_cols(pca, .) %>%
+#   mutate(cohort2 = ifelse(cohort == "Reference", "Reference", "Sample"))
+# 
+# pca_umap %>%
+#   mark_refs %>%
+#   ggplot(aes(x=UMPC1, y=UMPC2, color = superpop_infered, shape = cohort2)) +
+#   geom_point(size = 1) +
+#   scale_shape_manual(values = c(Reference = 16, Sample = 17)) +
+#   theme_bw() +
+#   theme(text = element_text(size=10), legend.box.margin = margin(0, 0, 0, 12), legend.title = element_blank()) +
+#   scale_color_manual(values = pca_col2)
+```
+
 The following plots are interactive so that outliers can be identified graphically for further removal. Geometric medians are applied across all `r as.character(nrow(eigenval))` principle componants, so some of the clusters used to distinguish ancestries may not be visible on the plot.
 
 ```{r 3PCinteractiveSuperPops_tern, echo=F, fig.width=7.5, fig.height=5, fig.align='center', fig.cap='Tridimensional plot of ancestery clustering of PC 1, 2 & 3'}
