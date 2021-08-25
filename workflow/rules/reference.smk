@@ -72,7 +72,7 @@ ereftype = detect_ref_type(config['extra_ref']) if extraref else 'none'
 if config['mirror'] == 'ncbi':
     tgbase = "http://ftp-trace.ncbi.nih.gov/1000genomes/ftp/"
 elif config['mirror'] == 'ebi':
-    tgbase = "http://ftp.1000genomes.ebi.ac.uk/vol1/ftp/"
+    tgbase = "ftp.1000genomes.ebi.ac.uk/vol1/ftp/"
 
 tgped = tgbase + "technical/working/20130606_sample_info/20130606_g1k.ped"
 
@@ -86,7 +86,7 @@ elif config['genome_build'] in ['hg38', 'GRCh38', 'grch38', 'GRCH38']:
     tgurl = (tgbase +
         'data_collections/1000_genomes_project/release/20181203_biallelic_SNV/' +
         'ALL.chr{chrom}.shapeit2_integrated_v1a.GRCh38.20181129.phased.vcf.gz')
-    tgfa = 'technical/reference/GRCh38_reference_genome/GRCh38_full_analysis_set_plus_decoy_hla.fa'
+    tgfa = tgbase + 'technical/reference/GRCh38_reference_genome/GRCh38_full_analysis_set_plus_decoy_hla.fa'
 
 # import ipdb; ipdb.set_trace()
 rule download_tg_chrom:
@@ -98,6 +98,10 @@ rule download_tg_chrom:
         temp("reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi")
     shell: "cp {input[0]} {output[0]}; cp {input[1]} {output[1]}"
 
+import time
+def http_sleep(url):
+    time.sleep(5)
+    return HTTP.remote(url)
 
 rule download_tg_fa:
     input:
