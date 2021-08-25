@@ -145,7 +145,7 @@ pca_intern <- function(gds, unrel_iid) {
     pc = as.data.frame(pc)
     colnames(pc) <- paste0("PC", 1:ncol(pc))
     as_tibble(pc) %>%
-      mutate(IID = iid) %>%
+      mutate(IID = as.character(iid)) %>%
       select(IID, everything())
   }
   
