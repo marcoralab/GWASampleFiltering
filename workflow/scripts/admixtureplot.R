@@ -10,8 +10,9 @@ p.out = snakemake@output[[1]] # Output
 
 message(
   "\ninput: ", q.path,
-  "\noutput:" ,p.out,"\n"
+  "\noutput:", p.out, "\n"
 )
+
 message ("Loading packages")
 library(dplyr)
 library(tibble)
