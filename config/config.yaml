@@ -34,8 +34,8 @@ DataOut: output
 
 #Do the samples contain families (true/false):
 family: false
-
-superpop: EUR
+pca_sd: false
+superpop: all
 pcair: true
 
 QC:

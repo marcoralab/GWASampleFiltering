@@ -350,3 +350,69 @@ rule ExcludePopulationOutliers:
         sd = pca_sd
     container: 'docker://befh/r_env_gwasamplefilt:3'
     script: '../scripts/PCA_QC.R'
+
+
+
+rule admixturepop:
+    input:
+        fam = rules.fix_fam.output,
+        pops = expand(DATAOUT + '/{refname}_allpops.txt' if extraref else "reference/{refname}_pops.txt", refname=REF),
+        spop = 'workflow/resources/tg_subpops.tsv'
+    output: "{dataout}/{sample}_{refname}_merged_fixed.pop"
+    container: 'docker://befh/r_env_gwasamplefilt:4'
+    script: '../scripts/admixture_pops.R'
+
+
+rule symlink_fixed:
+    input:
+        bed = "{dataout}/{sample}_{refname}_merged.bed",
+        bim = "{dataout}/{sample}_{refname}_merged.bim"
+    output:
+        bed = "{dataout}/{sample}_{refname}_merged_fixed.bed",
+        bim = "{dataout}/{sample}_{refname}_merged_fixed.bim"
+    shell:
+        '''
+ln -s $PWD/{input.bed} {output.bed}
+ln -s $PWD/{input.bim} {output.bim}
+'''
+
+# Perform supervised admixture on the samples
+rule supervised_admixture:
+    input:
+        plink = multiext("{dataout}/{sample}_{refname}_merged_fixed", ".bim", ".bed", ".fam", ".pop"),
+    output:
+        P = "{dataout}/{sample}_{refname}_merged.5.P",
+        Q = "{dataout}/{sample}_{refname}_merged.5.Q"
+    params:
+        stem = "{dataout}/{sample}_{refname}_merged_fixed",
+        K = 5
+    container: 'docker://befh/r_env_gwasamplefilt:4'
+    shell: #"admixture {params.stem}.bed {params.K} --supervised -j32"
+        r"""
+admixture {params.stem}.bed {params.K} --supervised -j32;
+mv {wildcards.sample}_{wildcards.refname}_merged_fixed.5.Q {output.Q};
+mv {wildcards.sample}_{wildcards.refname}_merged_fixed.5.P {output.P}
+"""
+
+
+# Interpret admixture Output
+rule interpret_admixture:
+    input:
+        Qraw = rules.supervised_admixture.output.Q,
+        pops = rules.admixturepop.output,
+        fam = rules.fix_fam.output.fixed,
+        pcs = rules.ExcludePopulationOutliers.output.pcs_pops
+    output: "{dataout}/{sample}_{refname}_merged_interpret_admixture.tsv"
+    container: 'docker://befh/r_env_gwasamplefilt:5'
+    script: '../scripts/interpret_admixture.R'
+
+
+# Make an admixture plot
+rule plot_admixture:
+    input:
+        Qdat = expand(
+            "{{dataout}}/{{sample}}_{refname}_merged_interpret_admixture.tsv",
+            refname=REF)
+    output: "{dataout}/plots/{sample}_admixture.png"
+    container: 'docker://befh/r_env_gwasamplefilt:5'
+    script: '../scripts/admixtureplot.R'
