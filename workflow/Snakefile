@@ -13,7 +13,14 @@ shell.executable("/bin/bash")
 BPLINK = ["bed", "bim", "fam"]
 RWD = os.getcwd()
 
-start, SAMPLE, DATAOUT = parser(config)
+
+if 'is_module' in config and config['is_module']:
+    start = config['start']
+    SAMPLE = config['SAMPLE']
+    DATAOUT = config['DATAOUT']
+else:
+    start, SAMPLE, DATAOUT = parser(config)
+
 
 FAMILY = 'T' if config['family'] else 'F'
 istg = config['isTG'] if 'isTG' in config else False
