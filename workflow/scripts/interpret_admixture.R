@@ -85,9 +85,6 @@ super_labels <- tbl_super %>%
   select(pca_super_pop, max) %>%
   deframe
 
-save.image("temp.Rdata")
-#load("../temp.Rdata")
-
 out_super <- tbl_super %>%
   rename(!!!super_labels) %>%
   relocate(FID, IID) %>%
