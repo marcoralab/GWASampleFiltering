@@ -48,6 +48,12 @@ message("Reading pop file \n")
 popfile <- path_popfile %>%
   read_table(col_names = c("super_pop"), col_types = "c")
 
+super_labels_frompop <- popfile %>%
+  distinct %>%
+  filter(super_pop != "-") %>%
+  mutate(col = paste0("k", 1:nrow(.))) %>%
+  deframe
+
 message("Reading fam fixed file \n")
 famfile <- path_famfile %>%
   read_table2(col_names = c("FID", "IID"), col_types = "cc----") %>%
@@ -85,6 +91,17 @@ super_labels <- tbl_super %>%
   select(pca_super_pop, max) %>%
   deframe
 
+if (length(super_labels) < length(super_labels_frompop)) {
+  test_max <- enframe(super_labels) %>% rename(max = value)
+  test_pop <- enframe(super_labels_frompop) %>% rename(pop = value)
+  test_names <- full_join(test_max, test_pop, by = "name")
+  if (!all(test_names$pop == test_names$max, na.rm=T)) {
+    print(test_names)
+    stop("Unsure of population names!")
+  }
+  super_labels <- super_labels_frompop
+}
+
 out_super <- tbl_super %>%
   rename(!!!super_labels) %>%
   relocate(FID, IID) %>%
@@ -99,11 +116,6 @@ out_super <- tbl_super %>%
       (AFR > 0.3 & EAS < 0.1 & SAS < 0.1 & AFR > AMR) ~ "AFR",
       (AMR > 0.1 & EAS < 0.1 & SAS < 0.1 ) ~ "AMR",
       TRUE ~ "Other"))
-
-#out_super %>% filter(admixture_super_pop_max != pca_super_pop)
-
-
-#out_super %>% filter(admixture_super_pop != pca_super_pop)
 
 message("Exporting out to ", supervised_assign, "\n")
 out_super %>% write_tsv(supervised_assign)
