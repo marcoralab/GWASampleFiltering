@@ -50,7 +50,7 @@ popfile <- path_popfile %>%
 
 message("Reading fam fixed file \n")
 famfile <- path_famfile %>%
-  read_tsv(col_names = c("FID", "IID"), col_types = "cc----") %>%
+  read_table2(col_names = c("FID", "IID"), col_types = "cc----") %>%
   bind_cols(popfile)
 
 message("Reading pcs file \n")
