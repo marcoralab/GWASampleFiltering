@@ -14,7 +14,7 @@ message(
 )
 
 message ("Loading packages")
-library(dplyr)
+suppressPackageStartupMessages(library(dplyr))
 library(tibble)
 library(purrr)
 library(forcats)
@@ -25,30 +25,32 @@ library(readr)
 library(tidyr)
 library(RColorBrewer)
 
+
 message("Reading admixture output file  \n")
 Q.dat <- read_tsv(q.path)
+
+spop_cols <- intersect(c("EUR", "AFR", "AMR", "EAS", "SAS"), names(Q.dat))
 
 Q.dat.long <- Q.dat %>%
   rowwise(IID) %>%
   mutate(
-    maxval=max(c_across(c(AFR, SAS, EAS, EUR, AMR))),
-    matchval=which.max(c_across(c(AFR, SAS, EAS, EUR, AMR))),
+    maxval=max(c_across(spop_cols)),
+    matchval=which.max(c_across(spop_cols)),
   ) %>%
   ungroup() %>%
   mutate(corder = order(matchval, -maxval)) %>%
-  pivot_longer(c("AFR", "SAS", "EAS", "EUR", "AMR"), names_to = "K", values_to = "prop" ) %>%
+  pivot_longer(spop_cols, names_to = "K", values_to = "prop" ) %>%
   arrange(matchval, -maxval) %>%
   mutate(IID = fct_inorder(IID))
 
-colour <- c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00")
+colour <- c(AFR = "#E41A1C", AMR = "#377EB8", EAS = "#4DAF4A",
+            EUR = "#984EA3", SAS = "#FF7F00")[spop_cols]
 plotQ <- ggplot(Q.dat.long , aes(x = IID, y = prop, fill = K)) +
   geom_bar(position="fill", stat="identity", width = 1) +
   scale_fill_manual(name="Super Population",
-                    values=colour ,
-                    breaks=c("AFR","AMR","EAS","EUR","SAS") ,
-                    labels=c("AFR", "AMR","EAS", "EUR", "SAS")) +
+                    values=colour) +
   theme_classic() + labs(x = "Indivuals", y = "Global Ancestry", color ="Super Population") +
-  facet_grid(~fct_relevel(pca_super_pop, "EUR", "AFR", "AMR", "EAS", "SAS"), switch = "x", scales = "free", space = "free")+
+  facet_grid(~fct_relevel(pca_super_pop, spop_cols), switch = "x", scales = "free", space = "free")+
   theme(
     axis.text.x = element_blank(),
     axis.ticks.x=element_blank(),

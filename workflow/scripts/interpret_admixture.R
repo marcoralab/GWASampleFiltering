@@ -3,7 +3,7 @@
 ## Assign ancestry for admixture output
 ## ========================================================================== ##
 
-library(dplyr)
+suppressPackageStartupMessages(library(dplyr))
 library(readr)
 library(tidyr)
 library(purrr)
@@ -11,12 +11,11 @@ library(tibble)
 library(stringr)
 
 if (!exists("snakemake")) {
-  setwd("..")
   cohort_name <- "ADSP17kWGS"
   inputs <- lapply(
-    list(Qraw = "output/%s_1kG_merged.5.Q",
-         fam = "output/%s_1kG_merged_fixed.fam",
-         pops = "output/%s_1kG_merged_fixed.pop",
+    list(Qraw = "output/%s_1kG_filtered.3.Q",
+         fam = "output/%s_1kG_admixfiltered.fam",
+         pops = "output/%s_1kG_admixfiltered.pop",
          pcs = "output/%s_cluster_pops.tsv"),
     sprintf,
     cohort_name)
@@ -102,10 +101,15 @@ if (length(super_labels) < length(super_labels_frompop)) {
   super_labels <- super_labels_frompop
 }
 
-out_super <- tbl_super %>%
+out_start <- tbl_super %>%
   rename(!!!super_labels) %>%
-  relocate(FID, IID) %>%
+  relocate(FID, IID)
+
+super_guess <- out_start %>%
+  bind_rows(tibble(
+    EUR = 0, EAS = 0, SAS = 0, AFR = 0, AMR = 0, dummy = T)) %>%
   mutate(
+    across(where(is.double), ~ replace_na(.x, 0)),
     admixture_super_pop_max = pmap_chr(
       select(., !!names(super_labels)),
       ~ c(...) %>% which.max %>% names),
@@ -115,7 +119,11 @@ out_super <- tbl_super %>%
       (SAS > 0.51) ~ "SAS",
       (AFR > 0.3 & EAS < 0.1 & SAS < 0.1 & AFR > AMR) ~ "AFR",
       (AMR > 0.1 & EAS < 0.1 & SAS < 0.1 ) ~ "AMR",
-      TRUE ~ "Other"))
+      TRUE ~ "Other")) %>%
+  filter(is.na(dummy)) %>%
+  select(FID, IID, admixture_super_pop_max, admixture_super_pop)
+
+out_super <- left_join(out_start, super_guess, by = c("FID", "IID"))
 
 message("Exporting out to ", supervised_assign, "\n")
 out_super %>% write_tsv(supervised_assign)
