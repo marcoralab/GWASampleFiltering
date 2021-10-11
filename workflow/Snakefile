@@ -1,6 +1,4 @@
 '''Snakefile for GWAS Variant and Sample QC Version 0.3.1'''
-# import ipdb; ipdb.set_trace()
-from scripts.parse_config_GWASampleFiltering import parser
 import os
 import warnings
 
@@ -19,6 +17,7 @@ if 'is_module' in config and config['is_module']:
     SAMPLE = config['SAMPLE']
     DATAOUT = config['DATAOUT']
 else:
+    from scripts.parse_config_GWASampleFiltering import parser
     start, SAMPLE, DATAOUT = parser(config)
 
 
