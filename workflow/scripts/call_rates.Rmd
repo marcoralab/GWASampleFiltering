@@ -5,24 +5,12 @@ date: "4/2/2018"
 output:
   html_document:
     df_print: paged
-params:
-    rwd:
-    Path_hwe: /Users/sheaandrews/Documents/Test/temp/201711_CoreExome-DIAN_SnpQc.hwe
-    Path_frq: /Users/sheaandrews/Documents/Test2/DianTest_geno.frq
-    Path_frqx: /Users/sheaandrews/Documents/Test2/DianTest_geno.frqx
-    Path_imiss: /Users/sheaandrews/Documents/Test2/DianTest_geno.imiss
-    Sample: 201711_CoreExome-DIAN
-    maf: 0.01
-    missing_geno: 0.05
-    missing_sample: 0.05
-    hwe: 1e-6
 editor_options:
   chunk_output_type: console
 ---
 
 ```{r setup call rate, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_knit$set(root.dir = params$rwd)
 
 # ---- packages ----
 library(readr)
@@ -55,7 +43,7 @@ disptab <- function(x) {
 
 # ---- readin plink .frq ---- ##
 message("reading plink frq file")
-freq.raw <- read_table2(params$Path_frq, col_names = T,
+freq.raw <- read_table2(snakemake@input[["frq"]], col_names = T,
   col_types = cols(
   CHR = col_double(),
   SNP =col_character(),
@@ -68,7 +56,7 @@ freq.raw <- read_table2(params$Path_frq, col_names = T,
 
 # ---- readin plink .frqx ---- ##
 message("reading plink frqx file")
-freqx.raw <- read_tsv(params$Path_frqx, col_names = T,
+freqx.raw <- read_tsv(snakemake@input[["frqx"]], col_names = T,
   col_types = cols(
   CHR = col_double(),
   SNP = col_character(),
@@ -85,7 +73,7 @@ freqx.raw <- read_tsv(params$Path_frqx, col_names = T,
 
 # ---- readin plink .hwe ---- ##
 message("reading plink hwe file")
-hwe.raw <- read_table2(params$Path_hwe, col_types = cols(
+hwe.raw <- read_table2(snakemake@input[["hwe"]], col_types = cols(
   CHR = col_integer(),
   SNP = col_character(),
   TEST = col_character(),
@@ -113,7 +101,7 @@ if ( nrow(hwe.raw) > 2*nrow(freq.raw) ) {
 ```
 
 # SNP QC
-SNP level QC consists of removing markers with excessive missingness or low allele frequency. This QC increases the power to identify true associations with disease risk by removing suboptimal markers that can increase false positives. `r round((1 - params$missing_geno)*100)`% was used as the SNP call rate threshhold (usually ≥ 95% or higher), and `r params$maf*100`% was used as the MAF threshold (usually ≥ 1% or higher).
+SNP level QC consists of removing markers with excessive missingness or low allele frequency. This QC increases the power to identify true associations with disease risk by removing suboptimal markers that can increase false positives. `r round((1 - snakemake@params[["geno_miss"]])*100)`% was used as the SNP call rate threshhold (usually ≥ 95% or higher), and `r snakemake@params[["MAF"]]*100`% was used as the MAF threshold (usually ≥ 1% or higher).
 <br>
 
 Filtering SNPs on MAF and call rate can be done in `PLINK 1.9` by typing the following (or similar) at the shell prompt. This uses 95% and 1% for the call-rate and MAF, respectively:
@@ -135,9 +123,9 @@ snps <- freq.raw %>%
   full_join(hwe, by = c("CHR", "SNP", "A1", "A2")) %>%
   rename(AA = `C(HOM A1)`, AB = `C(HET)`, BB = `C(HOM A2)`, missing = `C(MISSING)`) %>%
   mutate(Call.rate = 1 - (missing / c(AA + AB + BB + missing))) %>%
-  mutate(Call = Call.rate >= 1 - as.numeric(params$missing_geno)) %>%
-  mutate(Call.maf = MAF < params$maf) %>%
-  mutate(hwe = P > as.numeric(params$hwe)) %>%
+  mutate(Call = Call.rate >= 1 - as.numeric(snakemake@params[["geno_miss"]])) %>%
+  mutate(Call.maf = MAF < snakemake@params[["MAF"]]) %>%
+  mutate(hwe = P > as.numeric(snakemake@params[["HWE"]])) %>%
   as_tibble()
 ```
 
@@ -145,15 +133,15 @@ Figure \@ref(fig:MAFxcallrate) shows the SNP call rate versus minor allele frequ
 ```{r MAFxcallrate, cache=F, echo=F, warning=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Call rate by minor allele frequency '}
 ggplot(data = snps, aes(x = MAF, y = Call.rate)) +
   geom_point(alpha = 0.3, size = 0.5) +
-  geom_hline(yintercept = 1 - params$missing_geno, linetype = 2, colour = 'red') +
-  geom_vline(xintercept = params$maf, linetype = 2, colour = 'red') +
+  geom_hline(yintercept = 1 - snakemake@params[["geno_miss"]], linetype = 2, colour = 'red') +
+  geom_vline(xintercept = snakemake@params[["MAF"]], linetype = 2, colour = 'red') +
   scale_x_log10(breaks = scales::trans_breaks("log10", function(x) round(10^x, 3))) +
   labs(y = 'Proportion of called genotypes', x = 'Minor Allele Frequency (log)') +
   theme_bw() + annotation_logticks()
 ```
 
 # Hardy Weinberg Equilibrium
-Violations of Hardy Weinberg Equilibrium can indicate either the presence of population substructure, or the occurence of genotyping error. It is common practice to assume that violoations are indicative of genotyping error and remove SNPs in which the HWE test statistic has a corresponding p-value of less then 1x10-6. A threshold of `r params$hwe` is used here.
+Violations of Hardy Weinberg Equilibrium can indicate either the presence of population substructure, or the occurence of genotyping error. It is common practice to assume that violoations are indicative of genotyping error and remove SNPs in which the HWE test statistic has a corresponding p-value of less then 1x10-6. A threshold of `r snakemake@params[["HWE"]]` is used here.
 
 For case-control data, HWE is generally not tested in cases to not exclude real selection against a phenotype, so it is best to include case-control status in the PLINK files. `r CC_read`
 <br>
@@ -192,7 +180,7 @@ detach("package:ggtern", unload=TRUE)
 
 
 # Sample Call Rate
-A low genotyping call rate in a sample can be indicative of poor DNA sample quality, so samples with a call rate < `r round((1 - params$missing_sample)*100)`% are excluded from further analysis.
+A low genotyping call rate in a sample can be indicative of poor DNA sample quality, so samples with a call rate < `r round((1 - snakemake@params[["samp_miss"]])*100)`% are excluded from further analysis.
 <br>
 
 Filtering samples on a call rate of 95% can be done in PLINK by typing the following at the shell prompt:
@@ -204,16 +192,16 @@ plink_1.9 --bfile raw-GWA-data  \
 <br>
 
 ```{r, echo=FALSE, include=FALSE}
-if (params$Path_imiss != "/dev/null") {
+if (snakemake@input[["imiss"]] != "/dev/null") {
   imiss_tf <- T
   # ---- readin plink .imiss ---- ##
   message("reading plink individual missingness file")
-  imiss.raw <- read_table2(params$Path_imiss, col_names = T)
+  imiss.raw <- read_table2(snakemake@input[["imiss"]], col_names = T)
   imiss <- imiss.raw %>%
-    mutate(call = F_MISS > params$missing_sample) %>%
+    mutate(call = F_MISS > snakemake@params[["samp_miss"]]) %>%
     as_tibble()
   caption_table <- tabcap("highmiss", sprintf("Samples with a call rate < %i%%",
-    round((1 - params$missing_sample)*100)))
+    round((1 - snakemake@params[["samp_miss"]])*100)))
 } else {
   imiss_tf <- F
   imiss.raw <- "not used"
@@ -229,8 +217,8 @@ Figure \@ref(fig:samplecallrate) shows the distribution of sample call rates acr
 ggplot(data = imiss, aes(x = as.factor(1), y = F_MISS, colour = call, shape = call)) +
   geom_sina(size = 1.5) +
   geom_hline(yintercept = 0.05, linetype = 2, colour = 'red') +
-  scale_colour_manual(name = sprintf('Missing > %.2f', params$missing_sample), values = c("#377EB8", "#E41A1C")) +
-  scale_shape_manual(name = sprintf('Missing > %.2f', params$missing_sample), values = c(19,17)) +
+  scale_colour_manual(name = sprintf('Missing > %.2f', snakemake@params[["samp_miss"]]), values = c("#377EB8", "#E41A1C")) +
+  scale_shape_manual(name = sprintf('Missing > %.2f', snakemake@params[["samp_miss"]]), values = c(19,17)) +
   scale_y_log10(breaks = scales::trans_breaks("log10", function(x) round(10^x, 3)), limits = c(0.0001,1)) +
   labs(y = 'Proportion of missing genotypes (log)') +
   theme_bw() + coord_flip() +

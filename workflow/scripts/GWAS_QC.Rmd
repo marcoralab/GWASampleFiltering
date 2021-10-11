@@ -18,59 +18,42 @@ output:
       collapsed: false
       smooth_scroll: false
 params:
-    rwd: rwd
-    Sample: Sample
-    DataIn: DataIn
-    Path_hwe: Path_hwe
-    Path_frq: Path_frq
-    Path_frqx: Path_frqx
-    Path_imiss: Path_imiss
-    Path_SexFile: Path_SexFile
-    Path_HetFile: Path_HetFile
-    Family: Family
-    Path_IBD_stats:
-    Pi_threshold: 0.1875
-    Path_PCA_rdat: Path_PCA_rdat
-    Path_PopStrat_eigenvec: Path_PopStrat_eigenvec
-    Path_PopStrat_eigenval: Path_PopStrat_eigenval
-    auth: "Shea J. Andrews and Brian Fulton-Howard"
-    maf: 0.01
-    missing_geno: 0.05
-    missing_sample: 0.05
-    hwe: 1e-6
-    superpop: "EUR"
-    partmethod: "none"
-title: "GWAS QC: `r params$Sample`"
-author: "`r params$auth`"
+    rmd: "GWAS_QC.Rmd"
+title: "Genomic Sample QC Report"
+author: "Written and maintained by Brian Fulton-Howard and Shea Andrews"
 ---
+
+## Sample QC for `r snakemake@wildcards[["sample"]]`
 
 ```{r setup, include=FALSE, echo=F, message=F, warning=F}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = snakemake@params[["rwd"]])
 # knitr::opts_knit$set(root.dir = paste0(params$rwd, 'workflow/scripts'))
-cr_tf <- params$Path_imiss != "/dev/null" || params$Path_frq != "/dev/null"
-sexcheck_tf <- params$Path_SexFile != "/dev/null"
-hetcheck_tf <- params$Path_HetFile != "/dev/null"
-relcheck_tf <- params$Path_IBD_stats != "/dev/null"
-pcacheck_tf <- params$Path_PCA_rdat != "/dev/null"
-strat_tf <- params$Path_PopStrat_eigenvec != "/dev/null"
+cr_tf <- snakemake@input[["imiss"]] != "/dev/null" || snakemake@input[["frq"]] != "/dev/null"
+sexcheck_tf <- snakemake@input[["SexFile"]] != "/dev/null"
+hetcheck_tf <- snakemake@input[["HetFile"]] != "/dev/null"
+relcheck_tf <- snakemake@input[["IBD_stats"]] != "/dev/null"
+pcacheck_tf <- snakemake@input[["PCA_rdat"]] != "/dev/null"
+strat_tf <- snakemake@input[["PopStrat_eigenvec"]] != "/dev/null"
+sdir <- function(x) sprintf("%s/%s", snakemake@scriptdir, x)
 ```
 
-```{r child = 'call_rates.Rmd', eval = cr_tf}
+```{r child = sdir('call_rates.Rmd'), eval = cr_tf}
 ```
 
-```{r child = 'sexcheck_QC.Rmd', eval = sexcheck_tf}
+```{r child = sdir('sexcheck_QC.Rmd'), eval = sexcheck_tf}
 ```
 
-```{r child = 'Heterozygosity_QC.Rmd', eval = hetcheck_tf}
+```{r child = sdir('Heterozygosity_QC.Rmd'), eval = hetcheck_tf}
 ```
 
 # Population and family structure
 
-```{r child = 'relatedness_QC.Rmd', eval = relcheck_tf}
+```{r child = sdir('relatedness_QC.Rmd'), eval = relcheck_tf}
 ```
 
-```{r child = 'PCA_QC.Rmd', eval = pcacheck_tf}
+```{r child = sdir('PCA_QC.Rmd'), eval = pcacheck_tf}
 ```
 
-```{r child = 'population_stratification_QC.Rmd', eval = strat_tf}
+```{r child = sdir('population_stratification_QC.Rmd'), eval = strat_tf}
 ```

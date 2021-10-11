@@ -14,7 +14,7 @@ library(kableExtra)
 
 tg_subpop <- "workflow/resources/tg_subpops.tsv"
 
-if (!file.exists(here(tg_subpop))) here <- function(x) paste0(params$rwd, "/", x)
+if (!file.exists(here(tg_subpop))) here <- function(x) paste0(snakmake@params[["rwd"]], "/", x)
 
 tg_labs <- tg_subpop %>%
   here() %>%
@@ -37,7 +37,7 @@ sp_desc <- tg_labs %>%
 
 ```
 
-### `r sp_labs[params$superpop]` Population Structure
+### `r sp_labs[snakemake@params[["superpop"]]]` Population Structure
 
 Populations have been inferred based on minimum distance from the geometric median of the first 10 principle components.
 
@@ -48,7 +48,7 @@ tab_1 %>%
   kable_styling(bootstrap_options = c("striped", "hover"))
 ```
 
-The following plots show the population structure of `r params$Sample` (Black Triangles) based on the first three principal components. In Fig. \@ref(fig:ternplots_assign), the reference and projected samples are displayed on a ternary plot. Fig. \@ref(fig:3PCinteractiveSuperPops) contains the same data as an interactive 3d plot.
+The following plots show the population structure of `r snakemake@wildcards[["sample"]]` (Black Triangles) based on the first three principal components. In Fig. \@ref(fig:ternplots_assign), the reference and projected samples are displayed on a ternary plot. Fig. \@ref(fig:3PCinteractiveSuperPops) contains the same data as an interactive 3d plot.
 
 ```{r ternplots_assign, echo=F, fig.width=7.5, fig.height=3.4, fig.align='center', fig.cap='Ancestry assignment viewed on PCs 1-3'}
 
@@ -129,7 +129,7 @@ detach("package:ggtern", unload=TRUE)
 #   as_tibble() %>%
 #   bind_cols(pca, .) %>%
 #   mutate(cohort2 = ifelse(cohort == "Reference", "Reference", "Sample"))
-# 
+#
 # pca_umap %>%
 #   mark_refs %>%
 #   ggplot(aes(x=UMPC1, y=UMPC2, color = superpop_infered, shape = cohort2)) +
