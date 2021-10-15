@@ -5,18 +5,12 @@ date: "`r Sys.Date()`"
 output:
   html_document:
     df_print: paged
-params:
-  Path_PCA_rdat:
-  Sample:
-  rwd:
-  superpop: "EUR"
 editor_options:
   chunk_output_type: console
 ---
 
 ```{r setupPCA, include=FALSE, cache=F}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_knit$set(root.dir = params$rwd)
 
 ## ---- Load Required R packages ---- ##
 library(ggplot2)    ## For ploting
@@ -45,7 +39,7 @@ disptab <- function(x) {
 
 ```{r, Load sample PCA, message=F, warning=F, echo=F}
 ##---- Read in Data ----##
-load(params$Path_PCA_rdat)
+load(snakemake@input[["PCA_rdat"]])
 captions <- list(fig1 = paste("Scree Plot of PVE for 10 Principal Components",
                 "(left) and cumaltive PVE for 10 Principal Components (right)"),
                  fig2 = 'Population Structure Pairs Plots')
@@ -95,9 +89,9 @@ p2 <- ggplot(data = eigenval, aes(x=PC, y=cumsum(PVE), group = factor(1))) +
 grid.arrange(p1, p2, ncol = 2)
 ```
 
-### 1000g vs. `r params$Sample` Pairs Plot
+### 1000g vs. `r snakemake@wildcards[["sample"]]` Pairs Plot
 
-The following pairs plot (Fig. \@ref(fig:pairsplot)) displays the population structure across the first principal components for `r params$Sample` compared with the refernce populations from 1000 genomes.
+The following pairs plot (Fig. \@ref(fig:pairsplot)) displays the population structure across the first principal components for `r snakemake@wildcards[["sample"]]` compared with the refernce populations from 1000 genomes.
 
 ```{r pairsplot, echo=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap=captions$fig2}
 ##---- Plot pairs plots ----##

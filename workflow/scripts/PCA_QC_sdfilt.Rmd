@@ -7,7 +7,7 @@ library(purrr)
 
 tg_subpop <- "workflow/resources/tg_subpops.tsv"
 
-if (!file.exists(here(tg_subpop))) here <- function(x) paste0(params$rwd, "/", x)
+if (!file.exists(here(tg_subpop))) here <- function(x) paste0(snakmake@params[["rwd"]], "/", x)
 
 tg_labs <- tg_subpop %>%
   read_tsv(col_types = cols(.default = "c")) %>%
@@ -28,14 +28,14 @@ sp_desc <- tg_labs %>%
   deframe
 ```
 
-### `r sp_labs[params$superpop]` Population Structure
+### `r sp_labs[snakemake@params[["superpop"]]]` Population Structure
 
-The following plots show the population structure of `r params$Sample` (Black Triangles) based on the first two (Fig. \@ref(fig:2PCstaticSuperPops)) and three (Fig. \@ref(fig:3PCinteractiveSuperPops)) principal components compared with the reference populations from 1000 Genomes. The static plot is zoomed into the `r sp_labs[params$superpop]` refernce super population composed of `r sp_desc[params$superpop]`.
+The following plots show the population structure of `r snakemake@wildcards[["sample"]]` (Black Triangles) based on the first two (Fig. \@ref(fig:2PCstaticSuperPops)) and three (Fig. \@ref(fig:3PCinteractiveSuperPops)) principal components compared with the reference populations from 1000 Genomes. The static plot is zoomed into the `r sp_labs[snakemake@params[["superpop"]]]` refernce super population composed of `r sp_desc[snakemake@params[["superpop"]]]`.
 
 ```{r 2PCstaticSuperPops, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Ancestery clustering based on PC 1 & 2'}
 ##  Plot superpops, PC1 + PC2
 ggplot(pca, aes(x = PC2, y = PC1, color = superpop, shape = cohort)) +
-  geom_point() + facet_zoom(xy = superpop == params$superpop) +
+  geom_point() + facet_zoom(xy = superpop == snakemake@params[["superpop"]]) +
   scale_color_manual(values = pca_col$color) + coord_fixed(ratio = 1) +
   theme_bw() + theme(legend.position = 'right')
 ```
@@ -53,10 +53,10 @@ plot_ly(pca, x = ~PC2, y = ~PC1, z = ~PC3, color = ~superpop,
 
 ### Population Outliers
 
-Individuals of non-`r sp_labs[params$superpop]` ancestry were identified by determining the mean and standard deviation of the 10 principal components scores for the `r params$superpop` super-population (Table 1). Participants in `r params$Sample` who were \pm `r as.character(sdev)` SD from the `r params$superpop` population mean were determined to be of non-`r sp_labs[params$superpop]` ancestry (Tab. \@ref(tab:pcastats)).
+Individuals of non-`r sp_labs[snakemake@params[["superpop"]]]` ancestry were identified by determining the mean and standard deviation of the 10 principal components scores for the `r snakemake@params[["superpop"]]` super-population (Table 1). Participants in `r snakemake@wildcards[["sample"]]` who were \pm `r as.character(sdev)` SD from the `r snakemake@params[["superpop"]]` population mean were determined to be of non-`r sp_labs[snakemake@params[["superpop"]]]` ancestry (Tab. \@ref(tab:pcastats)).
 
 ```{r pcastats, echo=F}
-tab_1 %>% kable(booktabs = T, caption = sprintf("Mean and SD of PCs in %s population", params$superpop)) %>%
+tab_1 %>% kable(booktabs = T, caption = sprintf("Mean and SD of PCs in %s population", snakemake@params[["superpop"]])) %>%
   kable_styling(bootstrap_options = c("striped", "hover"))
 ```
 
@@ -66,12 +66,12 @@ cat('Figures and Table for population outliers are omitted because there are no 
 knitr::knit_exit()
 ```
 
-Fig. \@ref(fig:popOutliers2PC) and Fig. \@ref(fig:popOutliers3PC) display the population structure of `r params$Sample` with `r params$superpop` population outliers highlighted in red. Tab. \@ref(tab:popoutliers) lists all population outliers for removal.
+Fig. \@ref(fig:popOutliers2PC) and Fig. \@ref(fig:popOutliers3PC) display the population structure of `r snakemake@wildcards[["sample"]]` with `r snakemake@params[["superpop"]]` population outliers highlighted in red. Tab. \@ref(tab:popoutliers) lists all population outliers for removal.
 
-```{r, popOutliers2PC, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap=sprintf('%s population outliers on PC 1 & 2', params$superpop)}
+```{r, popOutliers2PC, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap=sprintf('%s population outliers on PC 1 & 2', snakemake@params[["superpop"]])}
 ggplot(pca_sample, aes(x = PC2, y = PC1, color = pop_outliers)) +
   geom_point() + coord_fixed(ratio = 1) + theme_bw() +
-  facet_zoom(xy = superpop %in% c(params$superpop) | pop_outliers == F) +
+  facet_zoom(xy = superpop %in% c(snakemake@params[["superpop"]]) | pop_outliers == F) +
   scale_color_manual(name = c('Population Outlier'),
                      values = c("#377EB8", "#E41A1C"))
 ```
@@ -87,7 +87,7 @@ plot_ly(pca_sample, x = ~PC2, y = ~PC1, z = ~PC3, color = ~pop_outliers,
 ```
 
 
-`r tabcap("popoutliers", sprintf("%s Population Outliers for each PC", params$superpop))`
+`r tabcap("popoutliers", sprintf("%s Population Outliers for each PC", snakemake@params[["superpop"]]))`
 
 ```{r, population outliers table, echo=F, results='asis'}
 tab_pop_exclusions %>%

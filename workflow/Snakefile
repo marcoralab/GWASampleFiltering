@@ -194,7 +194,6 @@ rule GWAS_QC_Report:
     output:
          "{dataout}/stats/{sample}_GWAS_QC.html"
     params:
-        script = "workflow/scripts/GWAS_QC.Rmd",
         rwd = RWD,
         Family = FAMILY,
         pi_threshold = 0.1875,
@@ -207,4 +206,4 @@ rule GWAS_QC_Report:
         superpop = config['superpop'],
         partmethod = rules.PCAPartitioning.output[1] if qc_type['popstrat'] and config["pcair"] else "none"
     container: 'docker://befh/r_env_gwasamplefilt:3'
-    script: "scripts/RenderMarkdown.R"
+    script: "scripts/GWAS_QC.Rmd"
