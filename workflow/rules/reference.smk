@@ -1,6 +1,6 @@
 '''Snakefile for GWAS Variant and Sample QC Version 0.3.1'''
 
-from scripts.parse_config_GWASampleFiltering import parser
+# from scripts.parse_config_GWASampleFiltering import parser
 
 from snakemake.remote.FTP import RemoteProvider as FTPRemoteProvider
 from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
