@@ -214,17 +214,30 @@ if (snakemake@input[["imiss"]] != "/dev/null") {
 Figure \@ref(fig:samplecallrate) shows the distribution of sample call rates across all individules in the study, with the dashed line denoting the call rate QC threshold (typicaly ≥ 95%). Table \@ref(tab:highmiss) lists the samples that were excluded based on call rate.
 
 ```{r samplecallrate, echo=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Sample call rate distribution', eval = imiss_tf}
-ggplot(data = imiss, aes(x = as.factor(1), y = F_MISS, colour = call, shape = call)) +
-  geom_sina(size = 1.5) +
-  geom_hline(yintercept = 0.05, linetype = 2, colour = 'red') +
-  scale_colour_manual(name = sprintf('Missing > %.2f', snakemake@params[["samp_miss"]]), values = c("#377EB8", "#E41A1C")) +
-  scale_shape_manual(name = sprintf('Missing > %.2f', snakemake@params[["samp_miss"]]), values = c(19,17)) +
-  scale_y_log10(breaks = scales::trans_breaks("log10", function(x) round(10^x, 3)), limits = c(0.0001,1)) +
+if(filter(imiss, call == T) %>% nrow() > 0){
+  ggplot(data = imiss, aes(x = as.factor(1), y = F_MISS, colour = call, shape = call)) +
+    geom_sina(size = 1.5) +
+    geom_hline(yintercept = 0.05, linetype = 2, colour = 'red') +
+    scale_colour_manual(name = sprintf('Missing > %.2f', snakemake@params[["samp_miss"]]), values = c("#377EB8", "#E41A1C")) +
+    scale_shape_manual(name = sprintf('Missing > %.2f', snakemake@params[["samp_miss"]]), values = c(19,17)) +
+    scale_y_log10(breaks = scales::trans_breaks("log10", function(x) round(10^x, 3)), limits = c(0.0001,1)) +
+    labs(y = 'Proportion of missing genotypes (log)') +
+    theme_bw() + coord_flip() +
+    theme(legend.position = 'bottom', axis.title.x = element_text(""),
+          axis.title.y = element_blank(), axis.ticks.y = element_blank())
+          #axis.text.y = element_blank())
+} else {
+  ggplot(data = imiss, aes(x = as.factor(1), y = F_MISS, colour = call, shape = call)) +
+  scale_y_log10(breaks = scales::trans_breaks("log10", function(x) round(10^x, 3)), limits = c(0.0001,1)) +  
   labs(y = 'Proportion of missing genotypes (log)') +
   theme_bw() + coord_flip() +
   theme(legend.position = 'bottom', axis.title.x = element_text(""),
-        axis.title.y = element_blank(), axis.ticks.y = element_blank())
-        #axis.text.y = element_blank())
+        axis.title.y = element_blank(), axis.ticks.y = element_blank()) + 
+  annotate(geom="text", x=as.factor(1), y=0.01, color="red", size = 10, 
+           label="No Samples with missing genotypes")
+
+}
+
 ```
 <br>
 

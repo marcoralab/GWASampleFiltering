@@ -58,7 +58,7 @@ excluded <- het %>%
   bind_rows(rel) %>%
   filter(!is.na(FID))
 message("Excluded:")
-print(data.frame(excluded))
+# print(data.frame(excluded))
 
 ##  write out samples to be excluded
 write_tsv(excluded, outfile, col_names = T)

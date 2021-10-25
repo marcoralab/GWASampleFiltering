@@ -123,24 +123,31 @@ plink --keep-allele-order --bfile {params.indat} \
 '''
 
 rule sex_sample_fail:
-    input: rules.sexcheck_QC.output
+    input: "{dataout}/{sample}_SexQC.sexcheck"
     output: "{dataout}/{sample}_exclude.sexcheck"
     container: 'docker://befh/r_env_gwasamplefilt:3'
     script: 'scripts/sexcheck_QC.R'
 
 
 # ---- Exclude Samples with outlying heterozigosity ----
+if 'unimputed_module' in config and config['is_module']:
+    het_in_plink = start['files']
+    het_in_plink_stem = start['stem']
+else:
+    het_in_plink = sampleqc_in_plink
+    het_in_plink_stem = sampleqc_in_plink_stem
+
 rule heterozygosity_QC:
-    input: sampleqc_in_plink
+    input: het_in_plink
     output: "{dataout}/{sample}_HetQC.het"
     params:
-        indat_plink = sampleqc_in_plink_stem,
+        indat_plink = het_in_plink_stem,
         out = "{dataout}/{sample}_HetQC"
     conda: "envs/plink.yaml"
     shell: "plink --keep-allele-order --bfile {params.indat_plink} --het --out {params.out}"
 
 rule heterozygosity_sample_fail:
-    input: rules.heterozygosity_QC.output
+    input: "{dataout}/{sample}_HetQC.het"
     output: "{dataout}/{sample}_exclude.heterozigosity"
     container: 'docker://befh/r_env_gwasamplefilt:3'
     script: 'scripts/heterozygosity_QC.R'

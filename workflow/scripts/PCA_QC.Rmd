@@ -102,5 +102,5 @@ GGally::ggpairs(pca, columns = paste0('PC', 1:PC.inc),
 ```{r child = 'PCA_QC_sdfilt.Rmd', eval = report_settings$filter_sd}
 ```
 
-```{r child = 'PCA_QC_inffilt.Rmd', eval = report_settings$filter_inference || report_settings$all_pos}
+```{r child = 'PCA_QC_inffilt.Rmd', eval = report_settings$filter_inference || report_settings$all_pops}
 ```
