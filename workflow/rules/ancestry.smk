@@ -357,7 +357,7 @@ rule admixturepop:
     input:
         fam = rules.fix_fam.output,
         pops = expand(DATAOUT + '/{refname}_allpops.txt' if extraref else "reference/{refname}_pops.txt", refname=REF),
-        spop = 'workflow/resources/tg_subpops.tsv'
+        spop = 'resources/tg_subpops.tsv'
     output: "{dataout}/{sample}_{refname}_merged_fixed.pop"
     container: 'docker://befh/r_env_gwasamplefilt:4'
     script: '../scripts/admixture_pops.R'
