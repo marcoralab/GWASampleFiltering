@@ -101,7 +101,7 @@ message("Processing data")
 # ---- Data wrangling ---- #
 
 # Read in populations and superpops
-tg_pops <- read_tsv("workflow/resources/tg_subpops.tsv", col_types = "cccc")
+tg_pops <- read_tsv("resources/tg_subpops.tsv", col_types = "cccc")
 populations <- tg_pops %>% select(pop, spop) %>% deframe %>% as.list
 superpops <- unlist(populations) %>% unique()
 
