@@ -265,10 +265,10 @@ else: #PLINK fileset of all chromosomes
             fasta = expand("reference/human_g1k_{gbuild}.fasta", gbuild=BUILD)
         output:
             temp(expand("reference/{{refname}}_{{gbuild}}_flipped.{ext}", ext=BPLINK))
-        conda: "../envs/flippyr.yaml"
         resources:
             mem_mb = 10000,
             time_min = 30
+        container: 'docker://befh/flippyr:0.5.3'
         shell:
             '''
 flippyr -p {input.fasta} \
@@ -281,10 +281,10 @@ flippyr -p {input.fasta} \
         output:
             bim = temp("reference/{refname}_{gbuild}_flipped_ChromPos.bim"),
             snplist = temp("reference/{refname}_{gbuild}_flipped_snplist")
-        container: 'docker://befh/r_env_gwasamplefilt:3'
         resources:
             mem_mb = 10000,
             time_min = 30
+        container: 'docker://befh/r_env_gwasamplefilt:5'
         shell: "Rscript scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"
 
     # Recode sample plink file to vcf
@@ -411,10 +411,10 @@ elif ereftype != 'none': #PLINK fileset of all chromosomes
             fasta = expand("reference/human_g1k_{gbuild}.fasta", gbuild=BUILD)
         output:
             temp(expand("{{dataout}}/extraref_{{gbuild}}_flipped.{ext}", ext=BPLINK, dataout = DATAOUT))
-        conda: "../envs/flippyr.yaml"
         resources:
             mem_mb = 10000,
             time_min = 30
+        container: 'docker://befh/flippyr:0.5.3'
         shell: "flippyr -p {input.fasta} -o {DATAOUT}/extraref_{wildcards.gbuild}_flipped {input.bim}"
 
     rule Ref_ChromPosRefAlt_extra:
@@ -423,10 +423,10 @@ elif ereftype != 'none': #PLINK fileset of all chromosomes
         output:
             bim = temp("{dataout}/extraref_{gbuild}_flipped_ChromPos.bim"),
             snplist = temp("{dataout}/extraref_{gbuild}_flipped_snplist")
-        container: 'docker://befh/r_env_gwasamplefilt:3'
         resources:
             mem_mb = 10000,
             time_min = 30
+        container: 'docker://befh/r_env_gwasamplefilt:5'
         shell: "R scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"
 
     # Recode sample plink file to vcf

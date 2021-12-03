@@ -128,10 +128,10 @@ plink --keep-allele-order --bfile {params.indat} \
 rule sex_sample_fail:
     input: "{dataout}/{sample}_SexQC.sexcheck"
     output: "{dataout}/{sample}_exclude.sexcheck"
-    container: 'docker://befh/r_env_gwasamplefilt:3'
     resources:
         mem_mb = 10000,
         time_min = 30
+    container: 'docker://befh/r_env_gwasamplefilt:5'
     script: 'scripts/sexcheck_QC.R'
 
 
@@ -158,10 +158,10 @@ rule heterozygosity_QC:
 rule heterozygosity_sample_fail:
     input: "{dataout}/{sample}_HetQC.het"
     output: "{dataout}/{sample}_exclude.heterozigosity"
-    container: 'docker://befh/r_env_gwasamplefilt:3'
     resources:
         mem_mb = 10000,
         time_min = 30
+    container: 'docker://befh/r_env_gwasamplefilt:5'
     script: 'scripts/heterozygosity_QC.R'
 
 
@@ -175,10 +175,10 @@ rule SampleExclusion:
     output:
         out = "{dataout}/{sample}_exclude.samples",
         out_distinct = "{dataout}/{sample}_exclude.distinct_samples"
-    container: 'docker://befh/r_env_gwasamplefilt:3'
     resources:
         mem_mb = 10000,
         time_min = 30
+    container: 'docker://befh/r_env_gwasamplefilt:5'
     script: "scripts/sample_QC.R"
 
 rule Exclude_failed:
@@ -230,9 +230,9 @@ rule GWAS_QC_Report:
         HWE = config['QC']['HWE'],
         superpop = config['superpop'],
         partmethod = rules.PCAPartitioning.output[1] if qc_type['popstrat'] and config["pcair"] else "none"
-    container: 'docker://befh/r_env_gwasamplefilt:3'
     threads: 17
     resources:
         mem_mb = 8000,
         walltime = '24:00'
+    container: 'docker://befh/r_env_gwasamplefilt:5'
     script: "scripts/GWAS_QC.Rmd"

@@ -82,11 +82,11 @@ plink --keep-allele-order --bfile {params.indat} \
             "{dataout}/{sample}_IBDQC.all.popfilt.kingfiles"
         params:
             indat = "{dataout}/{sample}_IBDQC.all",
-        container: 'docker://befh/r_env_gwasamplefilt:3'
         threads: 6
         resources:
             mem_mb = 10000,
             time_min = 30
+        container: 'docker://befh/r_env_gwasamplefilt:5'
         script: '../scripts/filterKing.R'
 
     rule PCAPartitioning:

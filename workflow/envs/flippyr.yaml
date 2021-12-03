@@ -1,6 +1,0 @@
-channels:
-    - bioconda
-dependencies:
-    - python=3.7.3
-    - flippyr=0.4.0
-    - plink=1.90b6.18
