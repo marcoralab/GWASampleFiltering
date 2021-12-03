@@ -117,6 +117,9 @@ rule Sample_Flip:
     params:
         dataout = DATAOUT
     container: 'docker://befh/flippyr:0.4.0'
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     shell: "flippyr -p {input.fasta} -o {params.dataout}/{wildcards.sample} {input.bim}"
 
 rule Sample_ChromPosRefAlt:
@@ -126,6 +129,10 @@ rule Sample_ChromPosRefAlt:
         bim = temp("{dataout}/{sample}_flipped_ChromPos.bim"),
         snplist = temp("{dataout}/{sample}_flipped_snplist")
     container: 'docker://befh/r_env_gwasamplefilt:3'
+    threads: 2
+    resources:
+        mem_mb = 8000,
+        time_min = 30
     script: '../scripts/bim_ChromPosRefAlt.R'
 
 p_intersect = (('overlap_panel' in config)
@@ -156,6 +163,9 @@ rule PruneDupvar_snps:
         dupvar = "{dataout}/{sample}_nodup.dupvar",
         out = "{dataout}/{sample}_nodup",
         extract = extract_sample
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     conda: "../envs/plink.yaml"
     shell:
         '''
@@ -168,6 +178,9 @@ rule SelectDupvar_snps:
     input: rules.PruneDupvar_snps.output[0]
     output: "{dataout}/{sample}_nodup.dupvar.delete"
     container: 'docker://befh/r_env_gwasamplefilt:3'
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     script: '../scripts/DuplicateVars.R'
 
 # Prune sample dataset
@@ -182,6 +195,9 @@ rule sample_prune:
     params:
         indat = "{dataout}/{sample}_flipped",
         out = "{dataout}/{sample}_pruned"
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     conda: "../envs/plink.yaml"
     shell:
         '''
@@ -191,9 +207,12 @@ plink --keep-allele-order --bfile {params.indat} --bim {input.bim} \
 '''
 
 rule sample_make_prunelist:
-  input: "{dataout}/{sample}_pruned.bim"
-  output: "{dataout}/{sample}_pruned.snplist"
-  shell: "cut -f2 {input} > {output}"
+    input: "{dataout}/{sample}_pruned.bim"
+    output: "{dataout}/{sample}_pruned.snplist"
+    resources:
+        mem_mb = 10000,
+        time_min = 30
+    shell: "cut -f2 {input} > {output}"
 
 rule Reference_prune:
     input:
@@ -206,6 +225,10 @@ rule Reference_prune:
         tbi = temp("{dataout}/{sample}_{refname}pruned.vcf.gz.tbi")
     params:
         founders = "-S reference/20130606_g1k.founders " if REF == '1kG' else ''
+    threads: 4
+    resources:
+        mem_mb = 4000,
+        walltime = '4:00'
     conda: "../envs/bcftools.yaml"
     shell:
         '''
@@ -222,6 +245,9 @@ rule Reference_prune_extra:
     output:
         vcf = temp("{dataout}/eref.{sample}pruned.vcf.gz"),
         tbi = temp("{dataout}/eref.{sample}pruned.vcf.gz.tbi")
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     conda: "../envs/bcftools.yaml"
     shell:
         '''
@@ -234,6 +260,9 @@ bcftools index -ft {output.vcf}
 rule tgfam:
     input: "{dataout}/{sample}_pruned.fam"
     output: "{dataout}/{sample}_pruned_tg.fam"
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     shell: '''awk '$1 = "1000g___"$1 {{print}}' {input} > {output}'''
 
 # Recode sample plink file to vcf
@@ -245,6 +274,9 @@ rule Sample_Plink2Bcf:
     output: "{dataout}/{sample}_pruned.vcf.gz"
     params:
         out = "{dataout}/{sample}_pruned"
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     conda: "../envs/plink.yaml"
     shell:
         '''
@@ -256,6 +288,9 @@ plink --bed {input.bed} --bim {input.bim} --fam {input.fam} --recode vcf bgz \
 rule Sample_IndexBcf:
     input: "{dataout}/{sample}_pruned.vcf.gz"
     output: "{dataout}/{sample}_pruned.vcf.gz.csi"
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     conda: "../envs/bcftools.yaml"
     shell: 'bcftools index -f {input}'
 
@@ -273,6 +308,10 @@ rule Merge_RefenceSample:
         extra = "{dataout}/eref.{sample}pruned.vcf.gz" if extraref else ''
     output:
         out = "{dataout}/{sample}_{refname}_merged.vcf"
+    threads: 4
+    resources:
+        mem_mb = 4000,
+        walltime = '4:00'
     conda: "../envs/bcftools.yaml"
     shell:
         r'''
@@ -289,6 +328,9 @@ rule Plink_RefenceSample:
         multiext("{dataout}/{sample}_{refname}_merged", '.bed', '.bim', '.fam')
     params:
         out = "{dataout}/{sample}_{refname}_merged"
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     conda: "../envs/plink.yaml"
     shell: "plink --keep-allele-order --vcf {input.vcf} --const-fid --make-bed --out {params.out}"
 
@@ -299,6 +341,9 @@ rule fix_fam:
         tgped = tgped
     output: fixed = "{dataout}/{sample}_{refname}_merged_fixed.fam"
     container: 'docker://befh/r_env_gwasamplefilt:3'
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     script: '../scripts/fix_fam.R'
 
 rule merge_pops:
@@ -311,6 +356,9 @@ rule merge_pops:
     params:
         extra_ref_code = config['extra_ref']['subpop']
     container: 'docker://befh/r_env_gwasamplefilt:3'
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     script: '../scripts/add_extraref_pops.R'
 
 # PCA analysis to identify population outliers
@@ -325,6 +373,9 @@ rule PcaPopulationOutliers:
     params:
         indat_plink = "{dataout}/{sample}_{refname}_merged",
         out = "{dataout}/{sample}_{refname}_merged"
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     conda: "../envs/plink.yaml"
     shell:
         '''
@@ -349,6 +400,9 @@ rule ExcludePopulationOutliers:
         extraref = 'none' if not extraref else config['extra_ref_subpop'],
         sd = pca_sd
     container: 'docker://befh/r_env_gwasamplefilt:3'
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     script: '../scripts/PCA_QC.R'
 
 
@@ -360,6 +414,9 @@ rule admixturepop:
         spop = 'resources/tg_subpops.tsv'
     output: "{dataout}/{sample}_{refname}_merged_fixed.pop"
     container: 'docker://befh/r_env_gwasamplefilt:4'
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     script: '../scripts/admixture_pops.R'
 
 
@@ -370,6 +427,9 @@ rule symlink_fixed:
     output:
         bed = "{dataout}/{sample}_{refname}_merged_fixed.bed",
         bim = "{dataout}/{sample}_{refname}_merged_fixed.bim"
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     shell:
         '''
 ln -s $PWD/{input.bed} {output.bed}
@@ -387,6 +447,9 @@ rule supervised_admixture:
         stem = "{dataout}/{sample}_{refname}_merged_fixed",
         K = 5
     container: 'docker://befh/r_env_gwasamplefilt:4'
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     shell: #"admixture {params.stem}.bed {params.K} --supervised -j32"
         r"""
 admixture {params.stem}.bed {params.K} --supervised -j32;
@@ -403,6 +466,9 @@ rule interpret_admixture:
         fam = rules.fix_fam.output.fixed,
         pcs = rules.ExcludePopulationOutliers.output.pcs_pops
     output: "{dataout}/{sample}_{refname}_merged_interpret_admixture.tsv"
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     container: 'docker://befh/r_env_gwasamplefilt:5'
     script: '../scripts/interpret_admixture.R'
 
@@ -414,5 +480,8 @@ rule plot_admixture:
             "{{dataout}}/{{sample}}_{refname}_merged_interpret_admixture.tsv",
             refname=REF)
     output: "{dataout}/plots/{sample}_admixture.png"
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     container: 'docker://befh/r_env_gwasamplefilt:5'
     script: '../scripts/admixtureplot.R'

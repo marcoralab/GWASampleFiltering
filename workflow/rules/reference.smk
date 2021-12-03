@@ -96,6 +96,9 @@ rule download_tg_chrom:
     output:
         temp("reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz"),
         temp("reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi")
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     shell: "cp {input[0]} {output[0]}; cp {input[1]} {output[1]}"
 
 import time
@@ -109,6 +112,9 @@ rule download_tg_fa:
     output:
         "reference/human_g1k_{gbuild}.fasta",
         "reference/human_g1k_{gbuild}.fasta.fai"
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     conda: '../envs/bcftools.yaml'
     cache: True
     shell:
@@ -130,6 +136,9 @@ rule download_tg_ped:
     output:
         "reference/20130606_g1k.ped",
     cache: True
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     shell: "cp {input} {output}"
 
 tgped = "reference/20130606_g1k.ped"
@@ -145,6 +154,9 @@ if REF == '1kG':
         output:
             "reference/20130606_g1k.founders"
         cache: True
+        resources:
+            mem_mb = 10000,
+            time_min = 30
         shell:
             r'''
 awk -F "\t" '!($12 != 0 || $10 != 0 || $9 != 0 || $3 != 0 || $4 != 0) {{print $2}}' \
@@ -157,6 +169,9 @@ awk -F "\t" '!($12 != 0 || $10 != 0 || $9 != 0 || $3 != 0 || $4 != 0) {{print $2
             "reference/1kG_pops.txt",
             "reference/1kG_pops_unique.txt"
         cache: True
+        resources:
+            mem_mb = 10000,
+            time_min = 30
         shell:
             '''
 awk 'BEGIN {{print "FID","IID","Population"}} NR>1 {{print $1,$2,$7}}' \
@@ -170,6 +185,9 @@ else:
             "reference/{refname}_pops.txt",
             "reference/{refname}_pops_unique.txt"
         cache: True
+        resources:
+            mem_mb = 10000,
+            time_min = 30
         shell:
             '''
 cp {input} {output[0]}
@@ -183,6 +201,10 @@ if REF == '1kG' or creftype == 'vcfchr':
             vcf = "reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz" if REF == '1kG' else config['custom_ref']['file'],
             tbi = "reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi" if REF == '1kG' else config['custom_ref']['file'] + '.tbi'
         output: temp("reference/{refname}.{gbuild}.chr{chrom}.maxmiss{miss}.vcf.gz")
+        threads: 12
+        resources:
+            mem_mb = 4000,
+            walltime = '4:00'
         conda: "../envs/bcftools.yaml"
         shell:
             '''
@@ -200,6 +222,10 @@ bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
             vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
         cache: True
+        threads: 2
+        resources:
+            mem_mb = 4000,
+            walltime = '4:00'
         conda: "../envs/bcftools.yaml"
         shell:
             '''
@@ -215,6 +241,10 @@ elif creftype == 'vcf':
             vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
         cache: True
+        threads: 12
+        resources:
+            mem_mb = 4000,
+            walltime = '4:00'
         conda: "../envs/bcftools.yaml"
         shell:
             '''
@@ -236,6 +266,9 @@ else: #PLINK fileset of all chromosomes
         output:
             temp(expand("reference/{{refname}}_{{gbuild}}_flipped.{ext}", ext=BPLINK))
         conda: "../envs/flippyr.yaml"
+        resources:
+            mem_mb = 10000,
+            time_min = 30
         shell:
             '''
 flippyr -p {input.fasta} \
@@ -249,6 +282,9 @@ flippyr -p {input.fasta} \
             bim = temp("reference/{refname}_{gbuild}_flipped_ChromPos.bim"),
             snplist = temp("reference/{refname}_{gbuild}_flipped_snplist")
         container: 'docker://befh/r_env_gwasamplefilt:3'
+        resources:
+            mem_mb = 10000,
+            time_min = 30
         shell: "Rscript scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"
 
     # Recode sample plink file to vcf
@@ -261,6 +297,9 @@ flippyr -p {input.fasta} \
         params:
             out = "reference/{refname}_{gbuild}_unQC_maxmissUnfilt",
             inp = "reference/{refname}_{gbuild}_flipped"
+        resources:
+            mem_mb = 10000,
+            time_min = 30
         conda: "../envs/plink.yaml"
         shell:
             '''
@@ -287,6 +326,10 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
             #refname = "[a-zA-Z0-9-]",
             #miss = "[0-9.]",
         cache: True
+        threads: 12
+        resources:
+            mem_mb = 4000,
+            walltime = '4:00'
         conda: "../envs/bcftools.yaml"
         shell:
             '''
@@ -304,6 +347,10 @@ if ereftype == 'vcfchr':
             vcf = config['extra_ref']['file'],
             tbi = config['extra_ref']['file'] + '.tbi'
         output: temp("{dataout}/extraref.{gbuild}.chr{chrom}.maxmiss{miss}.vcf.gz")
+        threads: 12
+        resources:
+            mem_mb = 4000,
+            walltime = '4:00'
         conda: "../envs/bcftools.yaml"
         shell:
             '''
@@ -321,6 +368,11 @@ bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
         output:
             vcf = "{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = "{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
+        threads: 2
+        resources:
+            mem_mb = 10000,
+            time_min = 30
+        conda: "../envs/bcftools.yaml"
         shell:
             '''
 bcftools concat {input.vcfs} -Oz -o {output.vcf} --threads 2
@@ -335,6 +387,10 @@ elif ereftype == 'vcf':
         output:
             vcf = "{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = "{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
+        threads: 12
+        resources:
+            mem_mb = 4000,
+            time_min = 30
         conda: "../envs/bcftools.yaml"
         shell:
             '''
@@ -356,6 +412,9 @@ elif ereftype != 'none': #PLINK fileset of all chromosomes
         output:
             temp(expand("{{dataout}}/extraref_{{gbuild}}_flipped.{ext}", ext=BPLINK, dataout = DATAOUT))
         conda: "../envs/flippyr.yaml"
+        resources:
+            mem_mb = 10000,
+            time_min = 30
         shell: "flippyr -p {input.fasta} -o {DATAOUT}/extraref_{wildcards.gbuild}_flipped {input.bim}"
 
     rule Ref_ChromPosRefAlt_extra:
@@ -365,6 +424,9 @@ elif ereftype != 'none': #PLINK fileset of all chromosomes
             bim = temp("{dataout}/extraref_{gbuild}_flipped_ChromPos.bim"),
             snplist = temp("{dataout}/extraref_{gbuild}_flipped_snplist")
         container: 'docker://befh/r_env_gwasamplefilt:3'
+        resources:
+            mem_mb = 10000,
+            time_min = 30
         shell: "R scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"
 
     # Recode sample plink file to vcf
@@ -377,6 +439,9 @@ elif ereftype != 'none': #PLINK fileset of all chromosomes
         params:
             out = "{dataout}/extraref_{gbuild}_unQC_maxmissUnfilt",
             inp = "{dataout}/extraref_{gbuild}_flipped"
+        resources:
+            mem_mb = 10000,
+            time_min = 30
         conda: "../envs/plink.yaml"
         shell:
             '''
@@ -388,6 +453,9 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
     rule Ref_IndexVcf_extra:
         input: "{dataout}/extraref_{gbuild}_unQC_maxmissUnfilt.vcf.gz"
         output: "{dataout}/extraref_{gbuild}_unQC_maxmissUnfilt.vcf.gz.csi"
+        resources:
+            mem_mb = 10000,
+            time_min = 30
         conda: "../envs/bcftools.yaml"
         shell: 'bcftools index -f {input}'
 
@@ -398,6 +466,10 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
         output:
             vcf = "{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = "{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
+        threads: 12
+        resources:
+            mem_mb = 4000,
+            time_min = 30
         conda: "../envs/bcftools.yaml"
         shell:
             '''
@@ -418,12 +490,18 @@ union_extraref = (extraref
 rule get_panelvars:
     input: "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz"
     output: '{dataout}/panelvars_{refname}_{gbuild}_allChr_maxmiss{miss}.snps'
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     conda: "../envs/bcftools.yaml"
     shell: "bcftools query -f '%ID\n' {input} > {output}"
 
 rule get_extravars:
     input: '{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz'
     output: '{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.snps'
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     conda: "../envs/bcftools.yaml"
     shell: "bcftools query -f '%ID\n' {input} > {output}"
 
@@ -449,6 +527,9 @@ rule intersection_panelvars:
                       gbuild=BUILD, miss=config['QC']['GenoMiss'],
                       dataout=DATAOUT)
     output: '{dataout}/panelvars_all.snp' if not union_extraref else "do.not"
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     conda: "../envs/miller.yaml"
     shell:
         '''

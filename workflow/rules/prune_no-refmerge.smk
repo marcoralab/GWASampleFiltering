@@ -24,6 +24,9 @@ rule PruneDupvar_snps_noancestry:
     params:
         indat = sampleqc_in_plink_stem,
         out = "{dataout}/{sample}_nodup_noancestry"
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     conda: "../envs/plink.yaml"
     shell:
         '''
@@ -36,6 +39,9 @@ rule SelectDupvar_snps_noancestry:
     input: rules.PruneDupvar_snps_noancestry.output[0]
     output: "{dataout}/{sample}_nodup_noancestry.dupvar.delete"
     container: 'docker://befh/r_env_gwasamplefilt:3'
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     script: '../scripts/DuplicateVars.R'
 
 # Prune sample dataset
@@ -49,6 +55,9 @@ rule sample_prune_noancestry:
     params:
         indat = sampleqc_in_plink_stem,
         out = "{dataout}/{sample}_pruned_noancestry"
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     conda: "../envs/plink.yaml"
     shell:
         '''

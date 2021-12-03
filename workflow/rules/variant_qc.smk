@@ -12,6 +12,9 @@ rule snp_qc:
         miss = config['QC']['GenoMiss'],
         MAF = config['QC']['MAF'],
         HWE = config['QC']['HWE']
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     conda: "../envs/plink.yaml"
     shell:
         '''
@@ -32,6 +35,9 @@ rule sample_callRate:
         indat = rules.snp_qc.params.out if qc_type['variant'] else start['stem'],
         miss = config['QC']['SampMiss'],
         out = "{dataout}/{sample}_callRate"
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     conda: "../envs/plink.yaml"
     shell:
         '''

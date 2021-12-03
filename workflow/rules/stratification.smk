@@ -63,6 +63,9 @@ if config['pcair']:
         params:
             indat = "{dataout}/{sample}_pruned",
             plinkout = "{dataout}/{sample}_filtered_PCApre"
+        resources:
+            mem_mb = 10000,
+            time_min = 30
         conda: "../envs/plink.yaml"
         shell:
             r'''
@@ -80,6 +83,10 @@ plink --keep-allele-order --bfile {params.indat} \
         params:
             indat = "{dataout}/{sample}_IBDQC.all",
         container: 'docker://befh/r_env_gwasamplefilt:3'
+        threads: 6
+        resources:
+            mem_mb = 10000,
+            time_min = 30
         script: '../scripts/filterKing.R'
 
     rule PCAPartitioning:
@@ -92,6 +99,10 @@ plink --keep-allele-order --bfile {params.indat} \
         params:
             stem = rules.ancestryFilt.params.plinkout if qc_type['ancestry'] else rules.sample_prune_noancestry.params.out,
             king = rules.filterKING.params.indat + ".popfilt" if qc_type['ancestry'] else rules.filterKING.params.indat
+        threads: 6
+        resources:
+            mem_mb = 10000,
+            time_min = 30
         container: 'docker://befh/genesis_env_gwasamplefilt:2.1'
         script: '../scripts/RunPCAiR.R'
 
@@ -103,6 +114,9 @@ plink --keep-allele-order --bfile {params.indat} \
         params:
             indat = rules.ancestryFilt.params.plinkout if qc_type['ancestry'] else rules.sample_prune_noancestry.params.out,
             out = "{dataout}/{sample}_filtered_PCAfreq"
+        resources:
+            mem_mb = 10000,
+            time_min = 30
         conda: "../envs/plink.yaml"
         shell:
             '''
@@ -126,6 +140,9 @@ fi
         params:
             indat = rules.ancestryFilt.params.plinkout if qc_type['ancestry'] else rules.sample_prune_noancestry.params.out,
             out = "{dataout}/{sample}_filtered_PCA"
+        resources:
+            mem_mb = 10000,
+            time_min = 30
         conda: "../envs/plink.yaml"
         shell:
             '''
@@ -149,6 +166,9 @@ elif qc_type['ancestry']:
         params:
             indat = "{dataout}/{sample}_pruned",
             out = "{dataout}/{sample}_filtered_PCA"
+        resources:
+            mem_mb = 10000,
+            time_min = 30
         conda: "../envs/plink.yaml"
         shell:
             '''
@@ -164,6 +184,9 @@ else:
         params:
             indat = rules.ancestryFilt.params.plinkout if qc_type['ancestry'] else rules.sample_prune_noancestry.params.out,
             out = "{dataout}/{sample}_filtered_PCA"
+        resources:
+            mem_mb = 10000,
+            time_min = 30
         conda: "../envs/plink.yaml"
         shell:
             '''

@@ -8,6 +8,9 @@ rule relatedness_sample_prep:
     params:
         indat_plink = sampleqc_in_plink_stem,
         out = "{dataout}/{sample}_IBDQCfilt"
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     conda: "../envs/plink.yaml"
     shell:
         '''
@@ -31,6 +34,9 @@ rule relatedness_sample_prep_remnoncc:
         indat_plink = rules.relatedness_sample_prep.params.out,
         out = "{dataout}/{sample}_IBDQCfilt_rm-non-cc"
     conda: "../envs/plink.yaml"
+    resources:
+        mem_mb = 10000,
+        time_min = 30
     shell:
         '''
 cp {input.bed} {output.bed}
@@ -48,6 +54,10 @@ rule relatedness_QC:
     params:
         out = "{dataout}/{sample}_IBDQC",
         dataout = DATAOUT
+    threads: 6
+    resources:
+        mem_mb = 5200,
+        walltime = '24:00'
     conda: "../envs/king.yaml"
     shell:
         '''
@@ -68,6 +78,10 @@ rule king_all:
     params:
         out = "{dataout}/{sample}_IBDQC.all",
         dataout = DATAOUT
+    threads: 6
+    resources:
+        mem_mb = 5200,
+        walltime = '24:00'
     conda: "../envs/king.yaml"
     shell:
         '''
@@ -90,4 +104,8 @@ rule relatedness_sample_fail:
         out = "{dataout}/{sample}_exclude.relatedness",
         rdat = "{dataout}/{sample}_IBDQC.Rdata"
     container: 'docker://befh/r_env_gwasamplefilt:3'
+    threads: 6
+    resources:
+        mem_mb = 10000,
+        walltime = '4:00'
     script: '../scripts/relatedness_QC.R'
