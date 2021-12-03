@@ -6,7 +6,7 @@ library(tidyr)
 library(purrr)
 library(here)
 
-tg_subpop <- "workflow/resources/tg_subpops.tsv"
+tg_subpop <- "resources/tg_subpops.tsv"
 
 if (!file.exists(here(tg_subpop))) here <- function(x) paste0(snakemake@params[["rwd"]], "/", x)
 
