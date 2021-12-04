@@ -186,7 +186,7 @@ rule Exclude_failed:
         plink = sampleqc_in_plink,
         indat_exclude = rules.SampleExclusion.output.out_distinct
     output:
-        temp(expand("{{dataout}}/{{sample}}_Excluded.{ext}", ext=BPLINK, dataout = DATAOUT)),
+        temp(expand("{{dataout}}/{{sample}}_Excluded.{ext}", ext=BPLINK)),
         excl = temp('{dataout}/{sample}_exclude.plink')
     params:
         indat_plink = sampleqc_in_plink_stem,

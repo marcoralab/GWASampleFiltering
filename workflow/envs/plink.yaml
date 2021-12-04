@@ -3,6 +3,3 @@ channels:
     - conda-forge
 dependencies:
     - plink=1.90b6.21
-    - r-base=4.0.3
-    - r-essentials=4.0
-    - r-here=1.0.1
