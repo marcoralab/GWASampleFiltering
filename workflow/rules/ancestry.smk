@@ -146,7 +146,7 @@ else:
         gbuild=BUILD, miss=config['QC']['GenoMiss'], refname=REF,
         dataout=DATAOUT)
 
-panel_variants = panel_variants if p_intersect else '/dev/null'
+panel_variants = panel_variants if p_intersect else ''
 extract_sample = '--extract {} '.format(panel_variants[0]) if p_intersect else ''
 
 
@@ -301,8 +301,8 @@ rule Merge_RefenceSample:
         tbi_ref = "{dataout}/{sample}_{refname}pruned.vcf.gz.tbi",
         bcf_samp = "{dataout}/{sample}_pruned.vcf.gz",
         csi_samp = "{dataout}/{sample}_pruned.vcf.gz.csi",
-        bcf_ext = "{dataout}/eref.{sample}pruned.vcf.gz" if extraref else '/dev/null',
-        tbi_ext = "{dataout}/eref.{sample}pruned.vcf.gz.tbi" if extraref else '/dev/null'
+        bcf_ext = "{dataout}/eref.{sample}pruned.vcf.gz" if extraref else '',
+        tbi_ext = "{dataout}/eref.{sample}pruned.vcf.gz.tbi" if extraref else ''
     params:
         miss = config['QC']['GenoMiss'],
         extra = "{dataout}/eref.{sample}pruned.vcf.gz" if extraref else ''
