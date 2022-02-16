@@ -140,6 +140,7 @@ p_intersect = (('overlap_panel' in config)
 
 if extraref:
     panel_variants = '{dataout}/panelvars_all.snp'
+    include: 'reference_extra.smk'
 else:
     panel_variants = expand(
         '{dataout}/panelvars_{refname}_{gbuild}_allChr_maxmiss{miss}.snps',
