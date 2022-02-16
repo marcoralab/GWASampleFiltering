@@ -143,7 +143,7 @@ if extraref:
     include: 'reference_extra.smk'
 else:
     panel_variants = expand(
-        '{dataout}/panelvars_{refname}_{gbuild}_allChr_maxmiss{miss}.snps',
+        'reference/panelvars_{refname}_{gbuild}_allChr_maxmiss{miss}.snps',
         gbuild=BUILD, miss=config['QC']['GenoMiss'], refname=REF,
         dataout=DATAOUT)
 

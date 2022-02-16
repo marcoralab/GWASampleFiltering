@@ -167,7 +167,7 @@ rule get_extravars:
 rule union_panelvars:
     input:
         ref = expand(
-            '{dataout}/panelvars_{refname}_{gbuild}_allChr_maxmiss{miss}.snps',
+            'reference/panelvars_{refname}_{gbuild}_allChr_maxmiss{miss}.snps',
             gbuild=BUILD, miss=config['QC']['GenoMiss'], refname=REF,
             dataout=DATAOUT),
         eref = expand("{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.snps",
@@ -179,7 +179,7 @@ rule union_panelvars:
 rule intersection_panelvars:
     input:
         ref = expand(
-            '{dataout}/panelvars_{refname}_{gbuild}_allChr_maxmiss{miss}.snps',
+            'reference/panelvars_{refname}_{gbuild}_allChr_maxmiss{miss}.snps',
             gbuild=BUILD, miss=config['QC']['GenoMiss'], refname=REF,
             dataout=DATAOUT),
         eref = expand("{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.snps",

@@ -335,7 +335,7 @@ bcftools index -ft {output.vcf}
 
 rule get_panelvars:
     input: "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz"
-    output: '{dataout}/panelvars_{refname}_{gbuild}_allChr_maxmiss{miss}.snps'
+    output: 'reference/panelvars_{refname}_{gbuild}_allChr_maxmiss{miss}.snps'
     resources:
         mem_mb = 10000,
         time_min = 30
