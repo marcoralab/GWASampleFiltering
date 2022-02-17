@@ -103,6 +103,25 @@ tgurls = {k: {**v, 'tbi': v['vcf'] + '.tbi'} for k, v in tgurls.items()}
 tgurls['ped'] = (tgbase
                  + "technical/working/20130606_sample_info/20130606_g1k.ped")
 
+
+if 'ref_only' in config and config['ref_only']:
+    MISS = config['GenoMiss']
+    rule all:
+        output:
+            fasta = expand("reference/human_g1k_{gbuild}.fasta", gbuild=BUILD),
+            panelvars = expand(
+                'reference/panelvars_{refname}_{gbuild}_allChr_maxmiss{miss}.snps',
+                gbuild=BUILD, miss=MISS, refname=REF),
+            vcf = expand(
+                'reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz',
+                gbuild=BUILD, miss=MISS, refname=REF),
+            tgped = "reference/20130606_g1k.ped" if REF == '1kG' else [],
+            pops = expand("reference/{refname}_pops.txt", refname=REF),
+            pops_unique = expand("reference/{refname}_pops_unique.txt",
+                                 refname=REF),
+
+
+
 rule download_tg_chrom:
     input:
         vcf = lambda wildcards: HTTP.remote(tgurls[wildcards.gbuild]['vcf']),
