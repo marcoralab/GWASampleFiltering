@@ -141,10 +141,10 @@ if REF == '1kG':
     Selects everyone who is unrelated or only has third degree relatives in
     thousand genomes.
     """
-    rule Reference_foundersonly:
+
+    rule Reference_find_founders:
         input: tgped
-        output:
-            "reference/20130606_g1k.founders"
+        output: "reference/20130606_g1k.founders"
         cache: True
         resources:
             mem_mb = 10000,
@@ -153,6 +153,28 @@ if REF == '1kG':
             r'''
 awk -F "\t" '!($12 != 0 || $10 != 0 || $9 != 0 || $3 != 0 || $4 != 0) {{print $2}}' \
 {input} > {output}
+'''
+
+    rule Reference_foundersonly:
+        input:
+            vcf = "reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz",
+            tbi = "reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi",
+            founders = rules.Reference_find_founders.output
+        input:
+            vcf = temp("reference/1000gFounders.{gbuild}.chr{chrom}.vcf.gz"),
+            tbi = temp("reference/1000gFounders.{gbuild}.chr{chrom}.vcf.gz.tbi")
+        threads: 4
+        resources:
+            mem_mb = 4000,
+            walltime = '4:00'
+            conda: "../envs/bcftools.yaml"
+        shell:
+            r'''
+bcftools view \
+  -S {input.founders} \
+  -s ^NA20299,NA20314,NA20274,HG01880 \
+  -Oz -o {output.vcf} --force-samples --threads 4 {input.vcf}
+bcftools index -ft {output.vcf}
 '''
 
     rule makeTGpops:
@@ -190,8 +212,8 @@ awk 'NR > 1 {{print $3}}' {input} | sort | uniq > {output[1]}
 if REF == '1kG' or creftype == 'vcfchr':
     rule Reference_prep:
         input:
-            vcf = "reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz" if REF == '1kG' else config['custom_ref']['file'],
-            tbi = "reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi" if REF == '1kG' else config['custom_ref']['file'] + '.tbi'
+            vcf = "reference/1000gFounders.{gbuild}.chr{chrom}.vcf.gz" if REF == '1kG' else config['custom_ref']['file'],
+            tbi = "reference/1000gFounders.{gbuild}.chr{chrom}.vcf.gz.tbi" if REF == '1kG' else config['custom_ref']['file'] + '.tbi'
         output: temp("reference/{refname}.{gbuild}.chr{chrom}.maxmiss{miss}.vcf.gz")
         threads: 12
         resources:

@@ -219,13 +219,10 @@ rule Reference_prune:
     input:
         vcf = expand("reference/{{refname}}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
                      gbuild=BUILD, miss=config['QC']['GenoMiss']),
-        prune = "{dataout}/{sample}_pruned.snplist",
-        founders = "reference/20130606_g1k.founders" if REF == '1kG' else '/dev/urandom'
+        prune = "{dataout}/{sample}_pruned.snplist"
     output:
         vcf = temp("{dataout}/{sample}_{refname}pruned.vcf.gz"),
         tbi = temp("{dataout}/{sample}_{refname}pruned.vcf.gz.tbi")
-    params:
-        founders = "-S reference/20130606_g1k.founders " if REF == '1kG' else ''
     threads: 4
     resources:
         mem_mb = 4000,
@@ -233,8 +230,7 @@ rule Reference_prune:
     conda: "../envs/bcftools.yaml"
     shell:
         '''
-bcftools view -i 'ID=@{input.prune}' {params.founders} {input.vcf} --force-samples --threads 4 | \
-    bcftools view -s ^NA20299,NA20314,NA20274,HG01880 -Oz -o {output.vcf} --force-samples --threads 4
+bcftools view -i 'ID=@{input.prune}' -Oz -o {output.vcf} --threads 4 {input.vcf}
 bcftools index -ft {output.vcf}
 '''
 
