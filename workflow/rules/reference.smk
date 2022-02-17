@@ -16,7 +16,7 @@ except urllib.error.URLError as ex:
 
 
 class dummyprovider:
-    def remote(string_, allow_redirects = "foo"):
+    def remote(string_, allow_redirects="foo"):
         return string_
 
 
@@ -80,7 +80,8 @@ if 'ref_only' in config and config['ref_only']:
         output:
             fasta = expand("reference/human_g1k_{gbuild}.fasta", gbuild=BUILD),
             panelvars = expand(
-                'reference/panelvars_{refname}_{gbuild}_allChr_maxmiss{miss}.snps',
+                'reference/panelvars_{refname}_{gbuild}'
+                + '_allChr_maxmiss{miss}.snps',
                 gbuild=BUILD, miss=MISS, refname=REF),
             vcf = expand(
                 'reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz',
@@ -146,7 +147,8 @@ if reftype == 'vcfchr':
             vcf = ref_genotypes,
             tbi = ref_genotypes + '.tbi'
         output:
-            temp("reference/{refname}.{gbuild}.chr{chrom}.maxmiss{miss}.vcf.gz")
+            temp('reference/{refname}.{gbuild}.chr{chrom}'
+                 + '.maxmiss{miss}.vcf.gz')
         threads: 12
         resources:
             mem_mb = 4000,
@@ -168,7 +170,8 @@ bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
                           chrom=list(range(1, 23)))
         output:
             vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
-            tbi = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
+            tbi = ("reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz"
+                   + ".tbi")
         cache: True
         threads: 2
         resources:
@@ -187,7 +190,8 @@ elif creftype == 'vcf':
             tbi = config['custom_ref']['file'] + '.tbi'
         output:
             vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
-            tbi = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
+            tbi = ("reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz"
+                   + ".tbi")
         cache: True
         threads: 12
         resources:
@@ -272,7 +276,8 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
             csi = rules.Ref_IndexVcf.output
         output:
             vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
-            tbi = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
+            tbi = ("reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz
+                   + ".tbi")
         cache: True
         threads: 12
         resources:
