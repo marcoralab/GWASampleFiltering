@@ -19,6 +19,7 @@ class dummyprovider:
     def remote(string_, allow_redirects = "foo"):
         return string_
 
+
 if iconnect and not ('nointernet' in config and config['nointernet']):
     FTP = FTPRemoteProvider()
     HTTP = HTTPRemoteProvider()
@@ -27,38 +28,6 @@ else:
     HTTP = dummyprovider
 
 BPLINK = ["bed", "bim", "fam"]
-
-localrules: download_tg_fa, download_tg_ped, download_tg_chrom
-
-
-def detect_ref_type(reffile):
-    if '.vcf' in reffile or '.bcf' in reffile:
-        if '{chrom}' in reffile:
-            return "vcfchr"
-        else:
-            return "vcf"
-    else:
-        return "plink"
-
-
-default_ref = (("custom_ref" not in config)
-               or (config['custom_ref'] is False)
-               or (config['custom_ref']['file'] is False)
-               or (config['custom_ref']['name'] is False))
-
-if default_ref:
-    REF = '1kG'
-else:
-    REF = config['custom_ref']['name']
-    creftype = detect_ref_type(config['custom_ref']['file'])
-
-# ---- Principal Compoent analysis ----
-#  Project ADNI onto a PCA using the 1000 Genomes dataset to identify
-#    population outliers
-
-#  Extract a pruned dataset from 1000 genomes using the same pruning SNPs
-#    from Sample
-# align 1000 genomes to fasta refrence
 
 
 def map_genome_build(genome_build):
@@ -78,30 +47,31 @@ elif (isinstance(config['genome_build'], list)
 else:
     raise ValueError("Genome build must be a string or list of strings.")
 
+localrules: download_tg_fa, download_tg_ped, download_tg_chrom
+
+
+def detect_ref_type(reffile):
+    if '.vcf' in reffile or '.bcf' in reffile:
+        if '{chrom}' in reffile:
+            return "vcfchr"
+        else:
+            return "vcf"
+    else:
+        return "plink"
+
+
+default_ref = (("custom_ref" not in config)
+               or (config['custom_ref'] is False)
+               or (config['custom_ref']['file'] is False)
+               or (config['custom_ref']['name'] is False))
 
 tgbase = "http://ftp-trace.ncbi.nih.gov/1000genomes/ftp/"
 tgbase_38 = "ftp.1000genomes.ebi.ac.uk/vol1/ftp/"
 
-tgurls = dict(
-    hg19=dict(
-        vcf=(tgbase + "release/20130502/ALL.chr{chrom}."
-             + "phase3_shapeit2_mvncall_integrated_v5a."
-             + "20130502.genotypes.vcf.gz"),
-        fa=(tgbase + "technical/reference/human_g1k_v37.fasta.gz")
-        ),
-    GRCh38=dict(
-        vcf=(tgbase_38
-             + 'data_collections/1000_genomes_project/'
-             + 'release/20181203_biallelic_SNV/'
-             + 'ALL.chr{chrom}.shapeit2_integrated_v1a.'
-             + 'GRCh38.20181129.phased.vcf.gz'),
-        fa=(tgbase_38 + 'technical/reference/GRCh38_reference_genome/'
-            + 'GRCh38_full_analysis_set_plus_decoy_hla.fa')
-        )
-    )
-tgurls = {k: {**v, 'tbi': v['vcf'] + '.tbi'} for k, v in tgurls.items()}
-tgurls['ped'] = (tgbase
-                 + "technical/working/20130606_sample_info/20130606_g1k.ped")
+tgfasta = dict(
+    hg19=(tgbase + "technical/reference/human_g1k_v37.fasta.gz")
+    GRCh38=(tgbase_38 + 'technical/reference/GRCh38_reference_genome/'
+            + 'GRCh38_full_analysis_set_plus_decoy_hla.fa'))
 
 
 if 'ref_only' in config and config['ref_only']:
@@ -118,29 +88,37 @@ if 'ref_only' in config and config['ref_only']:
             tgped = "reference/20130606_g1k.ped" if REF == '1kG' else [],
             pops = expand("reference/{refname}_pops.txt", refname=REF),
             pops_unique = expand("reference/{refname}_pops_unique.txt",
-                                 refname=REF),
+                                 refname=REF)
 
 
+if default_ref:
+    REF = '1kG'
+    reftype = 'vcfchr'
+    ref_genotypes = "reference/1000gFounders.{gbuild}.chr{chrom}.vcf.gz"
+    include: 'reference_1kG.smk'
+else:
+    REF = config['custom_ref']['name']
+    reftype = detect_ref_type(config['custom_ref']['file'])
+    ref_genotypes = config['custom_ref']['file']
 
-rule download_tg_chrom:
-    input:
-        vcf = lambda wildcards: HTTP.remote(tgurls[wildcards.gbuild]['vcf']),
-        tbi = lambda wildcards: HTTP.remote(tgurls[wildcards.gbuild]['tbi'])
-    output:
-        vcf = temp("reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz"),
-        tbi = temp("reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi")
-    resources:
-        mem_mb = 10000,
-        time_min = 30
-    shell: "cp {input.vcf} {output.vcf}; cp {input.tbi} {output.tbi}"
+    rule make_custom_pops:
+        input: config['custom_ref']['custom_pops']
+        output:
+            "reference/{refname}_pops.txt",
+            "reference/{refname}_pops_unique.txt"
+        cache: True
+        resources:
+            mem_mb = 10000,
+            time_min = 30
+        shell:
+            '''
+cp {input} {output[0]}
+awk 'NR > 1 {{print $3}}' {input} | sort | uniq > {output[1]}
+'''
 
-import time
-def http_sleep(url):
-    time.sleep(5)
-    return HTTP.remote(url)
 
 rule download_tg_fa:
-    input: lambda wildcards: HTTP.remote(tgurls[wildcards.gbuild]['fa'])
+    input: lambda wildcards: HTTP.remote(tgfasta[wildcards.gbuild])
     output:
         "reference/human_g1k_{gbuild}.fasta",
         "reference/human_g1k_{gbuild}.fasta.fai"
@@ -162,97 +140,11 @@ fi
 samtools faidx {output[0]}
 '''
 
-tgped = "reference/20130606_g1k.ped"
-
-rule download_tg_ped:
-    input:
-        HTTP.remote(tgurls['ped']),
-    output: tgped
-    cache: True
-    resources:
-        mem_mb = 10000,
-        time_min = 30
-    shell: "cp {input} {output}"
-
-
-if REF == '1kG':
-    """
-    Selects everyone who is unrelated or only has third degree relatives in
-    thousand genomes.
-    """
-
-    rule Reference_find_founders:
-        input: tgped
-        output: "reference/20130606_g1k.founders"
-        cache: True
-        resources:
-            mem_mb = 10000,
-            time_min = 30
-        shell:
-            r'''
-awk -F "\t" '!($12 != 0 || $10 != 0 || $9 != 0 || $3 != 0 || $4 != 0) {{print $2}}' \
-{input} > {output}
-'''
-
-    rule Reference_foundersonly:
-        input:
-            vcf = "reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz",
-            tbi = "reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi",
-            founders = rules.Reference_find_founders.output
-        input:
-            vcf = temp("reference/1000gFounders.{gbuild}.chr{chrom}.vcf.gz"),
-            tbi = temp("reference/1000gFounders.{gbuild}.chr{chrom}.vcf.gz.tbi")
-        threads: 4
-        resources:
-            mem_mb = 4000,
-            walltime = '4:00'
-            conda: "../envs/bcftools.yaml"
-        shell:
-            r'''
-bcftools view \
-  -S {input.founders} \
-  -s ^NA20299,NA20314,NA20274,HG01880 \
-  -Oz -o {output.vcf} --force-samples --threads 4 {input.vcf}
-bcftools index -ft {output.vcf}
-'''
-
-    rule makeTGpops:
-        input: tgped
-        output:
-            "reference/1kG_pops.txt",
-            "reference/1kG_pops_unique.txt"
-        cache: True
-        resources:
-            mem_mb = 10000,
-            time_min = 30
-        shell:
-            '''
-awk 'BEGIN {{print "FID","IID","Population"}} NR>1 {{print $1,$2,$7}}' \
-{input} > {output[0]}
-cut -f7 {input} | sed 1d | sort | uniq > {output[1]}
-'''
-else:
-    rule make_custom_pops:
-        input: config['custom_ref']['custom_pops']
-        output:
-            "reference/{refname}_pops.txt",
-            "reference/{refname}_pops_unique.txt"
-        cache: True
-        resources:
-            mem_mb = 10000,
-            time_min = 30
-        shell:
-            '''
-cp {input} {output[0]}
-awk 'NR > 1 {{print $3}}' {input} | sort | uniq > {output[1]}
-'''
-
-
-if REF == '1kG' or creftype == 'vcfchr':
+if reftype == 'vcfchr':
     rule Reference_prep:
         input:
-            vcf = "reference/1000gFounders.{gbuild}.chr{chrom}.vcf.gz" if REF == '1kG' else config['custom_ref']['file'],
-            tbi = "reference/1000gFounders.{gbuild}.chr{chrom}.vcf.gz.tbi" if REF == '1kG' else config['custom_ref']['file'] + '.tbi'
+            vcf = ref_genotypes,
+            tbi = ref_genotypes + '.tbi'
         output: temp("reference/{refname}.{gbuild}.chr{chrom}.maxmiss{miss}.vcf.gz")
         threads: 12
         resources:
