@@ -44,9 +44,7 @@ QC:
   MAF: 0.01
   HWE: 10e-30
 
-download_tg: true
 genome_build: hg38
-mirror: ebi # ncbi or ebi
 
 # make sure population ref panel and sample snps all overlap?
 #   select "intersection" for full overlap, or

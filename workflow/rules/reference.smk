@@ -61,37 +61,59 @@ else:
 # align 1000 genomes to fasta refrence
 
 
-if config['mirror'] == 'ncbi':
-    tgbase = "http://ftp-trace.ncbi.nih.gov/1000genomes/ftp/"
-elif config['mirror'] == 'ebi':
-    tgbase = "ftp.1000genomes.ebi.ac.uk/vol1/ftp/"
+def map_genome_build(genome_build):
+    if genome_build in ['hg19', 'hg37', 'GRCh37', 'grch37', 'GRCH37']:
+        return 'hg19'
+    elif genome_build in ['hg38', 'GRCh38', 'grch38', 'GRCH38']:
+        return 'GRCh38'
+    else:
+        raise ValueError("Invalid genome build!")
 
-tgped = tgbase + "technical/working/20130606_sample_info/20130606_g1k.ped"
 
-if config['genome_build'] in ['hg19', 'hg37', 'GRCh37', 'grch37', 'GRCH37']:
-    BUILD = 'hg19'
-    tgurl = (tgbase + "release/20130502/ALL.chr{chrom}." +
-        "phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.vcf.gz")
-    tgfa = tgbase + "technical/reference/human_g1k_v37.fasta"
-elif config['genome_build'] in ['hg38', 'GRCh38', 'grch38', 'GRCH38']:
-    BUILD = 'GRCh38'
-    tgurl = (tgbase +
-        'data_collections/1000_genomes_project/release/20181203_biallelic_SNV/' +
-        'ALL.chr{chrom}.shapeit2_integrated_v1a.GRCh38.20181129.phased.vcf.gz')
-    tgfa = tgbase + 'technical/reference/GRCh38_reference_genome/GRCh38_full_analysis_set_plus_decoy_hla.fa'
+if isinstance(config['genome_build'], str):
+    BUILD = map_genome_build(config['genome_build'])
+elif (isinstance(config['genome_build'], list)
+      and isinstance(config['genome_build'][0], str)):
+    BUILD = [map_genome_build(x) for x in config['genome_build']]
+else:
+    raise ValueError("Genome build must be a string or list of strings.")
 
-# import ipdb; ipdb.set_trace()
+
+tgbase = "http://ftp-trace.ncbi.nih.gov/1000genomes/ftp/"
+tgbase_38 = "ftp.1000genomes.ebi.ac.uk/vol1/ftp/"
+
+tgurls = dict(
+    hg19=dict(
+        vcf=(tgbase + "release/20130502/ALL.chr{chrom}."
+             + "phase3_shapeit2_mvncall_integrated_v5a."
+             + "20130502.genotypes.vcf.gz"),
+        fa=(tgbase + "technical/reference/human_g1k_v37.fasta.gz")
+        ),
+    GRCh38=dict(
+        vcf=(tgbase_38
+             + 'data_collections/1000_genomes_project/'
+             + 'release/20181203_biallelic_SNV/'
+             + 'ALL.chr{chrom}.shapeit2_integrated_v1a.'
+             + 'GRCh38.20181129.phased.vcf.gz'),
+        fa=(tgbase_38 + 'technical/reference/GRCh38_reference_genome/'
+            + 'GRCh38_full_analysis_set_plus_decoy_hla.fa')
+        )
+    )
+tgurls = {k: {**v, 'tbi': v['vcf'] + '.tbi'} for k, v in tgurls.items()}
+tgurls['ped'] = (tgbase
+                 + "technical/working/20130606_sample_info/20130606_g1k.ped")
+
 rule download_tg_chrom:
     input:
-        HTTP.remote(tgurl),
-        HTTP.remote(tgurl + ".tbi"),
+        vcf = lambda wildcards: HTTP.remote(tgurls[wildcards.gbuild]['vcf']),
+        tbi = lambda wildcards: HTTP.remote(tgurls[wildcards.gbuild]['tbi'])
     output:
-        temp("reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz"),
-        temp("reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi")
+        vcf = temp("reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz"),
+        tbi = temp("reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi")
     resources:
         mem_mb = 10000,
         time_min = 30
-    shell: "cp {input[0]} {output[0]}; cp {input[1]} {output[1]}"
+    shell: "cp {input.vcf} {output.vcf}; cp {input.tbi} {output.tbi}"
 
 import time
 def http_sleep(url):
@@ -99,8 +121,7 @@ def http_sleep(url):
     return HTTP.remote(url)
 
 rule download_tg_fa:
-    input:
-        HTTP.remote(tgfa + ".gz") if BUILD == 'hg19' else HTTP.remote(tgfa)
+    input: lambda wildcards: HTTP.remote(tgurls[wildcards.gbuild]['fa'])
     output:
         "reference/human_g1k_{gbuild}.fasta",
         "reference/human_g1k_{gbuild}.fasta.fai"
@@ -122,18 +143,17 @@ fi
 samtools faidx {output[0]}
 '''
 
+tgped = "reference/20130606_g1k.ped"
+
 rule download_tg_ped:
     input:
-        HTTP.remote(tgped),
-    output:
-        "reference/20130606_g1k.ped",
+        HTTP.remote(tgurls['ped']),
+    output: tgped
     cache: True
     resources:
         mem_mb = 10000,
         time_min = 30
     shell: "cp {input} {output}"
-
-tgped = "reference/20130606_g1k.ped"
 
 
 if REF == '1kG':
