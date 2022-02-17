@@ -145,7 +145,8 @@ if reftype == 'vcfchr':
         input:
             vcf = ref_genotypes,
             tbi = ref_genotypes + '.tbi'
-        output: temp("reference/{refname}.{gbuild}.chr{chrom}.maxmiss{miss}.vcf.gz")
+        output:
+            temp("reference/{refname}.{gbuild}.chr{chrom}.maxmiss{miss}.vcf.gz")
         threads: 12
         resources:
             mem_mb = 4000,
@@ -154,15 +155,17 @@ if reftype == 'vcfchr':
         shell:
             '''
 bcftools norm -m- {input.vcf} --threads 2 | \
-bcftools view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
+bcftools view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' \
+  --threads 2 | \
 bcftools annotate --rename-chrs reference/chr_name_conv.txt --threads 2 | \
 bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
 '''
 
     rule Reference_cat:
         input:
-            vcfs = expand("reference/{{refname}}.{{gbuild}}.chr{chrom}.maxmiss{{miss}}.vcf.gz",
-                          chrom = list(range(1, 23)))
+            vcfs = expand("reference/{{refname}}.{{gbuild}}"
+                          + ".chr{chrom}.maxmiss{{miss}}.vcf.gz",
+                          chrom=list(range(1, 23)))
         output:
             vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
@@ -195,12 +198,14 @@ elif creftype == 'vcf':
             '''
 for i in {1..22}; do echo "chr$i $i"; done > reference/chr_name_conv.txt;
 bcftools norm -m- {input.vcf} --threads 2 | \
-bcftools view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
+bcftools view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' \
+  --threads 2 | \
 bcftools annotate --rename-chrs reference/chr_name_conv.txt --threads 2 | \
-bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output.vcf}
+bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 \
+  -Oz -o {output.vcf}
 bcftools index -ft {output.vcf}
 '''
-else: #PLINK fileset of all chromosomes
+else:  # PLINK fileset of all chromosomes
     # align custom ref to fasta refrence
     rule Ref_Flip:
         input:
@@ -209,7 +214,8 @@ else: #PLINK fileset of all chromosomes
             fam = config['custom_ref']['file'] + '.fam',
             fasta = expand("reference/human_g1k_{gbuild}.fasta", gbuild=BUILD)
         output:
-            temp(expand("reference/{{refname}}_{{gbuild}}_flipped.{ext}", ext=BPLINK))
+            temp(expand("reference/{{refname}}_{{gbuild}}_flipped.{ext}",
+                        ext=BPLINK))
         resources:
             mem_mb = 10000,
             time_min = 30
@@ -230,7 +236,8 @@ flippyr -p {input.fasta} \
             mem_mb = 10000,
             time_min = 30
         container: 'docker://befh/r_env_gwasamplefilt:5'
-        shell: "Rscript scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}"
+        shell: '''
+Rscript scripts/bim_ChromPosRefAlt.R {input} {output.bim} {output.snplist}'''
 
     # Recode sample plink file to vcf
     rule Ref_Plink2Vcf:
@@ -266,10 +273,6 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
         output:
             vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
-        #wildcard_constraints:
-            #gbuild = "hg19|GRCh38",
-            #refname = "[a-zA-Z0-9-]",
-            #miss = "[0-9.]",
         cache: True
         threads: 12
         resources:
@@ -280,9 +283,11 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
             '''
 for i in {1..22}; do echo "chr$i $i"; done > reference/chr_name_conv.txt;
 bcftools norm -m- {input.vcf} --threads 2 | \
-bcftools view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' --threads 2 | \
+bcftools view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' \
+  --threads 2 | \
 bcftools annotate --rename-chrs reference/chr_name_conv.txt --threads 2 | \
-bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output.vcf}
+bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 \
+  -Oz -o {output.vcf}
 bcftools index -ft {output.vcf}
 '''
 
