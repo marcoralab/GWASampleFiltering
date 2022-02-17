@@ -335,7 +335,7 @@ rule fix_fam:
     input:
         oldfam = rules.Sample_Plink2Bcf.input.fam,
         newfam = "{dataout}/{sample}_{refname}_merged.fam",
-        tgped = tgped
+        tgped = "reference/20130606_g1k.ped" if REF == '1kG' else []
     output: fixed = "{dataout}/{sample}_{refname}_merged_fixed.fam"
     resources:
         mem_mb = 10000,
