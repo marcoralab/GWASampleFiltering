@@ -95,7 +95,8 @@ if "pca_sd" in config:
 else:
     pca_sd = 6
 
-include: 'reference.smk'
+if (not "construct_ref" in config) or config["construct_ref"]:
+    include: 'reference.smk'
 
 if config['genome_build'] in ['hg19', 'hg37', 'GRCh37', 'grch37', 'GRCH37']:
     BUILD = 'hg19'
@@ -298,8 +299,8 @@ rule Merge_RefenceSample:
         tbi_ref = "{dataout}/{sample}_{refname}pruned.vcf.gz.tbi",
         bcf_samp = "{dataout}/{sample}_pruned.vcf.gz",
         csi_samp = "{dataout}/{sample}_pruned.vcf.gz.csi",
-        bcf_ext = "{dataout}/eref.{sample}pruned.vcf.gz" if extraref else '',
-        tbi_ext = "{dataout}/eref.{sample}pruned.vcf.gz.tbi" if extraref else ''
+        bcf_ext = "{dataout}/eref.{sample}pruned.vcf.gz" if extraref else [],
+        tbi_ext = "{dataout}/eref.{sample}pruned.vcf.gz.tbi" if extraref else []
     params:
         miss = config['QC']['GenoMiss'],
         extra = "{dataout}/eref.{sample}pruned.vcf.gz" if extraref else ''

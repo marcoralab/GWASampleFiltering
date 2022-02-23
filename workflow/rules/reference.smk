@@ -69,15 +69,25 @@ tgbase = "http://ftp-trace.ncbi.nih.gov/1000genomes/ftp/"
 tgbase_38 = "ftp.1000genomes.ebi.ac.uk/vol1/ftp/"
 
 tgfasta = dict(
-    hg19=(tgbase + "technical/reference/human_g1k_v37.fasta.gz")
+    hg19=(tgbase + "technical/reference/human_g1k_v37.fasta.gz"),
     GRCh38=(tgbase_38 + 'technical/reference/GRCh38_reference_genome/'
             + 'GRCh38_full_analysis_set_plus_decoy_hla.fa'))
+
+
+if default_ref:
+    REF = '1kG'
+    reftype = 'vcfchr'
+    ref_genotypes = "reference/1000gFounders.{gbuild}.chr{chrom}.vcf.gz"
+else:
+    REF = config['custom_ref']['name']
+    reftype = detect_ref_type(config['custom_ref']['file'])
+    ref_genotypes = config['custom_ref']['file']
 
 
 if 'ref_only' in config and config['ref_only']:
     MISS = config['GenoMiss']
     rule all:
-        output:
+        input:
             fasta = expand("reference/human_g1k_{gbuild}.fasta", gbuild=BUILD),
             panelvars = expand(
                 'reference/panelvars_{refname}_{gbuild}'
@@ -93,15 +103,8 @@ if 'ref_only' in config and config['ref_only']:
 
 
 if default_ref:
-    REF = '1kG'
-    reftype = 'vcfchr'
-    ref_genotypes = "reference/1000gFounders.{gbuild}.chr{chrom}.vcf.gz"
     include: 'reference_1kG.smk'
 else:
-    REF = config['custom_ref']['name']
-    reftype = detect_ref_type(config['custom_ref']['file'])
-    ref_genotypes = config['custom_ref']['file']
-
     rule make_custom_pops:
         input: config['custom_ref']['custom_pops']
         output:
@@ -276,8 +279,7 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
             csi = rules.Ref_IndexVcf.output
         output:
             vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
-            tbi = ("reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz
-                   + ".tbi")
+            tbi = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
         cache: True
         threads: 12
         resources:

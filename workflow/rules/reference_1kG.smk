@@ -62,14 +62,14 @@ rule Reference_foundersonly:
         vcf = "reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz",
         tbi = "reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi",
         founders = rules.Reference_find_founders.output
-    input:
+    output:
         vcf = temp("reference/1000gFounders.{gbuild}.chr{chrom}.vcf.gz"),
         tbi = temp("reference/1000gFounders.{gbuild}.chr{chrom}.vcf.gz.tbi")
     threads: 4
     resources:
         mem_mb = 4000,
         walltime = '4:00'
-        conda: "../envs/bcftools.yaml"
+    conda: "../envs/bcftools.yaml"
     shell:
         r'''
 bcftools view \
