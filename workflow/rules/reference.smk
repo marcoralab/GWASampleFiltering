@@ -20,6 +20,10 @@ class dummyprovider:
         return string_
 
 
+if not 'config' in locals() or not config:
+    configfile: "config/references.yaml"
+    config['ref_only'] = True
+
 if iconnect and not ('nointernet' in config and config['nointernet']):
     FTP = FTPRemoteProvider()
     HTTP = HTTPRemoteProvider()
