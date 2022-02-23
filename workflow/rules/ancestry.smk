@@ -155,7 +155,7 @@ else:
         gbuild=BUILD, miss=config['QC']['GenoMiss'], refname=REF,
         dataout=DATAOUT)
 
-panel_variants = panel_variants if p_intersect else ''
+panel_variants = panel_variants if p_intersect else []
 extract_sample = '--extract {} '.format(panel_variants[0]) if p_intersect else ''
 
 
