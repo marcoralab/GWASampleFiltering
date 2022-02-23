@@ -98,10 +98,17 @@ else:
 if (not "construct_ref" in config) or config["construct_ref"]:
     include: 'reference.smk'
 
-if config['genome_build'] in ['hg19', 'hg37', 'GRCh37', 'grch37', 'GRCH37']:
-    BUILD = 'hg19'
-elif config['genome_build'] in ['hg38', 'GRCh38', 'grch38', 'GRCH38']:
-    BUILD = 'GRCh38'
+
+def map_genome_build(genome_build):
+    if genome_build.lower() in ['hg19', 'hg37', 'grch37', 'b37']:
+        return 'hg19'
+    elif genome_build.lower() in ['hg38', 'grch38', 'b38']:
+        return 'GRCh38'
+    else:
+        raise ValueError("Invalid genome build!")
+
+
+BUILD = map_genome_build(config['genome_build'])
 
 # ---- Prune SNPs, autosome only ----
 #  Pruned SNP list is used for IBD and PCA calculations
