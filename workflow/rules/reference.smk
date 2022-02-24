@@ -125,6 +125,14 @@ awk 'NR > 1 {{print $3}}' {input} | sort | uniq > {output[1]}
 '''
 
 
+rule make_contig_convert_b38:
+    output: 'reference/chr_name_conv.txt'
+    resources:
+        time_min = 4
+    shell: '''
+cat <(for i in {{1..22}} X Y; do echo chr$i $i; done) <(echo chrM MT) > {output}
+'''
+
 rule download_tg_fa:
     input: lambda wildcards: HTTP.remote(tgfasta[wildcards.gbuild])
     output:
@@ -152,7 +160,8 @@ if reftype == 'vcfchr':
     rule Reference_prep:
         input:
             vcf = ref_genotypes,
-            tbi = ref_genotypes + '.tbi'
+            tbi = ref_genotypes + '.tbi',
+            conv = 'reference/chr_name_conv.txt'
         output:
             temp('reference/{refname}.{gbuild}.chr{chrom}'
                  + '.maxmiss{miss}.vcf.gz')
@@ -166,7 +175,7 @@ if reftype == 'vcfchr':
 bcftools norm -m- {input.vcf} --threads 2 | \
 bcftools view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' \
   --threads 2 | \
-bcftools annotate --rename-chrs reference/chr_name_conv.txt --threads 2 | \
+bcftools annotate --rename-chrs {input.conv} --threads 2 | \
 bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
 '''
 
@@ -194,7 +203,8 @@ elif creftype == 'vcf':
     rule Reference_prep:
         input:
             vcf = config['custom_ref']['file'],
-            tbi = config['custom_ref']['file'] + '.tbi'
+            tbi = config['custom_ref']['file'] + '.tbi',
+            conv = 'reference/chr_name_conv.txt'
         output:
             vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = ("reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz"
@@ -207,11 +217,10 @@ elif creftype == 'vcf':
         conda: "../envs/bcftools.yaml"
         shell:
             '''
-for i in {1..22}; do echo "chr$i $i"; done > reference/chr_name_conv.txt;
 bcftools norm -m- {input.vcf} --threads 2 | \
 bcftools view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' \
   --threads 2 | \
-bcftools annotate --rename-chrs reference/chr_name_conv.txt --threads 2 | \
+bcftools annotate --rename-chrs {input.conv} --threads 2 | \
 bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 \
   -Oz -o {output.vcf}
 bcftools index -ft {output.vcf}
@@ -280,7 +289,8 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
     rule Reference_prep:
         input:
             vcf = rules.Ref_Plink2Vcf.output,
-            csi = rules.Ref_IndexVcf.output
+            csi = rules.Ref_IndexVcf.output,
+            conv = 'reference/chr_name_conv.txt'
         output:
             vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
@@ -292,11 +302,10 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
         conda: "../envs/bcftools.yaml"
         shell:
             '''
-for i in {1..22}; do echo "chr$i $i"; done > reference/chr_name_conv.txt;
 bcftools norm -m- {input.vcf} --threads 2 | \
 bcftools view -v snps --min-af 0.01:minor -i 'F_MISSING <= {wildcards.miss}' \
   --threads 2 | \
-bcftools annotate --rename-chrs reference/chr_name_conv.txt --threads 2 | \
+bcftools annotate --rename-chrs {input.conv} --threads 2 | \
 bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 \
   -Oz -o {output.vcf}
 bcftools index -ft {output.vcf}
