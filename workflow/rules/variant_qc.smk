@@ -7,8 +7,8 @@ rule snp_qc:
         "{dataout}/{sample}_SnpQc.frq",
         "{dataout}/{sample}_SnpQc.frqx",
     params:
-        stem = start['stem'],
-        out = "{dataout}/{sample}_SnpQc",
+        stem = apply_prefix(start['stem']),
+        out = apply_prefix("{dataout}/{sample}_SnpQc"),
         miss = config['QC']['GenoMiss'],
         MAF = config['QC']['MAF'],
         HWE = config['QC']['HWE']
@@ -32,9 +32,9 @@ rule sample_callRate:
         "{dataout}/{sample}_callRate.imiss",
         touch("{dataout}/{sample}_callRate.irem")
     params:
-        indat = rules.snp_qc.params.out if qc_type['variant'] else start['stem'],
+        indat = rules.snp_qc.params.out if qc_type['variant'] else apply_prefix(start['stem']),
         miss = config['QC']['SampMiss'],
-        out = "{dataout}/{sample}_callRate"
+        out = apply_prefix("{dataout}/{sample}_callRate")
     resources:
         mem_mb = 10000,
         time_min = 30

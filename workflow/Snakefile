@@ -1,5 +1,5 @@
 '''Snakefile for GWAS Variant and Sample QC Version 0.3.1'''
-# import ipdb; ipdb.set_trace()
+
 import os
 import warnings
 
@@ -11,6 +11,10 @@ shell.executable("/bin/bash")
 
 BPLINK = ["bed", "bim", "fam"]
 RWD = os.getcwd()
+
+
+def apply_prefix(path):
+    return workflow.modifier.path_modifier.modify(path)
 
 
 if 'is_module' in config and config['is_module']:
@@ -83,10 +87,10 @@ if qc_type['variant'] or qc_type['callrate']:
 
 if qc_type['callrate']:
     sampleqc_in_plink = rules.sample_callRate.output[0]
-    sampleqc_in_plink_stem = rules.sample_callRate.params.out
+    sampleqc_in_plink_stem = "{dataout}/{sample}_callRate"
 elif qc_type['variant']:
     sampleqc_in_plink = expand("{{dataout}}/{{sample}}_SnpQc.{ext}", ext=BPLINK)
-    sampleqc_in_plink_stem = rules.snp_qc.params.out
+    sampleqc_in_plink_stem = "{dataout}/{sample}_SnpQc"
 else:
     sampleqc_in_plink = start['files']
     sampleqc_in_plink_stem = start['stem']
@@ -116,8 +120,8 @@ rule sexcheck_QC:
     output:
         "{dataout}/{sample}_SexQC.sexcheck"
     params:
-        indat = start['sex_stem'],
-        out = "{dataout}/{sample}_SexQC",
+        indat = apply_prefix(start['sex_stem']),
+        out = apply_prefix("{dataout}/{sample}_SexQC"),
     resources:
         mem_mb = 10000,
         time_min = 30
@@ -150,8 +154,8 @@ rule heterozygosity_QC:
     input: het_in_plink
     output: "{dataout}/{sample}_HetQC.het"
     params:
-        indat_plink = het_in_plink_stem,
-        out = "{dataout}/{sample}_HetQC"
+        indat_plink = apply_prefix(het_in_plink_stem),
+        out = apply_prefix("{dataout}/{sample}_HetQC")
     resources:
         mem_mb = 10000,
         time_min = 30
@@ -192,8 +196,8 @@ rule Exclude_failed:
         temp(expand("{{dataout}}/{{sample}}_Excluded.{ext}", ext=BPLINK)),
         excl = temp('{dataout}/{sample}_exclude.plink')
     params:
-        indat_plink = sampleqc_in_plink_stem,
-        out = "{dataout}/{sample}_Excluded"
+        indat_plink = apply_prefix(sampleqc_in_plink_stem),
+        out = apply_prefix("{dataout}/{sample}_Excluded")
     resources:
         mem_mb = 10000,
         time_min = 30

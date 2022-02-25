@@ -22,15 +22,15 @@ rule PruneDupvar_snps_noancestry:
         expand("{{dataout}}/{{sample}}_nodup_noancestry.{ext}",
                ext=['prune.in', 'prune.out'], dataout=DATAOUT),
     params:
-        indat = sampleqc_in_plink_stem,
-        out = "{dataout}/{sample}_nodup_noancestry"
+        ins = sampleqc_in_plink_stem,
+        out = apply_prefix("{dataout}/{sample}_nodup_noancestry")
     resources:
         mem_mb = 10000,
         time_min = 30
     conda: "../envs/plink.yaml"
     shell:
         '''
-plink --keep-allele-order --bfile {params.indat} \
+plink --keep-allele-order --bfile {params.ins} \
   --autosome --indep 50 5 1.5 \
   --list-duplicate-vars --out {params.out}
 '''
@@ -54,7 +54,7 @@ rule sample_prune_noancestry:
         temp(expand("{{dataout}}/{{sample}}_pruned_noancestry.{ext}", ext=BPLINK))
     params:
         indat = sampleqc_in_plink_stem,
-        out = "{dataout}/{sample}_pruned_noancestry"
+        out = apply_prefix("{dataout}/{sample}_pruned_noancestry")
     resources:
         mem_mb = 10000,
         time_min = 30

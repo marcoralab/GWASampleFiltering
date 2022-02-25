@@ -61,10 +61,10 @@ qc_type_relate = {x: enableqc(x) for x in qc_type_relate}
 
 if qc_type_relate['callrate']:
     sampleqc_in_plink = rules.sample_callRate.output[0]
-    sampleqc_in_plink_stem = rules.sample_callRate.params.out
+    sampleqc_in_plink_stem = "{dataout}/{sample}_callRate"
 elif qc_type_relate['variant']:
     sampleqc_in_plink = multiext("{dataout}/{sample}_SnpQc", '.bed', '.bim', '.fam')
-    sampleqc_in_plink_stem = rules.snp_qc.params.out
+    sampleqc_in_plink_stem = "{dataout}/{sample}_SnpQc"
 else:
     sampleqc_in_plink = start['files']
     sampleqc_in_plink_stem = start['stem']
@@ -123,7 +123,7 @@ rule Sample_Flip:
     output:
         multiext("{dataout}/{sample}_flipped", ".bim", ".bed", ".fam")
     params:
-        dataout = DATAOUT
+        dataout = apply_prefix(DATAOUT)
     resources:
         mem_mb = 10000,
         time_min = 30
@@ -156,7 +156,7 @@ else:
         dataout=DATAOUT)
 
 panel_variants = panel_variants if p_intersect else []
-extract_sample = '--extract {} '.format(panel_variants[0]) if p_intersect else ''
+extract_sample = '--extract {} '.format(apply_prefix(panel_variants[0])) if p_intersect else ''
 
 
 rule PruneDupvar_snps:
@@ -168,9 +168,8 @@ rule PruneDupvar_snps:
         "{dataout}/{sample}_nodup.dupvar",
         multiext("{dataout}/{sample}_nodup", '.prune.in', '.prune.out'),
     params:
-        indat = "{dataout}/{sample}_flipped",
-        dupvar = "{dataout}/{sample}_nodup.dupvar",
-        out = "{dataout}/{sample}_nodup",
+        ins = apply_prefix("{dataout}/{sample}_flipped"),
+        out = apply_prefix("{dataout}/{sample}_nodup"),
         extract = extract_sample
     resources:
         mem_mb = 10000,
@@ -178,7 +177,7 @@ rule PruneDupvar_snps:
     conda: "../envs/plink.yaml"
     shell:
         '''
-plink --keep-allele-order --bfile {params.indat} -bim {input.bim} \
+plink --keep-allele-order --bfile {params.ins} -bim {input.bim} \
   {params.extract}--autosome --indep 50 5 1.5 \
   --list-duplicate-vars --out {params.out}
 '''
@@ -202,15 +201,15 @@ rule sample_prune:
     output:
         temp(multiext("{dataout}/{sample}_pruned", '.bed', '.bim', '.fam'))
     params:
-        indat = "{dataout}/{sample}_flipped",
-        out = "{dataout}/{sample}_pruned"
+        ins = apply_prefix("{dataout}/{sample}_flipped"),
+        out = apply_prefix("{dataout}/{sample}_pruned")
     resources:
         mem_mb = 10000,
         time_min = 30
     conda: "../envs/plink.yaml"
     shell:
         '''
-plink --keep-allele-order --bfile {params.indat} --bim {input.bim} \
+plink --keep-allele-order --bfile {params.ins} --bim {input.bim} \
   --extract {input.prune} --exclude {input.dupvar} \
   --make-bed --out {params.out}
 '''
@@ -278,7 +277,7 @@ rule Sample_Plink2Bcf:
         fam = rules.tgfam.output if istg else "{dataout}/{sample}_pruned.fam"
     output: "{dataout}/{sample}_pruned.vcf.gz"
     params:
-        out = "{dataout}/{sample}_pruned"
+        out = apply_prefix("{dataout}/{sample}_pruned")
     resources:
         mem_mb = 10000,
         time_min = 30
@@ -310,7 +309,7 @@ rule Merge_RefenceSample:
         tbi_ext = "{dataout}/eref.{sample}pruned.vcf.gz.tbi" if extraref else []
     params:
         miss = config['QC']['GenoMiss'],
-        extra = "{dataout}/eref.{sample}pruned.vcf.gz" if extraref else ''
+        extra = apply_prefix("{dataout}/eref.{sample}pruned.vcf.gz") if extraref else ''
     output:
         out = "{dataout}/{sample}_{refname}_merged.vcf"
     threads: 4
@@ -332,7 +331,7 @@ rule Plink_RefenceSample:
     output:
         multiext("{dataout}/{sample}_{refname}_merged", '.bed', '.bim', '.fam')
     params:
-        out = "{dataout}/{sample}_{refname}_merged"
+        out = apply_prefix("{dataout}/{sample}_{refname}_merged")
     resources:
         mem_mb = 10000,
         time_min = 30
@@ -344,7 +343,8 @@ rule fix_fam:
         oldfam = rules.tgfam.output if istg else "{dataout}/{sample}_pruned.fam",
         newfam = "{dataout}/{sample}_{refname}_merged.fam",
         tgped = "reference/20130606_g1k.ped" if REF == '1kG' else []
-    output: fixed = "{dataout}/{sample}_{refname}_merged_fixed.fam"
+    output:
+        fixed = "{dataout}/{sample}_{refname}_merged_fixed.fam"
     resources:
         mem_mb = 10000,
         time_min = 30
@@ -371,20 +371,20 @@ rule PcaPopulationOutliers:
     input:
         plink = multiext("{dataout}/{sample}_{refname}_merged", '.bed', '.bim', '.fam'),
         fam = rules.fix_fam.output,
-        ref = DATAOUT + '/{refname}_allpops.txt' if extraref else "reference/{refname}_pops.txt",
-        clust = DATAOUT + '/{refname}_allpops_unique.txt' if extraref else "reference/{refname}_pops_unique.txt"
+        ref = '{dataout}/{refname}_allpops.txt' if extraref else "reference/{refname}_pops.txt",
+        clust = '{dataout}/{refname}_allpops_unique.txt' if extraref else "reference/{refname}_pops_unique.txt"
     output:
         multiext("{dataout}/{sample}_{refname}_merged", '.eigenval', '.eigenvec')
     params:
-        indat_plink = "{dataout}/{sample}_{refname}_merged",
-        out = "{dataout}/{sample}_{refname}_merged"
+        ins = apply_prefix("{dataout}/{sample}_{refname}_merged"),
+        out = apply_prefix("{dataout}/{sample}_{refname}_merged")
     resources:
         mem_mb = 10000,
         time_min = 30
     conda: "../envs/plink.yaml"
     shell:
         '''
-plink --keep-allele-order --bfile {params.indat_plink} --fam {input.fam} \
+plink --keep-allele-order --bfile {params.ins} --fam {input.fam} \
   --pca 10 --within {input.ref} --pca-clusters {input.clust} --out {params.out}
 '''
 
@@ -449,7 +449,7 @@ rule supervised_admixture:
         P = "{dataout}/{sample}_{refname}_merged.5.P",
         Q = "{dataout}/{sample}_{refname}_merged.5.Q"
     params:
-        stem = "{dataout}/{sample}_{refname}_merged_fixed",
+        stem = apply_prefix("{dataout}/{sample}_{refname}_merged_fixed"),
         K = 5
     resources:
         mem_mb = 10000,

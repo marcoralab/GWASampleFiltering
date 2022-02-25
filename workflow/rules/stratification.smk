@@ -61,17 +61,17 @@ if config['pcair']:
             temp(expand("{{dataout}}/{{sample}}_filtered_PCApre.{ext}",
                  ext=BPLINK, dataout = DATAOUT)),
         params:
-            indat = "{dataout}/{sample}_pruned",
-            plinkout = "{dataout}/{sample}_filtered_PCApre"
+            ins = apply_prefix("{dataout}/{sample}_pruned"),
+            out = apply_prefix("{dataout}/{sample}_filtered_PCApre")
         resources:
             mem_mb = 10000,
             time_min = 30
         conda: "../envs/plink.yaml"
         shell:
             r'''
-plink --keep-allele-order --bfile {params.indat} \
+plink --keep-allele-order --bfile {params.ins} \
   --remove {input.exclude} \
-  --make-bed --out {params.plinkout}
+  --make-bed --out {params.out}
 '''
 
     rule filterKING:
@@ -81,7 +81,7 @@ plink --keep-allele-order --bfile {params.indat} \
         output:
             "{dataout}/{sample}_IBDQC.all.popfilt.kingfiles"
         params:
-            indat = "{dataout}/{sample}_IBDQC.all",
+            indat = apply_prefix("{dataout}/{sample}_IBDQC.all"),
         threads: 6
         resources:
             mem_mb = 10000,
@@ -97,7 +97,7 @@ plink --keep-allele-order --bfile {params.indat} \
         output:
             expand("{{dataout}}/{{sample}}_filtered_PCApre.{ext}",ext=['unrel', 'partition.log'], dataout = DATAOUT)
         params:
-            stem = rules.ancestryFilt.params.plinkout if qc_type['ancestry'] else rules.sample_prune_noancestry.params.out,
+            stem = rules.ancestryFilt.params.out if qc_type['ancestry'] else rules.sample_prune_noancestry.params.out,
             king = rules.filterKING.params.indat + ".popfilt" if qc_type['ancestry'] else rules.filterKING.params.indat
         threads: 6
         resources:
@@ -112,18 +112,18 @@ plink --keep-allele-order --bfile {params.indat} \
             unrel = rules.PCAPartitioning.output[0],
         output: "{dataout}/{sample}_filtered_PCAfreq.frqx"
         params:
-            indat = rules.ancestryFilt.params.plinkout if qc_type['ancestry'] else rules.sample_prune_noancestry.params.out,
-            out = "{dataout}/{sample}_filtered_PCAfreq"
+            ins = rules.ancestryFilt.params.out if qc_type['ancestry'] else rules.sample_prune_noancestry.params.out,
+            out = apply_prefix("{dataout}/{sample}_filtered_PCAfreq")
         resources:
             mem_mb = 10000,
             time_min = 30
         conda: "../envs/plink.yaml"
         shell:
             '''
-if [ -f {params.indat}.pcair.eigenval ]; then
+if [ -f {params.ins}.pcair.eigenval ]; then
   echo "SNPRelate used instead." > {output}
 else
-  plink --keep-allele-order --bfile {params.indat} --freqx \
+  plink --keep-allele-order --bfile {params.ins} --freqx \
     --within {input.unrel} --keep-cluster-names unrelated \
     --out {params.out}
 fi
@@ -138,19 +138,19 @@ fi
             expand("{{dataout}}/{{sample}}_filtered_PCA.{ext}",
                    ext=['eigenval', 'eigenvec'])
         params:
-            indat = rules.ancestryFilt.params.plinkout if qc_type['ancestry'] else rules.sample_prune_noancestry.params.out,
-            out = "{dataout}/{sample}_filtered_PCA"
+            ins = rules.ancestryFilt.params.out if qc_type['ancestry'] else rules.sample_prune_noancestry.params.out,
+            out = apply_prefix("{dataout}/{sample}_filtered_PCA")
         resources:
             mem_mb = 10000,
             time_min = 30
         conda: "../envs/plink.yaml"
         shell:
             '''
-if [ -f {params.indat}.pcair.eigenval ]; then
-  ln -s $(readlink -e {params.indat}.pcair.eigenval) {params.out}.eigenval
-  ln -s $(readlink -e {params.indat}.pcair.eigenvec) {params.out}.eigenvec
+if [ -f {params.ins}.pcair.eigenval ]; then
+  ln -s $(readlink -e {params.ins}.pcair.eigenval) {params.out}.eigenval
+  ln -s $(readlink -e {params.ins}.pcair.eigenvec) {params.out}.eigenvec
 else
-  plink --keep-allele-order --bfile {params.indat} --read-freq {input.frq} --pca 10 \
+  plink --keep-allele-order --bfile {params.ins} --read-freq {input.frq} --pca 10 \
     --within {input.unrel} --pca-cluster-names unrelated \
     --out {params.out}
 fi
@@ -164,15 +164,15 @@ elif qc_type['ancestry']:
             expand("{{dataout}}/{{sample}}_filtered_PCA.{ext}",
                    ext=['eigenval', 'eigenvec'])
         params:
-            indat = "{dataout}/{sample}_pruned",
-            out = "{dataout}/{sample}_filtered_PCA"
+            ins = apply_prefix("{dataout}/{sample}_pruned"),
+            out = apply_prefix("{dataout}/{sample}_filtered_PCA")
         resources:
             mem_mb = 10000,
             time_min = 30
         conda: "../envs/plink.yaml"
         shell:
             '''
-plink --keep-allele-order --bfile {params.indat} --remove {input.exclude} \
+plink --keep-allele-order --bfile {params.ins} --remove {input.exclude} \
   --pca 10 --out {params.out}
 '''
 else:
@@ -182,7 +182,7 @@ else:
             expand("{{dataout}}/{{sample}}_filtered_PCA.{ext}",
                    ext=['eigenval', 'eigenvec'])
         params:
-            indat = rules.ancestryFilt.params.plinkout if qc_type['ancestry'] else rules.sample_prune_noancestry.params.out,
+            ins = rules.ancestryFilt.params.out if qc_type['ancestry'] else rules.sample_prune_noancestry.params.out,
             out = "{dataout}/{sample}_filtered_PCA"
         resources:
             mem_mb = 10000,
@@ -190,6 +190,6 @@ else:
         conda: "../envs/plink.yaml"
         shell:
             '''
-plink --keep-allele-order --bfile {params.indat} \
+plink --keep-allele-order --bfile {params.ins} \
   --pca 10 --out {params.out}
 '''

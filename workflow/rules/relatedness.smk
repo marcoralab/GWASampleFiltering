@@ -6,15 +6,15 @@ rule relatedness_sample_prep:
         bim = temp("{dataout}/{sample}_IBDQCfilt.bim"),
         fam = temp("{dataout}/{sample}_IBDQCfilt.fam")
     params:
-        indat_plink = sampleqc_in_plink_stem,
-        out = "{dataout}/{sample}_IBDQCfilt"
+        ins = apply_prefix(sampleqc_in_plink_stem),
+        out = apply_prefix("{dataout}/{sample}_IBDQCfilt")
     resources:
         mem_mb = 10000,
         time_min = 30
     conda: "../envs/plink.yaml"
     shell:
         '''
-plink --bfile {params.indat_plink} \
+plink --bfile {params.ins} \
   --geno 0.02 \
   --maf 0.02 \
   --memory 6000 \
@@ -30,9 +30,6 @@ rule relatedness_sample_prep_remnoncc:
         bed = temp("{dataout}/{sample}_IBDQCfilt_rm-non-cc.bed"),
         bim = temp("{dataout}/{sample}_IBDQCfilt_rm-non-cc.bim"),
         fam = temp("{dataout}/{sample}_IBDQCfilt_rm-non-cc.fam")
-    params:
-        indat_plink = rules.relatedness_sample_prep.params.out,
-        out = "{dataout}/{sample}_IBDQCfilt_rm-non-cc"
     resources:
         mem_mb = 10000,
         time_min = 30
@@ -51,8 +48,8 @@ rule relatedness_QC:
         fam = rules.relatedness_sample_prep_remnoncc.output.fam
     output: "{dataout}/{sample}_IBDQC.kingfiles"
     params:
-        out = "{dataout}/{sample}_IBDQC",
-        dataout = DATAOUT
+        out = apply_prefix("{dataout}/{sample}_IBDQC"),
+        dataout = apply_prefix(DATAOUT)
     threads: 6
     resources:
         mem_mb = 5200,
@@ -75,8 +72,8 @@ rule king_all:
         fam = rules.relatedness_sample_prep_remnoncc.output.fam
     output: "{dataout}/{sample}_IBDQC.all.kingfiles",
     params:
-        out = "{dataout}/{sample}_IBDQC.all",
-        dataout = DATAOUT
+        out = apply_prefix("{dataout}/{sample}_IBDQC.all"),
+        dataout = apply_prefix(DATAOUT)
     threads: 6
     resources:
         mem_mb = 5200,
