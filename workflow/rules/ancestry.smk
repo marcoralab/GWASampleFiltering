@@ -244,8 +244,8 @@ bcftools index -ft {output.vcf}
 
 rule Reference_prune_extra:
     input:
-        vcf = expand("{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
-                     gbuild=BUILD, miss=config['QC']['GenoMiss'], dataout = DATAOUT),
+        vcf = expand("{{dataout}}/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
+                     gbuild=BUILD, miss=config['QC']['GenoMiss']),
         prune = "{dataout}/{sample}_pruned.snplist"
     output:
         vcf = temp("{dataout}/eref.{sample}pruned.vcf.gz"),
@@ -275,7 +275,7 @@ rule Sample_Plink2Bcf:
     input:
         bed = "{dataout}/{sample}_pruned.bed",
         bim = "{dataout}/{sample}_pruned.bim",
-        fam = rules.tgfam.output if istg else rules.tgfam.input
+        fam = rules.tgfam.output if istg else "{dataout}/{sample}_pruned.fam"
     output: "{dataout}/{sample}_pruned.vcf.gz"
     params:
         out = "{dataout}/{sample}_pruned"
@@ -341,7 +341,7 @@ rule Plink_RefenceSample:
 
 rule fix_fam:
     input:
-        oldfam = rules.Sample_Plink2Bcf.input.fam,
+        oldfam = rules.tgfam.output if istg else "{dataout}/{sample}_pruned.fam",
         newfam = "{dataout}/{sample}_{refname}_merged.fam",
         tgped = "reference/20130606_g1k.ped" if REF == '1kG' else []
     output: fixed = "{dataout}/{sample}_{refname}_merged_fixed.fam"
@@ -394,8 +394,8 @@ rule ExcludePopulationOutliers:
     input:
         eigenval = expand("{{dataout}}/{{sample}}_{refname}_merged.eigenval", refname=REF),
         eigenvec = expand("{{dataout}}/{{sample}}_{refname}_merged.eigenvec", refname=REF),
-        fam = rules.Sample_Plink2Bcf.input.fam,
-        pops = expand(DATAOUT + '/{refname}_allpops.txt' if extraref else "reference/{refname}_pops.txt", refname=REF)
+        fam = rules.tgfam.output if istg else "{dataout}/{sample}_pruned.fam",
+        pops = expand('{{dataout}}/{refname}_allpops.txt' if extraref else "reference/{refname}_pops.txt", refname=REF)
     output:
         excl = "{dataout}/{sample}_exclude.pca",
         rmd = "{dataout}/{sample}_pca.Rdata",
@@ -415,7 +415,7 @@ rule ExcludePopulationOutliers:
 rule admixturepop:
     input:
         fam = rules.fix_fam.output,
-        pops = expand(DATAOUT + '/{refname}_allpops.txt' if extraref else "reference/{refname}_pops.txt", refname=REF),
+        pops = expand('{{dataout}}/{refname}_allpops.txt' if extraref else "reference/{refname}_pops.txt", refname=REF),
         spop = 'resources/tg_subpops.tsv'
     output: "{dataout}/{sample}_{refname}_merged_fixed.pop"
     resources:
@@ -437,8 +437,8 @@ rule symlink_fixed:
         time_min = 30
     shell:
         '''
-ln -s $PWD/{input.bed} {output.bed}
-ln -s $PWD/{input.bim} {output.bim}
+ln -rs $PWD/{input.bed} {output.bed}
+ln -rs $PWD/{input.bim} {output.bim}
 '''
 
 # Perform supervised admixture on the samples

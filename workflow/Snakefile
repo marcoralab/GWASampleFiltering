@@ -67,6 +67,9 @@ outs = {
 outputs = [outs[x] for x in config["outputs"]]
 outputs = flatten(outputs)
 
+wildcard_constraints:
+    dataout = DATAOUT
+
 rule all:
     input:
         outputs
