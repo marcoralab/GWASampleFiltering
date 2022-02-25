@@ -33,7 +33,6 @@ else:
 
 BPLINK = ["bed", "bim", "fam"]
 
-
 def map_genome_build(genome_build):
     if genome_build.lower() in ['hg19', 'hg37', 'grch37', 'b37']:
         return 'hg19'
@@ -51,7 +50,7 @@ elif (isinstance(config['genome_build'], list)
 else:
     raise ValueError("Genome build must be a string or list of strings.")
 
-localrules: download_tg_fa, download_tg_ped, download_tg_chrom
+localrules: download_tg_fa, download_tg_ped, download_tg_chrom, download_md5_b38, download_md5_hg19
 
 
 def detect_ref_type(reffile):
@@ -133,11 +132,28 @@ rule make_contig_convert_b38:
 cat <(for i in {{1..22}} X Y; do echo chr$i $i; done) <(echo chrM MT) > {output}
 '''
 
+
+def fasta_remote(wc):
+    gbuild = wc.gbuild
+    if gbuild == 'GRCh38':
+        return FTP.remote(tgfasta['GRCh38'], immediate_close=True)
+    else:
+        return HTTP.remote(tgfasta[gbuild])
+
+def fasta_md5(wc):
+    gbuild = wc.gbuild
+    if gbuild == 'GRCh38':
+        return '64b32de2fc934679c16e83a2bc072064'
+    elif gbuild == 'hg19':
+        return '45f81df94f0408d082363e34a081ed81'
+
 rule download_tg_fa:
-    input: lambda wildcards: HTTP.remote(tgfasta[wildcards.gbuild])
+    input: fasta_remote
     output:
         "reference/human_g1k_{gbuild}.fasta",
         "reference/human_g1k_{gbuild}.fasta.fai"
+    params:
+        md5 = lambda wc: fasta_md5(wc)
     resources:
         mem_mb = 10000,
         time_min = 30
@@ -145,6 +161,7 @@ rule download_tg_fa:
     cache: True
     shell:
         '''
+md5sum -c <(echo {params.md5} {input[0]})
 if [[ "{input[0]}" == *.gz ]]; then
   zcat {input[0]} > {output[0]} && rstatus=0 || rstatus=$?; true
   if [ $rstatus -ne 2 && $rstatus -ne 0 ]; then
