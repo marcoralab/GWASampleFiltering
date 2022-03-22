@@ -3,6 +3,7 @@
 import os
 import warnings
 
+
 configfile: "config/config.yaml"
 config['full_pipeline'] = True
 config['king'] = True
@@ -174,11 +175,11 @@ rule heterozygosity_sample_fail:
 
 rule SampleExclusion:
     input:
-        SampCallRate = "{dataout}/{sample}_callRate.irem" if qc_type['callrate'] else '/dev/null',
-        het = "{dataout}/{sample}_exclude.heterozigosity" if qc_type['heterozygosity'] else '/dev/null',
-        sex = "{dataout}/{sample}_exclude.sexcheck" if qc_type['sex'] else '/dev/null',
-        pca = "{dataout}/{sample}_exclude.pca" if qc_type['ancestry'] else '/dev/null',
-        relat = "{dataout}/{sample}_exclude.relatedness" if qc_type['relatedness'] else '/dev/null'
+        SampCallRate = "{dataout}/{sample}_callRate.irem" if qc_type['callrate'] else ancient('/dev/null'),
+        het = "{dataout}/{sample}_exclude.heterozigosity" if qc_type['heterozygosity'] else ancient('/dev/null'),
+        sex = "{dataout}/{sample}_exclude.sexcheck" if qc_type['sex'] else ancient('/dev/null'),
+        pca = "{dataout}/{sample}_exclude.pca" if qc_type['ancestry'] else ancient('/dev/null'),
+        relat = "{dataout}/{sample}_exclude.relatedness" if qc_type['relatedness'] else ancient('/dev/null')
     output:
         out = "{dataout}/{sample}_exclude.samples",
         out_distinct = "{dataout}/{sample}_exclude.distinct_samples"
@@ -211,18 +212,19 @@ plink --keep-allele-order --bfile {params.indat_plink} --remove {output.excl} \
 
 rule GWAS_QC_Report:
     input:
-        SexFile = "{dataout}/{sample}_SexQC.sexcheck" if qc_type['sex'] else '/dev/null',
-        hwe = "{dataout}/{sample}_SnpQc.hwe" if qc_type['variant'] else '/dev/null',
-        frq = "{dataout}/{sample}_SnpQc.frq" if qc_type['variant'] else '/dev/null',
-        frqx = "{dataout}/{sample}_SnpQc.frqx" if qc_type['variant'] else '/dev/null',
-        imiss = "{dataout}/{sample}_callRate.imiss" if qc_type['callrate'] else '/dev/null',
-        HetFile = "{dataout}/{sample}_HetQC.het" if qc_type['heterozygosity'] else '/dev/null',
-        IBD_stats = "{dataout}/{sample}_IBDQC.Rdata" if qc_type['relatedness'] else '/dev/null',
-        PCA_rdat = "{dataout}/{sample}_pca.Rdata" if qc_type['ancestry'] else '/dev/null',
-        cluster_pops = "{dataout}/{sample}_cluster_pops.tsv" if qc_type['ancestry'] else '/dev/null',
-        PopStrat_eigenval = "{dataout}/{sample}_filtered_PCA.eigenval" if qc_type['popstrat'] else '/dev/null',
-        PopStrat_eigenvec = "{dataout}/{sample}_filtered_PCA.eigenvec" if qc_type['popstrat'] else '/dev/null',
-        partmethod = rules.PCAPartitioning.output[1] if qc_type['popstrat'] and config["pcair"] else "/dev/null"
+        SexFile = "{dataout}/{sample}_SexQC.sexcheck" if qc_type['sex'] else ancient('/dev/null'),
+        hwe = "{dataout}/{sample}_SnpQc.hwe" if qc_type['variant'] else ancient('/dev/null'),
+        frq = "{dataout}/{sample}_SnpQc.frq" if qc_type['variant'] else ancient('/dev/null'),
+        frqx = "{dataout}/{sample}_SnpQc.frqx" if qc_type['variant'] else ancient('/dev/null'),
+        imiss = "{dataout}/{sample}_callRate.imiss" if qc_type['callrate'] else ancient('/dev/null'),
+        HetFile = "{dataout}/{sample}_HetQC.het" if qc_type['heterozygosity'] else ancient('/dev/null'),
+        IBD_stats = "{dataout}/{sample}_IBDQC.Rdata" if qc_type['relatedness'] else ancient('/dev/null'),
+        PCA_rdat = "{dataout}/{sample}_pca.Rdata" if qc_type['ancestry'] else ancient('/dev/null'),
+        cluster_pops = "{dataout}/{sample}_cluster_pops.tsv" if qc_type['ancestry'] else ancient('/dev/null'),
+        PopStrat_eigenval = "{dataout}/{sample}_filtered_PCA.eigenval" if qc_type['popstrat'] else ancient('/dev/null'),
+        PopStrat_eigenvec = "{dataout}/{sample}_filtered_PCA.eigenvec" if qc_type['popstrat'] else ancient('/dev/null'),
+        partmethod = rules.PCAPartitioning.output[1] if qc_type['popstrat'] and config["pcair"] else ancient('/dev/null'),
+        tgpops = workflow.current_basedir.path + '/../resources/tg_subpops.tsv' # workflow.source_path('../resources/tg_subpops.tsv')
     output:
          "{dataout}/stats/{sample}_GWAS_QC.html"
     params:
