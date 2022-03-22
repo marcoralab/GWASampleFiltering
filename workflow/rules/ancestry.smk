@@ -392,10 +392,14 @@ plink --keep-allele-order --bfile {params.ins} --fam {input.fam} \
 # Rscript to identify population outliers
 rule ExcludePopulationOutliers:
     input:
-        eigenval = expand("{{dataout}}/{{sample}}_{refname}_merged.eigenval", refname=REF),
-        eigenvec = expand("{{dataout}}/{{sample}}_{refname}_merged.eigenvec", refname=REF),
+        eigenval = expand("{{dataout}}/{{sample}}_{refname}_merged.eigenval",
+                          refname=REF),
+        eigenvec = expand("{{dataout}}/{{sample}}_{refname}_merged.eigenvec",
+                          refname=REF),
         fam = rules.tgfam.output if istg else "{dataout}/{sample}_pruned.fam",
-        pops = expand('{{dataout}}/{refname}_allpops.txt' if extraref else "reference/{refname}_pops.txt", refname=REF)
+        pops = expand('{{dataout}}/{refname}_allpops.txt' if extraref
+                      else "reference/{refname}_pops.txt", refname=REF),
+        poptable = workflow.current_basedir.path + '/../../resources/tg_subpops.tsv' # ancient(workflow.source_path('../../resources/tg_subpops.tsv'))
     output:
         excl = "{dataout}/{sample}_exclude.pca",
         rmd = "{dataout}/{sample}_pca.Rdata",
@@ -406,17 +410,17 @@ rule ExcludePopulationOutliers:
         sd = pca_sd
     resources:
         mem_mb = 10000,
-        time_min = 30
+        time_min = 30,
+        tmpdir = workflow.basedir + '/../temp'
     container: 'docker://befh/r_env_gwasamplefilt:5'
     script: '../scripts/PCA_QC.R'
-
 
 
 rule admixturepop:
     input:
         fam = rules.fix_fam.output,
         pops = expand('{{dataout}}/{refname}_allpops.txt' if extraref else "reference/{refname}_pops.txt", refname=REF),
-        spop = 'resources/tg_subpops.tsv'
+        spop = workflow.current_basedir.path + '/../../resources/tg_subpops.tsv' # workflow.source_path('../../resources/tg_subpops.tsv')
     output: "{dataout}/{sample}_{refname}_merged_fixed.pop"
     resources:
         mem_mb = 10000,

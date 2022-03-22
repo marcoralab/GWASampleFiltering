@@ -54,6 +54,7 @@ population <- snakemake@params[["superpop"]]
 extraref <- snakemake@params[["extraref"]]
 sdev <- snakemake@params[["sd"]]
 pcs_out_path <- snakemake@output[["pcs_pops"]]
+tg_pops_file <- snakemake@input[["poptable"]]
 save.image(file = paste0(output, ".params.Rdata"))
 
 #load("output/ADGC/x_present_AA/ADC8-AA_exclude.pca.params.Rdata")
@@ -101,7 +102,7 @@ message("Processing data")
 # ---- Data wrangling ---- #
 
 # Read in populations and superpops
-tg_pops <- read_tsv("resources/tg_subpops.tsv", col_types = "cccc")
+tg_pops <- read_tsv(tg_pops_file, col_types = "cccc")
 populations <- tg_pops %>% select(pop, spop) %>% deframe %>% as.list
 superpops <- unlist(populations) %>% unique()
 
