@@ -51,8 +51,7 @@ freq.raw <- read_table2(snakemake@input[["frq"]], col_names = T,
   A2 = col_character(),
   MAF = col_double(),
   NCHROBS = col_double()
-)
-  )
+))
 
 # ---- readin plink .frqx ---- ##
 message("reading plink frqx file")
@@ -68,8 +67,7 @@ freqx.raw <- read_tsv(snakemake@input[["frqx"]], col_names = T,
   `C(HAP A1)` = col_double(),
   `C(HAP A2)` = col_double(),
   `C(MISSING)` = col_double()
-)
-)
+))
 
 # ---- readin plink .hwe ---- ##
 message("reading plink hwe file")
@@ -130,6 +128,7 @@ snps <- freq.raw %>%
 ```
 
 Figure \@ref(fig:MAFxcallrate) shows the SNP call rate versus minor allele frequncy across all typed SNPs in the study. The dashed lines denote the MAF and call rate QC thresholds. `r nrow(filter(snps, Call == F))` SNPs were removed due to low call rate and `r nrow(filter(snps, Call.maf == T))` SNPs were removed due to low minor allele frequency.
+
 ```{r MAFxcallrate, cache=F, echo=F, warning=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Call rate by minor allele frequency '}
 ggplot(data = snps, aes(x = MAF, y = Call.rate)) +
   geom_point(alpha = 0.3, size = 0.5) +
@@ -144,9 +143,11 @@ ggplot(data = snps, aes(x = MAF, y = Call.rate)) +
 Violations of Hardy Weinberg Equilibrium can indicate either the presence of population substructure, or the occurence of genotyping error. It is common practice to assume that violoations are indicative of genotyping error and remove SNPs in which the HWE test statistic has a corresponding p-value of less then 1x10-6. A threshold of `r snakemake@params[["HWE"]]` is used here.
 
 For case-control data, HWE is generally not tested in cases to not exclude real selection against a phenotype, so it is best to include case-control status in the PLINK files. `r CC_read`
+
 <br>
 
 Filtering SNPs on Hardy Weinberg Equilibrium for autosomes only can be done in PLINK by typing the following at the shell prompt:
+
 ```{bash, eval=F}
 plink_1.9 --bfile raw-GWA-data  \
   --autosome \
@@ -154,6 +155,7 @@ plink_1.9 --bfile raw-GWA-data  \
   --hwe 0.000001 \
   --make-bed --out filtered-GWA-data
 ```
+
 <br>
 
 Figure \@ref(fig:hwe) displays a ternary plot for the genotype frequency of all typed SNPs, with `r nrow(filter(snps, hwe == F))` SNPs that are violating HWE coloured red.
@@ -189,6 +191,7 @@ plink_1.9 --bfile raw-GWA-data  \
   --mind 0.05 \
   --make-bed --out filtered-GWA-data
 ```
+
 <br>
 
 ```{r, echo=FALSE, include=FALSE}
@@ -214,7 +217,7 @@ if (snakemake@input[["imiss"]] != "/dev/null") {
 Figure \@ref(fig:samplecallrate) shows the distribution of sample call rates across all individules in the study, with the dashed line denoting the call rate QC threshold (typicaly ≥ 95%). Table \@ref(tab:highmiss) lists the samples that were excluded based on call rate.
 
 ```{r samplecallrate, echo=F, fig.width=7.5, fig.height=5.7, fig.align='center', fig.cap='Sample call rate distribution', eval = imiss_tf}
-if(filter(imiss, call == T) %>% nrow() > 0){
+if(filter(imiss, F_MISS > 0.002) %>% distinct(F_MISS) %>% {nrow(.) > 1}){
   ggplot(data = imiss, aes(x = as.factor(1), y = F_MISS, colour = call, shape = call)) +
     geom_sina(size = 1.5) +
     geom_hline(yintercept = 0.05, linetype = 2, colour = 'red') +
@@ -228,12 +231,12 @@ if(filter(imiss, call == T) %>% nrow() > 0){
           #axis.text.y = element_blank())
 } else {
   ggplot(data = imiss, aes(x = as.factor(1), y = F_MISS, colour = call, shape = call)) +
-  scale_y_log10(breaks = scales::trans_breaks("log10", function(x) round(10^x, 3)), limits = c(0.0001,1)) +  
+  scale_y_log10(breaks = scales::trans_breaks("log10", function(x) round(10^x, 3)), limits = c(0.0001,1)) +
   labs(y = 'Proportion of missing genotypes (log)') +
   theme_bw() + coord_flip() +
   theme(legend.position = 'bottom', axis.title.x = element_text(""),
-        axis.title.y = element_blank(), axis.ticks.y = element_blank()) + 
-  annotate(geom="text", x=as.factor(1), y=0.01, color="red", size = 10, 
+        axis.title.y = element_blank(), axis.ticks.y = element_blank()) +
+  annotate(geom="text", x=as.factor(1), y=0.01, color="red", size = 10,
            label="No Samples with missing genotypes")
 
 }
