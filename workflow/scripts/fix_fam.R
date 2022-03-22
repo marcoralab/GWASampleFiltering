@@ -1,8 +1,9 @@
 #!/usr/bin/env Rscript
 
-library(dplyr)
+suppressPackageStartupMessages(library(dplyr))
 library(readr)
 library(tidyr)
+library(vroom)
 
 if (!exists("snakemake")) {
   setClass("snakemake_fake", representation(
@@ -26,11 +27,11 @@ col.nn <- c("none", "FIDIID", "PID_new", "MID_new", "Sex_new", "Phe_new")
 col.t <- "ccccii"
 
 new_fam_basic <- snakemake@input[["newfam"]] %>%
-  read_table2(col_names = col.nn, col_types = col.t) %>%
+  vroom(col_names = col.nn, col_types = col.t) %>%
   separate(FIDIID, c("FID_new", "IID_new"), sep = "_",
-           remove = F, extra = "merge")
+           remove = F, extra = "merge", fill = "right")
 
-if (snakemake@input[["tgped"]]) {
+if (length(snakemake@input[["tgped"]]) > 0) {
   ped <- snakemake@input[["tgped"]] %>%
     read_tsv(col_types = cols(`Family ID` = col_character(),
                               `Individual ID` = col_character(),
@@ -47,7 +48,7 @@ if (snakemake@input[["tgped"]]) {
 }
 
 old_fam <- snakemake@input[["oldfam"]] %>%
-  read_table2(col_names = col.n, col_types = col.t) %>%
+  vroom(col_names = col.n, col_types = col.t) %>%
   unite("FIDIID", FID, IID, sep = "_", remove = F)
 
 left_join(new_fam, old_fam, by = "FIDIID") %>%
