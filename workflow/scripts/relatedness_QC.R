@@ -32,8 +32,10 @@ dat_inter_all_kin0 <- paste0(genome_file, ".all.kin0")
 dat_inter_all_kin <- paste0(genome_file, ".all.kin")
 if (file.exists(dat_inter_all_kin0)) {
   kin0 <- T
-  if (!norel) {
-    dat_inter_kin0 <- paste0(genome_file, ".kin0") %>%
+  dat_inter_kin0_path <- paste0(genome_file, ".kin0")
+  kin0_rel_exists <- file.exists(dat_inter_kin0_path)
+  if (!norel & kin0_rel_exists) {
+    dat_inter_kin0 <- dat_inter_kin0_path %>%
       read_table2(col_types = cols(
         .default = col_double(),
         FID1 = col_character(),
@@ -60,8 +62,10 @@ if (file.exists(dat_inter_all_kin0)) {
 
 if (file.exists(dat_inter_all_kin)) {
   kin <- T
-  if (!norel) {
-    dat_inter_kin <- paste0(genome_file, ".kin") %>%
+  dat_inter_kin_path <- paste0(genome_file, ".kin")
+  kin_rel_exists <- file.exists(dat_inter_kin_path)
+  if (!norel & kin_rel_exists) {
+    dat_inter_kin <- dat_inter_kin_path %>%
       read_table2(col_types = cols(
         .default = col_double(),
         FID = col_character(),
@@ -85,24 +89,29 @@ if (file.exists(dat_inter_all_kin)) {
     mutate(FID2 = FID1, PI_HAT = ifelse(Kinship > 0, 2 * Kinship, 0))
 }
 
+if (!norel & kin0_rel_exists & kin_rel_exists) {
+  print("Relatedness kin and kin0 files present")
+  dat_inter <- bind_rows(dat_inter_kin0, dat_inter_kin) %>%
+    distinct(FID1, IID1, FID2, IID2, .keep_all = T)
+} else if (!norel & kin0_rel_exists) {
+  print("Relatedness kin0 file present")
+  dat_inter <- dat_inter_kin0
+} else if (!norel & kin_rel_exists) {
+  print("Relatedness kin file present")
+  dat_inter <- dat_inter_kin
+}
+
 if (kin0 & kin) {
   print("Kin and kin0 files present")
   dat_inter_all <- bind_rows(dat_inter_all_kin0, dat_inter_all_kin) %>%
     distinct(FID1, IID1, FID2, IID2, .keep_all = T)
-  if (!norel) {
-    dat_inter <- bind_rows(dat_inter_kin0, dat_inter_kin) %>%
-      distinct(FID1, IID1, FID2, IID2, .keep_all = T)
-  }
 } else if (kin0) {
-  print("Kin0 files present")
+  print("Kin0 file present")
   dat_inter_all <- dat_inter_all_kin0
-  if (!norel) dat_inter <- dat_inter_kin0
 } else if (kin) {
-  print("Kin files present")
+  print("Kin file present")
   dat_inter_all <- dat_inter_all_kin
-  if (!norel) dat_inter <- dat_inter_kin
 }
-
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
 ##  IBD relationship
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
