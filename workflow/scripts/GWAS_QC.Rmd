@@ -25,6 +25,9 @@ author: "Written and maintained by Brian Fulton-Howard and Shea Andrews"
 
 ## Sample QC for `r snakemake@wildcards[["sample"]]`
 
+Pipeline version `r snakemake@params[[pipeline_version]]`
+
+
 ```{r setup, include=FALSE, echo=F, message=F, warning=F}
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(root.dir = snakemake@params[["rwd"]])
