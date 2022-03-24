@@ -133,7 +133,7 @@ rule makeTGpops:
     output:
         "reference/1kG_pops.txt",
         "reference/1kG_pops_unique.txt"
-    cache: True
+    #cache: True
     resources:
         mem_mb = 10000,
         time_min = 30
