@@ -18,9 +18,9 @@ rule snp_qc:
     conda: "../envs/plink.yaml"
     shell:
         '''
-plink --keep-allele-order --bfile {params.stem} --freq --out {params.out}
-plink --keep-allele-order --bfile {params.stem} --freqx --out {params.out}
-plink --keep-allele-order --bfile {params.stem} --geno {params.miss} \
+plink --keep-allele-order --allow-no-sex --bfile {params.stem} --freq --out {params.out}
+plink --keep-allele-order --allow-no-sex --bfile {params.stem} --freqx --out {params.out}
+plink --keep-allele-order --allow-no-sex --bfile {params.stem} --geno {params.miss} \
 --maf {params.MAF} --hardy --hwe {params.HWE} --make-bed --out {params.out}
 '''
 
@@ -41,6 +41,6 @@ rule sample_callRate:
     conda: "../envs/plink.yaml"
     shell:
         '''
-plink --keep-allele-order --bfile {params.indat} --mind {params.miss} \
-  --missing --make-bed --out {params.out}
+plink --keep-allele-order --allow-no-sex --bfile {params.indat} \
+  --mind {params.miss} --missing --make-bed --out {params.out}
 '''
