@@ -113,7 +113,7 @@ else:
         output:
             "reference/{refname}_pops.txt",
             "reference/{refname}_pops_unique.txt"
-        cache: True
+        #cache: True
         resources:
             mem_mb = 10000,
             time_min = 30
@@ -205,7 +205,7 @@ bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
             vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = ("reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz"
                    + ".tbi")
-        cache: True
+        #cache: True
         threads: 2
         resources:
             mem_mb = 4000,
@@ -226,7 +226,7 @@ elif creftype == 'vcf':
             vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = ("reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz"
                    + ".tbi")
-        cache: True
+        #cache: True
         threads: 12
         resources:
             mem_mb = 4000,
@@ -311,7 +311,7 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
         output:
             vcf = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz",
             tbi = "reference/{refname}_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
-        cache: True
+        #cache: True
         threads: 12
         resources:
             mem_mb = 4000,
