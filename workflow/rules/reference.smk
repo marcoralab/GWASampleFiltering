@@ -16,7 +16,7 @@ except urllib.error.URLError as ex:
 
 
 class dummyprovider:
-    def remote(string_, allow_redirects="foo"):
+    def remote(string_, allow_redirects="foo", immediate_close="bar"):
         return string_
 
 
