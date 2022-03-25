@@ -26,27 +26,17 @@ rdat <- snakemake@output[["rdat"]]
 
 norel <- any(read_lines(snakemake@input[["genome"]]) == "norel")
 
-kin0 <- F
-kin <- F
 dat_inter_all_kin0 <- paste0(genome_file, ".all.kin0")
 dat_inter_all_kin <- paste0(genome_file, ".all.kin")
-if (file.exists(dat_inter_all_kin0)) {
-  kin0 <- T
-  dat_inter_kin0_path <- paste0(genome_file, ".kin0")
-  kin0_rel_exists <- file.exists(dat_inter_kin0_path)
-  if (!norel & kin0_rel_exists) {
-    dat_inter_kin0 <- dat_inter_kin0_path %>%
-      read_table2(col_types = cols(
-        .default = col_double(),
-        FID1 = col_character(),
-        ID1 = col_character(),
-        FID2 = col_character(),
-        ID2 = col_character(),
-        N_SNP = col_integer(),
-        InfType = col_character()
-      )) %>%
-      rename(IID1 = ID1, IID2 = ID2, PI_HAT = PropIBD)
-  }
+dat_inter_kin0_path <- paste0(genome_file, ".kin0")
+dat_inter_kin_path <- paste0(genome_file, ".kin")
+
+kin0 <- file.exists(dat_inter_all_kin0)
+kin <- file.exists(dat_inter_all_kin)
+kin0_rel_exists <- file.exists(dat_inter_kin0_path)
+kin_rel_exists <- file.exists(dat_inter_kin_path)
+
+if (kin0) {
   dat_inter_all_kin0 <- dat_inter_all_kin0 %>%
     read_table2(col_types = cols(
       .default = col_double(),
@@ -60,23 +50,21 @@ if (file.exists(dat_inter_all_kin0)) {
     mutate(PI_HAT = ifelse(Kinship > 0, 2 * Kinship, 0))
 }
 
-if (file.exists(dat_inter_all_kin)) {
-  kin <- T
-  dat_inter_kin_path <- paste0(genome_file, ".kin")
-  kin_rel_exists <- file.exists(dat_inter_kin_path)
-  if (!norel & kin_rel_exists) {
-    dat_inter_kin <- dat_inter_kin_path %>%
-      read_table2(col_types = cols(
-        .default = col_double(),
-        FID = col_character(),
-        ID1 = col_character(),
-        ID2 = col_character(),
-        N_SNP = col_integer(),
-        InfType = col_character()
-      )) %>%
-      rename(IID1 = ID1, IID2 = ID2, FID1 = FID, PI_HAT = PropIBD) %>%
-      mutate(FID2 = FID1)
-  }
+if (!norel & kin0_rel_exists) {
+  dat_inter_kin0 <- dat_inter_kin0_path %>%
+    read_table2(col_types = cols(
+      .default = col_double(),
+      FID1 = col_character(),
+      ID1 = col_character(),
+      FID2 = col_character(),
+      ID2 = col_character(),
+      N_SNP = col_integer(),
+      InfType = col_character()
+    )) %>%
+    rename(IID1 = ID1, IID2 = ID2, PI_HAT = PropIBD)
+}
+
+if (kin) {
   dat_inter_all_kin <- dat_inter_all_kin %>%
     read_table2(col_types = cols(
       .default = col_double(),
@@ -87,6 +75,20 @@ if (file.exists(dat_inter_all_kin)) {
     )) %>%
     rename(IID1 = ID1, IID2 = ID2, FID1 = FID) %>%
     mutate(FID2 = FID1, PI_HAT = ifelse(Kinship > 0, 2 * Kinship, 0))
+}
+
+if (!norel & kin_rel_exists) {
+  dat_inter_kin <- dat_inter_kin_path %>%
+    read_table2(col_types = cols(
+      .default = col_double(),
+      FID = col_character(),
+      ID1 = col_character(),
+      ID2 = col_character(),
+      N_SNP = col_integer(),
+      InfType = col_character()
+    )) %>%
+    rename(IID1 = ID1, IID2 = ID2, FID1 = FID, PI_HAT = PropIBD) %>%
+    mutate(FID2 = FID1)
 }
 
 if (!norel & kin0_rel_exists & kin_rel_exists) {
