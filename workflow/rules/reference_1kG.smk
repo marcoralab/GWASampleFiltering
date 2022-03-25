@@ -119,7 +119,7 @@ rule Reference_foundersonly:
     resources:
         mem_mb = 4000,
         walltime = '4:00'
-    conda: "../envs/bcftools.yaml"
+    container: "docker://befh/bcftools-htslib-samtools:1.15"
     shell:
         r'''
 bcftools view -S {input.founders} --force-samples --threads 2 {input.vcf} | \

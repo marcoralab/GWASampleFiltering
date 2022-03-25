@@ -234,7 +234,7 @@ rule Reference_prune:
     resources:
         mem_mb = 4000,
         walltime = '4:00'
-    conda: "../envs/bcftools.yaml"
+    container: "docker://befh/bcftools-htslib-samtools:1.15"
     shell:
         '''
 bcftools view -i 'ID=@{input.prune}' -Oz -o {output.vcf} --threads 4 {input.vcf}
@@ -252,7 +252,7 @@ rule Reference_prune_extra:
     resources:
         mem_mb = 10000,
         time_min = 30
-    conda: "../envs/bcftools.yaml"
+    container: "docker://befh/bcftools-htslib-samtools:1.15"
     shell:
         '''
 bcftools view -i 'ID=@{input.prune}' \
@@ -295,7 +295,7 @@ rule Sample_IndexBcf:
     resources:
         mem_mb = 10000,
         time_min = 30
-    conda: "../envs/bcftools.yaml"
+    container: "docker://befh/bcftools-htslib-samtools:1.15"
     shell: 'bcftools index -f {input}'
 
 # Merge ref and sample
@@ -316,7 +316,7 @@ rule Merge_RefenceSample:
     resources:
         mem_mb = 4000,
         walltime = '4:00'
-    conda: "../envs/bcftools.yaml"
+    container: "docker://befh/bcftools-htslib-samtools:1.15"
     shell:
         r'''
 bcftools merge -m none --threads 2 \

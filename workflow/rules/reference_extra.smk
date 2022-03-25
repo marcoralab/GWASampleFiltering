@@ -21,7 +21,7 @@ if ereftype == 'vcfchr':
         resources:
             mem_mb = 4000,
             walltime = '4:00'
-        conda: "../envs/bcftools.yaml"
+        container: "docker://befh/bcftools-htslib-samtools:1.15"
         shell:
             '''
 for i in {1..22}; do echo "chr$i $i"; done > reference/chr_name_conv.txt;
@@ -42,7 +42,7 @@ bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
         resources:
             mem_mb = 10000,
             time_min = 30
-        conda: "../envs/bcftools.yaml"
+        container: "docker://befh/bcftools-htslib-samtools:1.15"
         shell:
             '''
 bcftools concat {input.vcfs} -Oz -o {output.vcf} --threads 2
@@ -61,7 +61,7 @@ elif ereftype == 'vcf':
         resources:
             mem_mb = 4000,
             time_min = 30
-        conda: "../envs/bcftools.yaml"
+        container: "docker://befh/bcftools-htslib-samtools:1.15"
         shell:
             '''
 for i in {1..22}; do echo "chr$i $i"; done > reference/chr_name_conv.txt;
@@ -126,7 +126,7 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
         resources:
             mem_mb = 10000,
             time_min = 30
-        conda: "../envs/bcftools.yaml"
+        container: "docker://befh/bcftools-htslib-samtools:1.15"
         shell: 'bcftools index -f {input}'
 
     rule Reference_prep_extra:
@@ -140,7 +140,7 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
         resources:
             mem_mb = 4000,
             time_min = 30
-        conda: "../envs/bcftools.yaml"
+        container: "docker://befh/bcftools-htslib-samtools:1.15"
         shell:
             '''
 for i in {1..22}; do echo "chr$i $i"; done > reference/chr_name_conv.txt;
@@ -161,7 +161,7 @@ rule get_extravars:
     resources:
         mem_mb = 10000,
         time_min = 30
-    conda: "../envs/bcftools.yaml"
+    container: "docker://befh/bcftools-htslib-samtools:1.15"
     shell: "bcftools query -f '%ID\n' {input} > {output}"
 
 rule union_panelvars:

@@ -186,7 +186,7 @@ if reftype == 'vcfchr':
         resources:
             mem_mb = 4000,
             walltime = '4:00'
-        conda: "../envs/bcftools.yaml"
+        container: "docker://befh/bcftools-htslib-samtools:1.15"
         shell:
             '''
 bcftools norm -m- {input.vcf} --threads 2 | \
@@ -210,7 +210,7 @@ bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
         resources:
             mem_mb = 4000,
             walltime = '4:00'
-        conda: "../envs/bcftools.yaml"
+        container: "docker://befh/bcftools-htslib-samtools:1.15"
         shell:
             '''
 bcftools concat {input.vcfs} -Oz -o {output.vcf} --threads 2
@@ -231,7 +231,7 @@ elif creftype == 'vcf':
         resources:
             mem_mb = 4000,
             walltime = '4:00'
-        conda: "../envs/bcftools.yaml"
+        container: "docker://befh/bcftools-htslib-samtools:1.15"
         shell:
             '''
 bcftools norm -m- {input.vcf} --threads 2 | \
@@ -316,7 +316,7 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
         resources:
             mem_mb = 4000,
             walltime = '4:00'
-        conda: "../envs/bcftools.yaml"
+        container: "docker://befh/bcftools-htslib-samtools:1.15"
         shell:
             '''
 bcftools norm -m- {input.vcf} --threads 2 | \
@@ -334,5 +334,5 @@ rule get_panelvars:
     resources:
         mem_mb = 10000,
         time_min = 30
-    conda: "../envs/bcftools.yaml"
+    container: "docker://befh/bcftools-htslib-samtools:1.15"
     shell: "bcftools query -f '%ID\n' {input} > {output}"
