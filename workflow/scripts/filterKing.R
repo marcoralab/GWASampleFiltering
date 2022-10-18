@@ -24,7 +24,7 @@ if ( nrow(excluded) == 0 ) {
   if (file.exists(kinfile)) {
     message("Symlinking kinfile")
     kinout <- paste0(kingstem, ".popfilt.kin")
-    system(sprintf("ln -sf %s.kin %s", kingstem, kinout))
+    system(sprintf("ln -srf %s.kin %s", kingstem, kinout))
   } else {
     message(sprintf("%s does not exist.", kin0file))
     kinout <- ""
@@ -33,7 +33,7 @@ if ( nrow(excluded) == 0 ) {
   if (file.exists(kin0file)) {
     message("Symlinking kin0file")
     kin0out <- paste0(kingstem, ".popfilt.kin0")
-    system(sprintf("ln -sf %s.kin0 %s", kingstem, kin0out))
+    system(sprintf("ln -srf %s.kin0 %s", kingstem, kin0out))
   } else {
     message(sprintf("%s does not exist.", kin0file))
     kin0out <- ""
