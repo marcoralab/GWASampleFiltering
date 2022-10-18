@@ -50,14 +50,14 @@ rule relatedness_QC:
     params:
         out = apply_prefix("{dataout}/{sample}_IBDQC"),
         dataout = apply_prefix(DATAOUT)
-    threads: 6
+    threads: 24
     resources:
-        mem_mb = 5200,
-        walltime = '24:00'
+        mem_mb = 4000,
+        walltime = '144:00'
     conda: "../envs/king.yaml"
     shell:
         '''
-king -b {input.bed} --related --degree 4 --prefix {params.out} > {params.out}.log
+king -b {input.bed} --related --degree 4 --prefix {params.out} --cpus 24 > {params.out}.log
 if test -n "$(find {params.dataout} -name "{wildcards.sample}_IBDQC.kin*")"; then
   find {params.dataout} -name "{wildcards.sample}_IBDQC.kin*" > {output}
 elif grep --quiet "No close relatives" {params.out}.log; then
@@ -74,14 +74,14 @@ rule king_all:
     params:
         out = apply_prefix("{dataout}/{sample}_IBDQC.all"),
         dataout = apply_prefix(DATAOUT)
-    threads: 6
+    threads: 24
     resources:
-        mem_mb = 5200,
-        walltime = '24:00'
+        mem_mb = 4000,
+        walltime = '144:00'
     conda: "../envs/king.yaml"
     shell:
         '''
-king -b {input.bed} --kinship --ibs --prefix {params.out} > {params.out}.log
+king -b {input.bed} --kinship --ibs --prefix {params.out} --cpus 24 > {params.out}.log
 if test -n "$(find {params.dataout} -name "{wildcards.sample}_IBDQC.all.kin*")"; then
   find {params.dataout} -name "{wildcards.sample}_IBDQC.all.kin*" > {output}
 fi
@@ -99,9 +99,9 @@ rule relatedness_sample_fail:
     output:
         out = "{dataout}/{sample}_exclude.relatedness",
         rdat = "{dataout}/{sample}_IBDQC.Rdata"
-    threads: 6
+    threads: 8
     resources:
-        mem_mb = 10000,
-        walltime = '4:00'
-    container: 'docker://befh/r_env_gwasamplefilt:5'
+        mem_mb = 64000,
+        walltime = '24:00'
+    container: 'docker://befh/r_env_gwasamplefilt:7'
     script: '../scripts/relatedness_QC.R'

@@ -37,8 +37,26 @@ kin0_rel_exists <- file.exists(dat_inter_kin0_path)
 kin_rel_exists <- file.exists(dat_inter_kin_path)
 
 if (kin0) {
+  exclude_unrelated <- file.size(dat_inter_all_kin0) >= 4e+10
+} else {
+  exclude_unrelated <- FALSE
+}
+
+if (exclude_unrelated) {
+  read_kinship <- function(file, ...) {
+    filter_unrelate <- function(x, i) {
+      filter(x, Kinship > 0)
+    }
+    read_tsv_chunked(file, DataFrameCallback$new(filter_unrelate),
+                     chunk_size = 100000, ...)
+  }
+} else {
+  read_kinship <- read_table
+}
+
+if (kin0) {
   dat_inter_all_kin0 <- dat_inter_all_kin0 %>%
-    read_table2(col_types = cols(
+    read_kinship(col_types = cols(
       .default = col_double(),
       FID1 = col_character(),
       ID1 = col_character(),
@@ -52,7 +70,7 @@ if (kin0) {
 
 if (!norel & kin0_rel_exists) {
   dat_inter_kin0 <- dat_inter_kin0_path %>%
-    read_table2(col_types = cols(
+    read_kinship(col_types = cols(
       .default = col_double(),
       FID1 = col_character(),
       ID1 = col_character(),
@@ -66,7 +84,7 @@ if (!norel & kin0_rel_exists) {
 
 if (kin) {
   dat_inter_all_kin <- dat_inter_all_kin %>%
-    read_table2(col_types = cols(
+    read_kinship(col_types = cols(
       .default = col_double(),
       FID = col_character(),
       ID1 = col_character(),
@@ -79,7 +97,7 @@ if (kin) {
 
 if (!norel & kin_rel_exists) {
   dat_inter_kin <- dat_inter_kin_path %>%
-    read_table2(col_types = cols(
+    read_kinship(col_types = cols(
       .default = col_double(),
       FID = col_character(),
       ID1 = col_character(),

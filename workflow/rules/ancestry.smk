@@ -280,7 +280,7 @@ rule Sample_Plink2Bcf:
         out = apply_prefix("{dataout}/{sample}_pruned")
     resources:
         mem_mb = 10000,
-        time_min = 30
+        time_min = 120
     conda: "../envs/plink.yaml"
     shell:
         '''

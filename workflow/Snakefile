@@ -9,6 +9,7 @@ import warnings
 configfile: "config/config.yaml"
 config['full_pipeline'] = True
 config['king'] = True
+config['relatedness_preexclude'] = 'relatedness_preexclude' in config and config['relatedness_preexclude']
 
 shell.executable("/bin/bash")
 

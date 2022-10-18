@@ -65,7 +65,7 @@ if config['pcair']:
             out = apply_prefix("{dataout}/{sample}_filtered_PCApre")
         resources:
             mem_mb = 10000,
-            time_min = 30
+            time_min = 60
         conda: "../envs/plink.yaml"
         shell:
             r'''
@@ -85,24 +85,26 @@ plink --keep-allele-order --bfile {params.ins} \
         threads: 6
         resources:
             mem_mb = 10000,
-            time_min = 30
+            time_min = 60
         container: 'docker://befh/r_env_gwasamplefilt:5'
         script: '../scripts/filterKing.R'
 
     rule PCAPartitioning:
         input:
             plink = rules.ancestryFilt.output if qc_type['ancestry'] else rules.sample_prune_noancestry.output,
+            plink_unpruned = sampleqc_in_plink,
             king = rules.filterKING.output if qc_type['ancestry'] else "{dataout}/{sample}_IBDQC.all.kingfiles",
             iterative = rules.relatedness_sample_fail.output.out
         output:
             expand("{{dataout}}/{{sample}}_filtered_PCApre.{ext}",ext=['unrel', 'partition.log'], dataout = DATAOUT)
         params:
             stem = rules.ancestryFilt.params.out if qc_type['ancestry'] else rules.sample_prune_noancestry.params.out,
+            stem_unpruned = sampleqc_in_plink_stem,
             king = rules.filterKING.params.indat + ".popfilt" if qc_type['ancestry'] else rules.filterKING.params.indat
-        threads: 6
+        threads: 12
         resources:
-            mem_mb = 10000,
-            time_min = 30
+            mem_mb = 32000,
+            walltime = '100:00'
         container: 'docker://befh/genesis_env_gwasamplefilt:2.1'
         script: '../scripts/RunPCAiR.R'
 
@@ -116,7 +118,7 @@ plink --keep-allele-order --bfile {params.ins} \
             out = apply_prefix("{dataout}/{sample}_filtered_PCAfreq")
         resources:
             mem_mb = 10000,
-            time_min = 30
+            time_min = 60
         conda: "../envs/plink.yaml"
         shell:
             '''
@@ -142,7 +144,7 @@ fi
             out = apply_prefix("{dataout}/{sample}_filtered_PCA")
         resources:
             mem_mb = 10000,
-            time_min = 30
+            time_min = 60
         conda: "../envs/plink.yaml"
         shell:
             '''

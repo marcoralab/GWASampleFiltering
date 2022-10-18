@@ -37,6 +37,15 @@ disptab <- function(x) {
 ## ---- Read in Data ----##
 dat_inter_raw <- load(snakemake@input[["IBD_stats"]])
 
+
+if (exclude_unrelated) {
+  filter_msg <- paste("Note: Unrelated individuals (Kinship 0 or below)",
+                      "removed from all plots due to extreme number of pairs.")
+} else {
+  filter_msg <- ""
+}
+
+
 plot2Ydesc <- "kinship coefficient"
 plot2Y <- "Kinship Coefficient"
 plot2Ycol <- "Kinship"
