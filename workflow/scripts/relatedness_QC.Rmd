@@ -21,12 +21,14 @@ library(kableExtra)
 library(DT)
 
 tabcap <- function (name, caption) {
-  sprintf("<table width=\"100%%\"><caption>(#tab:%s) %s </caption></table>", name, caption)
+  "<table width=\"100%%\"><caption>(#tab:%s) %s </caption></table>" %>%
+    sprintf(name, caption)
 }
 disptab <- function(x) {
   if (knitr::opts_knit$get("rmarkdown.pandoc.to") == "html") {
-    dtopts <- list(dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel', 'pdf', 'print'))
-    return(datatable(x, extensions = 'Buttons', options = dtopts))
+    dtopts <- list(dom = "Bfrtip",
+      buttons = c("copy", "csv", "excel", "pdf", "print"))
+    return(datatable(x, extensions = "Buttons", options = dtopts))
   } else {
     return(kable(x))
   }
@@ -55,9 +57,12 @@ package <- "KING"
 ```
 
 ## Cryptic Relatedness
-Population based cohorts are often limited to unrelated individuals as associations statisitcs often assume independence across individuals. Closely related samples will share more of their genome and are likely to be more phenotypically similar than than two individules chosen randomly from the population. A common measure of relatedness is identity by descent (IBD), where a kinship correlation coefficent (pi-hat) greater 0.1 suggests that samples maybe related or duplicates samples.
 
-Identifing duplicated or related samples can be done in PLINK 1.9 by typing the following command at the shell prompt.
+`r filter_msg`
+
+Population based cohorts are often limited to unrelated individuals as associations statistics often assume independence across individuals. Closely related samples will share more of their genome and are likely to be more phenotypically similar than than two individuals chosen randomly from the population. A common measure of relatedness is identity by descent (IBD), where a kinship correlation coefficient (pi-hat) greater 0.1 suggests that samples maybe related or duplicates samples.
+
+Identifying duplicated or related samples can be done in PLINK 1.9 by typing the following command at the shell prompt.
 
 ```{bash, eval=F}
 plink_1.9 --bfile raw-GWA-data \
@@ -65,7 +70,7 @@ plink_1.9 --bfile raw-GWA-data \
   --genome --min 0.05 --out output.ibd
 ```
 
-This produces a file containing the pariwise IBS estimates for all pairs of individuals with minimum IBS of 0.05. Analysis should be performed using an LD pruned snplist.
+This produces a file containing the pairwise IBS estimates for all pairs of individuals with minimum IBS of 0.05. Analysis should be performed using an LD pruned snplist.
 
 IBD can be calculated using KING Robust by typing the following command at the shell prompt. Genotypes do not need to be pruned, but basic QC is recommended.
 
@@ -76,7 +81,7 @@ king -b raw-GWA-data.bed \
   --prefix output.ibd
 ```
 
-This produces a file containing the pariwise IBS estimates for all pairs of individuals, looking for pairs with at least 3rd degree relatedness.
+This produces a file containing the pairwise IBS estimates for all pairs of individuals, looking for pairs with at least 3rd degree relatedness.
 
 `r package` has been chosen for IBD analysis.
 
@@ -84,44 +89,48 @@ This produces a file containing the pariwise IBS estimates for all pairs of indi
 
 The following histogram (Fig. \@ref(fig:kinplot)) shows the distribution of proportion of IBD sharing (pi-hat in PLINK; PropIBD in KING) between all pairs.
 
-```{r kinplot, echo=FALSE, fig.width=4.7, fig.height=4.7, fig.align='center', fig.cap='Distribution of pairwise kinship coefficients'}
+```{r kinplot, echo=FALSE, fig.width=4.7, fig.height=4.7, fig.align="center", fig.cap="Distribution of pairwise kinship coefficients"}
 ggplot(dat_forplots, aes(x = PI_HAT)) +
   geom_histogram(binwidth = 0.01, fill = "#377EB8") +
   coord_cartesian(xlim = c(min(dat_forplots$PI_HAT) - 0.05, 1)) +
-  theme_bw() + labs(x = 'IBD Sharing (pi-hat in PLINK)') +
-  geom_vline(xintercept = snakemake@params[["pi_threshold"]], colour = 'red', linetype = 2)
+  theme_bw() + labs(x = "IBD Sharing (pi-hat in PLINK)") +
+  geom_vline(xintercept = snakemake@params[["pi_threshold"]],
+             colour = "red", linetype = 2)
 
 ```
 
 Relationship between pairs of individuals is based on the following IBD values (Table \@ref(tab:reltable)) in PLINK, and is calculated internally in KING:
 
-
 ```{r reltable, echo=FALSE}
-rel_tab %>% kable(caption = "IBD relationships", booktabs = TRUE) %>%
+rel_tab %>%
+  kable(caption = "IBD relationships", booktabs = TRUE) %>%
   kable_styling(bootstrap_options = c("striped", "hover"))
 ```
 
 
-The following plot (Fig. \@ref(fig:relplot)) shows the `r plot2Ydesc` by the proportion of loci where individules share zero alleles (Z0), where the proportion of IBD sharing is greater than 0.05. In family based studies, pairs are coloured by IBD relationship. Table \@ref(tab:ibdfail) displays the individules where the kinship coefficent was greather than `r snakemake@params[["pi_threshold"]]` in population based studies OR how were duplicates in family based studies.
-```{r relplot, echo=FALSE, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Pairs of individules plotted by their degree of relatedness'}
+The following plot (Fig. \@ref(fig:relplot)) shows the `r plot2Ydesc` by the proportion of loci where individuals share zero alleles (Z0), where the proportion of IBD sharing is greater than 0.05. In family based studies, pairs are colored by IBD relationship. Table \@ref(tab:ibdfail) displays the individuals where the kinship coefficient was greater than `r snakemake@params[["pi_threshold"]]` in population based studies OR how were duplicates in family based studies.
+
+```{r relplot, echo=FALSE, fig.width=7.5, fig.height=4.7, fig.align="center", fig.cap="Pairs of individuals plotted by their degree of relatedness"}
 
 pht <- snakemake@params[["pi_threshold"]]
-if(snakemake@params[["Family"]] == "F" || snakemake@params[["Family"]] == F) {
+if (snakemake@params[["Family"]] == "F" ||
+    snakemake@params[["Family"]] == FALSE) {
   dat_forplots %>%
     select(-FID1, -IID1, -FID2, -IID2) %>%
     mutate(related = PI_HAT > pht) %>%
     ggplot(aes(colour = related)) +
       geom_point(aes_string(x = plot2Xcol, y = plot2Ycol)) +
-      scale_colour_manual(name = sprintf("IBD Sharing > %f", snakemake@params[["pi_threshold"]]),
+      scale_colour_manual(name = sprintf("IBD Sharing > %f",
+                          snakemake@params[["pi_threshold"]]),
       values = c("#377EB8", "#E41A1C")) +
-      labs(x = 'IBD Z0', y = plot2Y) +
-      coord_cartesian(xlim = c(0,1), ylim = c(0,1)) + theme_bw() +
+      labs(x = "IBD Z0", y = plot2Y) +
+      coord_cartesian(xlim = c(0, 1), ylim = c(0, 1)) + theme_bw() +
       theme(legend.position = "bottom")
 } else {
   ggplot(dat_inter, aes(colour = relationship)) +
     geom_point(aes_string(x = plot2Xcol, y = plot2Ycol)) +
-    coord_cartesian(xlim = c(0,1), ylim = c(0,1)) +
-    labs(x = 'IBD Z0', y = plot2Y) +
+    coord_cartesian(xlim = c(0, 1), ylim = c(0, 1)) +
+    labs(x = "IBD Z0", y = plot2Y) +
     theme_bw() + theme(legend.position = "right")
 }
 ```
@@ -132,7 +141,7 @@ if(snakemake@params[["Family"]] == "F" || snakemake@params[["Family"]] == F) {
 ibd_tab %>% disptab
 ```
 
-To construct a sample of unrelated individuals, participants with the highest number of proportions of IBD sharing > `r snakemake@params[["pi_threshold"]]` can be iterativly removed.
+To construct a sample of unrelated individuals, participants with the highest number of proportions of IBD sharing > `r snakemake@params[["pi_threshold"]]` were iteratively removed.
 
 `r tabcap("famexcluded", "The following samples were excluded due to relatedness:")`
 

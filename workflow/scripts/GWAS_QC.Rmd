@@ -31,8 +31,8 @@ Pipeline version `r snakemake@params[["pipeline_version"]]`
 ```{r setup, include=FALSE, echo=F, message=F, warning=F}
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(root.dir = snakemake@params[["rwd"]])
-# knitr::opts_knit$set(root.dir = paste0(params$rwd, 'workflow/scripts'))
-cr_tf <- snakemake@input[["imiss"]] != "/dev/null" || snakemake@input[["frq"]] != "/dev/null"
+cr_tf <- (snakemake@input[["imiss"]] != "/dev/null" ||
+          snakemake@input[["frq"]] != "/dev/null")
 sexcheck_tf <- snakemake@input[["SexFile"]] != "/dev/null"
 hetcheck_tf <- snakemake@input[["HetFile"]] != "/dev/null"
 relcheck_tf <- snakemake@input[["IBD_stats"]] != "/dev/null"

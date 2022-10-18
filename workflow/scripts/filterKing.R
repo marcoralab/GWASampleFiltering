@@ -2,10 +2,10 @@
 
 require(tibble)
 require(readr)
-require(dplyr)
+suppressMessages(require(dplyr))
 
-kingstem <- snakemake@params[['indat']]
-exclude <- snakemake@input[['exclude']]
+kingstem <- snakemake@params[["indat"]]
+exclude <- snakemake@input[["exclude"]]
 outfile <- snakemake@output[[1]]
 
 message(
@@ -19,7 +19,7 @@ excluded <- read_tsv(exclude, col_names = c("FID", "IID"), col_types = "cc")
 kin0file <- paste0(kingstem, ".kin0")
 kinfile <- paste0(kingstem, ".kin")
 
-if ( nrow(excluded) == 0 ) {
+if (nrow(excluded) == 0) {
   message("no kinship exclusions.")
   if (file.exists(kinfile)) {
     message("Symlinking kinfile")
@@ -29,7 +29,7 @@ if ( nrow(excluded) == 0 ) {
     message(sprintf("%s does not exist.", kin0file))
     kinout <- ""
   }
-  
+
   if (file.exists(kin0file)) {
     message("Symlinking kin0file")
     kin0out <- paste0(kingstem, ".popfilt.kin0")
@@ -48,7 +48,7 @@ if ( nrow(excluded) == 0 ) {
       ID2 = col_character(),
       N_SNP = col_integer()
     )
-  
+
     kinout <- paste0(kingstem, ".popfilt.kin")
     read_tsv(kinfile, col_types = kincols) %>%
       anti_join(excluded, by = c("FID", "ID1" = "IID")) %>%
@@ -58,7 +58,7 @@ if ( nrow(excluded) == 0 ) {
     message(sprintf("%s does not exist.", kin0file))
     kinout <- ""
   }
-  
+
   if (file.exists(kin0file)) {
     message(sprintf("Loading %s", kin0file))
     kin0cols <- cols(
@@ -69,7 +69,7 @@ if ( nrow(excluded) == 0 ) {
       ID2 = col_character(),
       N_SNP = col_integer()
     )
-  
+
     kin0out <- paste0(kingstem, ".popfilt.kin0")
     read_tsv(kin0file, col_types = kin0cols) %>%
       anti_join(excluded, by = c("FID1" = "FID", "ID1" = "IID")) %>%
@@ -81,12 +81,12 @@ if ( nrow(excluded) == 0 ) {
   }
 }
 
-message( "Exporting... ", outfile)
+message("Exporting... ", outfile)
 
 if (nchar(paste0(kinout, kin0out)) > 0) {
-  fileConn <- file(outfile)
-  writeLines(c(kinout,kin0out), fileConn)
-  close(fileConn)
+  fileconn <- file(outfile)
+  writeLines(c(kinout, kin0out), fileconn)
+  close(fileconn)
 } else {
   stop("No KING output files!")
 }
