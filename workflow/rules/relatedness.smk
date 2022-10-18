@@ -87,11 +87,28 @@ if test -n "$(find {params.dataout} -name "{wildcards.sample}_IBDQC.all.kin*")";
 fi
 '''
 
+rule SampleExclusion_prerelate:
+    input:
+        SampCallRate = "{dataout}/{sample}_callRate.irem" if qc_type['callrate'] else ancient('/dev/null'),
+        het = "{dataout}/{sample}_exclude.heterozigosity" if qc_type['heterozygosity'] else ancient('/dev/null'),
+        sex = "{dataout}/{sample}_exclude.sexcheck" if qc_type['sex'] else ancient('/dev/null'),
+        pca = "{dataout}/{sample}_exclude.pca" if qc_type['ancestry'] else ancient('/dev/null'),
+        relat = ancient('/dev/null')
+    output:
+        out = temp("{dataout}/{sample}_exlude.prerelate"),
+        out_distinct = temp("{dataout}/{sample}_exlude.prerelate.distinct")
+    resources:
+        mem_mb = 10000,
+        time_min = 30
+    container: 'docker://befh/r_env_gwasamplefilt:5'
+    script: "../scripts/sample_QC.R"
+
 rule relatedness_sample_fail:
     input:
         genome = rules.relatedness_QC.output,
         geno_all = rules.king_all.output,
-        fam = sampleqc_in_plink_stem + ".fam"
+        fam = sampleqc_in_plink_stem + ".fam",
+        exclude = rules.SampleExclusion_prerelate.output.out if config['relatedness_preexclude'] else ancient('/dev/null')
     params:
         Family = FAMILY,
         threshold = 0.1875,

@@ -26,6 +26,23 @@ rdat <- snakemake@output[["rdat"]]
 
 norel <- any(read_lines(snakemake@input[["genome"]]) == "norel")
 
+fam <- snakemake@input[["fam"]] %>%
+  read_table(col_types = "cc---i", col_names = c("FID", "IID", "status"))
+
+if (snakemake@input[["exclude"]] != "/dev/null") {
+  exclusions <- snakemake@input[["exclude"]] %>%
+    read_tsv(col_types = "ccc") %>%
+    group_by(FID, IID) %>%
+    # collapse all exclusions into one row and separate the reasons with commas
+    dplyr::summarise(why = paste(why, collapse = ","), .groups = "drop") %>%
+    mutate(qc_failed = TRUE)
+  fam <- fam %>%
+    left_join(exclusions, by = c("FID", "IID")) %>%
+    mutate(qc_failed = replace_na(qc_failed, FALSE))
+} else {
+  fam <- mutate(fam, qc_failed = FALSE)
+}
+
 dat_inter_all_kin0 <- paste0(genome_file, ".all.kin0")
 dat_inter_all_kin <- paste0(genome_file, ".all.kin")
 dat_inter_kin0_path <- paste0(genome_file, ".kin0")
@@ -189,6 +206,52 @@ if (!norel) {
 # select samples with kinship cofficents > 0.1875
 # https://link.springer.com/protocol/10.1007/978-1-60327-367-1_19
 
+remove_samples <- function(ibdcoeff, fam, msg = "closely related to") {
+  fam_fi <- fam %>%
+    mutate(FI = paste0(FID, "_-_-tempsep-_-_", IID)) %>%
+    mutate(status = ifelse(status > 2, 0.5, status))
+
+  ibdcoeff %<>%
+    mutate(FI1 = paste0(FID1, "_-_-tempsep-_-_", IID1),
+           FI2 = paste0(FID2, "_-_-tempsep-_-_", IID2))
+  related_samples <- NULL
+  excluded <- c()
+  fam_table <- tibble(FID = c("deleteme"),
+                      IID = c("deleteme"),
+                      Related = c("deleteme"))
+  while (nrow(ibdcoeff) > 0) {
+    test_tab <- plyr:::count(c(ibdcoeff$FI1, ibdcoeff$FI2))
+    if (!("x" %in% names(test_tab))) {
+      print(ibdcoeff)
+    }
+    sample.counts <- plyr:::count(c(ibdcoeff$FI1, ibdcoeff$FI2)) %>%
+      as_tibble %>%
+      rename(FI = x) %>%
+      mutate(FI = as.character(FI)) %>%
+      inner_join(fam_fi, by = "FI") %>%
+      arrange(desc(qc_failed), status, desc(freq))
+    rm.sample <- sample.counts[[1, "FI"]]
+    id_ <- str_split(rm.sample, "_-_-tempsep-_-_")[[1]]
+    fid <- id_[1]
+    iid <- id_[2]
+    remtxt <- sprintf("%s %i other samples.",
+                      msg,
+                      sample.counts[[1, "freq"]])
+    message(paste("Removing sample", iid, remtxt))
+    ft <- tibble(FID = fid, IID = iid, Related = remtxt)
+    fam_table <- fam_table %>%
+      bind_rows(ft)
+    ibdcoeff <- ibdcoeff[ibdcoeff$FI1 != rm.sample &
+                           ibdcoeff$FI2 != rm.sample, ]
+    related_samples <- c(as.character(rm.sample), related_samples)
+  }
+  return(
+    list(related_samples = related_samples,
+         fam_table = filter(fam_table, Related != "deleteme"),
+         exclude_samples = tibble(FI = as.character(related_samples)) %>%
+           separate(FI, c("FID", "IID"), sep = "_-_-tempsep-_-_")))
+}
+
 if (norel) {
   message("No related samples.")
   fam_table <- tibble(message = "No related samples.") %>% as.data.frame()
@@ -213,42 +276,14 @@ if (norel) {
 
   if (family == F | family == "F") {
     message("Working with unrelated samples.")
-    ibdcoeff %<>%
-      mutate(FI1 = paste0(FID1, "_-_-tempsep-_-_", IID1),
-             FI2 = paste0(FID2, "_-_-tempsep-_-_", IID2))
-    related_samples <- NULL
-    excluded <- c()
-    fam_table <- tibble(FID = c("deleteme"),
-                        IID = c("deleteme"),
-                        Related = c("deleteme"))
-    while (nrow(ibdcoeff) > 0) {
-      sample.counts <- arrange(
-        plyr:::count(c(ibdcoeff$FI1, ibdcoeff$FI2)), -freq)
-      rm.sample <- sample.counts[1, "x"]
-      id_ <- str_split(rm.sample, "_-_-tempsep-_-_")[[1]]
-      fid <- id_[1]
-      iid <- id_[2]
-      remtxt <- sprintf("closely related to %i other samples.",
-                        sample.counts[1, "freq"])
-      message(paste("Removing sample", iid, remtxt))
-      ft <- tibble(FID = fid, IID = iid, Related = remtxt)
-      fam_table <- fam_table %>%
-        bind_rows(ft)
-      ibdcoeff <- ibdcoeff[ibdcoeff$FI1 != rm.sample &
-                           ibdcoeff$FI2 != rm.sample, ]
-      related_samples <- c(as.character(rm.sample), related_samples)
-    }
-    # Don't simplify fam_table. It will break.
-    fam_table <- fam_table %>%
-      filter(Related != "deleteme")
-    exclude_samples <- tibble(FI = as.character(related_samples)) %>%
-      separate(FI, c("FID", "IID"), sep = "_-_-tempsep-_-_")
+    removal <- remove_samples(ibdcoeff, fam)
   } else {
     message("Working with related samples.")
-    fam_table <- as.data.frame(ibdcoeff)
-    related_samples <- c(ibdcoeff$IID1, ibdcoeff$IID2)
-    exclude_samples <- tibble(FID = character(), IID = character())
+    removal <- remove_samples(ibdcoeff, fam, "duplicate/twin of")
   }
+  # Don't simplify fam_table. It will break.
+  fam_table <- removal$fam_table
+  exclude_samples <- removal$exclude_samples
 }
 
 dat_forplots <- dat_inter_all
@@ -259,5 +294,5 @@ if (norel) {
   save(norel, dat_forplots, rel_tab, fam_table, ibd_tab, file = rdat)
 } else {
   save(norel, dat_inter, dat_forplots, rel_tab, fam_table, ibd_tab,
-    file = rdat)
+       exclude_unrelated, file = rdat)
 }
