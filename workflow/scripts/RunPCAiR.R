@@ -158,35 +158,39 @@ pca_intern <- function(gds, unrel_iid) {
               PCA_all   = PCA_all))
 }
 
-if ( length(unique(iids)) < length(iids) ) {
-  parts <- use_iterlist(fam, iterlist)
-  method <- "iterative (plink)"
-  iid_repeats = T
-  reason <- "There are non-unique IIDs."
-} else {
-  iid_repeats = F
-  out <- tryCatch({
-    parts <- use_pcair(fam, kingstem)
-    method <- "PC-AiR"
-    reason <- "This is the default method."
-    list(parts = parts, method = method, reason = reason)
-  }, error = function (e) {
-    if ( grepl("unmatched node provided", e) ) {
-      parts <- use_iterlist(fam, iterlist)
-      method <- "iterative (SNPRelate)"
-      reason <- "PC-AiR was unable to partition based on relatedness."
-      list(parts = parts, method = method, reason = reason)
-    } else {
-      stop(e)
-    }
-  })
-  parts <- out$parts
-  method <- out$method
-  reason <- out$reason
+partition <- function(fam, kingstem, iterlist, iids) {
+  if ( length(unique(iids)) < length(iids)) {
+    parts <- use_iterlist(fam, iterlist)
+    method <- "iterative (plink)"
+    reason <- "There are non-unique IIDs."
+    out <- list(parts = parts, method = method, reason = reason,
+                iid_repeats = TRUE)
+  } else {
+    out <- tryCatch({
+      parts <- use_pcair(fam, kingstem)
+      method <- "PC-AiR"
+      reason <- "This is the default method."
+      list(parts = parts, method = method, reason = reason, iid_repeats = FALSE)
+    }, error = function(e) {
+      if (grepl("unmatched node provided", e)) {
+        parts <- use_iterlist(fam, iterlist)
+        method <- "iterative (SNPRelate)"
+        reason <- "PC-AiR was unable to partition based on relatedness."
+        list(parts = parts, method = method, reason = reason,
+             iid_repeats = FALSE)
+      } else {
+        stop(e)
+      }
+    })
+  }
+  return(out)
 }
 
-
-
+partitioning <- partition(fam, kingstem, iterlist, iids)
+parts <- partitioning$parts
+method <- partitioning$method
+reason <- partitioning$reason
+iid_repeats <- partitioning$iid_repeats
 unrel <- parts$unrels %>%
   mutate(cluster = "unrelated")
 rel <- parts$rels %>%
