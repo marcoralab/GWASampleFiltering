@@ -99,13 +99,13 @@ plink --keep-allele-order --bfile {params.ins} \
             expand("{{dataout}}/{{sample}}_filtered_PCApre.{ext}",ext=['unrel', 'partition.log'], dataout = DATAOUT)
         params:
             stem = rules.ancestryFilt.params.out if qc_type['ancestry'] else rules.sample_prune_noancestry.params.out,
-            stem_unpruned = sampleqc_in_plink_stem,
+            stem_unpruned = apply_prefix(sampleqc_in_plink_stem),
             king = rules.filterKING.params.indat + ".popfilt" if qc_type['ancestry'] else rules.filterKING.params.indat
-        threads: 12
+        threads: 48
         resources:
-            mem_mb = 32000,
+            mem_mb = 30000,
             walltime = '100:00'
-        container: 'docker://befh/genesis_env_gwasamplefilt:2.1'
+        container: 'docker://befh/genesis_env_gwasamplefilt:3.0'
         script: '../scripts/RunPCAiR.R'
 
     rule stratFrq:

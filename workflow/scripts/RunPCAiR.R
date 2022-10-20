@@ -4,15 +4,18 @@ require(GENESIS)
 library(SNPRelate)
 require(tibble)
 require(readr)
-require(dplyr)
+suppressMessages(require(dplyr))
 
-fstem <- "output/ADGC/x_present_AA/REAAADI-AA_filtered_PCApre"
-kingstem <-"output/ADGC/x_present_AA/REAAADI-AA_IBDQC.all.popfilt"
-iterlist <- "output/ADGC/x_present_AA/REAAADI-AA_exclude.relatedness"
+outdir <- "results/intermediate/post-impute_filter/output"
+fstem <- paste0(outdir, "/imputed_filtered_PCApre")
+fstem_unpruned <- paste0(outdir, "/imputed_callRate")
+kingstem <- paste0(outdir, "/imputed_IBDQC.all.popfilt")
+iterlist <- paste0(outdir, "/imputed_exclude.relatedness")
 
-fstem <- snakemake@params[['stem']]
-kingstem <- snakemake@params[['king']]
-iterlist <- snakemake@input[['iterative']]
+fstem <- snakemake@params[["stem"]]
+fstem_unpruned <- snakemake@params[["stem_unpruned"]]
+kingstem <- snakemake@params[["king"]]
+iterlist <- snakemake@input[["iterative"]]
 
 fam <- read_table2(paste0(fstem, ".fam"), col_types = "ccccii",
                    col_names = c("FID", "IID", "PID", "MID", "Sex", "Pheno"))
@@ -23,7 +26,7 @@ iterlist <- iterlist %>%
 iids <- fam$IID
 
 use_iterlist <- function(fam, iterlist) {
-  if ( nrow(iterlist) == 0 ) {
+  if (nrow(iterlist) == 0) {
     unrel <- fam %>%
       select(FID, IID)
   } else {
@@ -35,7 +38,7 @@ use_iterlist <- function(fam, iterlist) {
   return(list(rels = rel, unrels = unrel))
 }
 
-import_KING_external <- function(fam, kingstem) {
+import_king_external <- function(fam, kingstem) {
   if (length(unique(fam$FID)) == 1) {
     kingext <- ".kin"
   } else if (length(unique(fam$FID)) == length(fam$FID)) {
@@ -45,13 +48,15 @@ import_KING_external <- function(fam, kingstem) {
   }
   kingfiles <- paste0(kingstem, kingext)
   if (exists("kingToMatrix")) {
-    KINGmat <- kingToMatrix(kingfiles, sample.include = fam$IID, estimator = "Kinship")
+    kingmat <- GENESIS::kingToMatrix(kingfiles,
+                                     sample.include = fam$IID,
+                                     estimator = "Kinship")
   } else if (length(kingfiles) == 2) {
-    KINGmat <- king2mat(file.kin0 = kingfiles[1],
-                        file.kin = kingfiles[2],
-                        iids = fam$IID)
+    kingmat <- GENESIS::king2mat(file.kin0 = kingfiles[1],
+                                 file.kin = kingfiles[2],
+                                 iids = fam$IID)
   } else {
-    if (length(kingfiles) == 1 & !grepl("kin0", kingfiles)) {
+    if (length(kingfiles) == 1 && !grepl("kin0", kingfiles)) {
       warning("This version of GENESIS requires a kin0 file, but everyone has the same FID. Generating a kin0 file with the same pairs as in the kin file.")
       read_table2(kingfiles, col_types = cols(
         .default = col_double(),
@@ -64,44 +69,68 @@ import_KING_external <- function(fam, kingstem) {
         mutate(FID2 = FID) %>%
         rename(FID1 = FID) %>%
         select(FID1, ID1, FID2, ID2, everything()) %>%
-        write_tsv(paste0(kingfiles,"0"), col_names = T)
-      kingfiles <- paste0(kingfiles,"0")
+        write_tsv(paste0(kingfiles, "0"), col_names = TRUE)
+      kingfiles <- paste0(kingfiles, "0")
     }
-    KINGmat <- king2mat(file.kin0 = kingfiles, iids = fam$IID)
+    kingmat <- GENESIS::king2mat(file.kin0 = kingfiles, iids = fam$IID)
   }
-  return(KINGmat)
+  return(kingmat)
 }
 
-pcair_segment <- function(KINGmat, divthresh="default") {
+generate_king_intern <- function(fam, fstem_unpruned) {
+  gdsfile <- paste0(fstem_unpruned, ".gds")
+  snpgdsBED2GDS(
+    paste0(fstem_unpruned, ".bed"),
+    paste0(fstem_unpruned, ".fam"),
+    paste0(fstem_unpruned, ".bim"),
+    gdsfile, family = TRUE)
+  gds <- snpgdsOpen(gdsfile)
+  ibd_robust <- snpgdsIBDKING(gds, num.thread = 48)
+  snpgdsClose(gds)
+  GENESIS::kingToMatrix(ibd_robust, sample.include = fam$IID) %>%
+    return()
+}
+
+load_king_intern <- function(fam, rds) {
+  read_rds(rds) %>%
+    GENESIS::kingToMatrix(sample.include = fam$IID) %>%
+    return()
+}
+
+pcair_segment <- function(kinmat, divmat, divthresh = "default") {
   if (divthresh == "default") {
     if (exists("kingToMatrix")) {
-      raws <- pcairPartition(kinobj = KINGmat, divobj = KINGmat)
+      raws <- GENESIS::pcairPartition(kinobj = kinmat, divobj = divmat)
     } else {
-      raws <- pcairPartition(kinMat = KINGmat, divMat = KINGmat)
+      raws <- GENESIS::pcairPartition(kinMat = kinmat, divMat = divmat)
     }
   } else {
     warning("Initial div threshold failed to find unrelated set.")
     message(sprintf("Retrying with threshold of %s.", divthresh))
     if (exists("kingToMatrix")) {
-      raws <- pcairPartition(kinobj = KINGmat, divobj = KINGmat, div.thresh = divthresh)
+      raws <- GENESIS::pcairPartition(kinobj = kinmat, divobj = divmat,
+                                      div.thresh = divthresh)
     } else {
-      raws <- pcairPartition(kinMat = KINGmat, divMat = KINGmat, div.thresh = divthresh)
+      raws <- GENESIS::pcairPartition(kinMat = kinmat, divMat = divmat,
+                                      div.thresh = divthresh)
     }
   }
   return(raws)
 }
 
-tryDivthresh <- function(KINGmat, thresholds, retry=F) {
+try_divthresh <- function(kinmat, divmat, thresholds, retry=F) {
   ret <- tryCatch({
     if (retry) {
-      raws <- pcair_segment(KINGmat, thresholds[1])
+      raws <- pcair_segment(kinmat, divmat, thresholds[1])
     } else {
-      raws <- pcair_segment(KINGmat)
+      raws <- pcair_segment(kinmat, divmat)
     }
     raws
-  }, error = function (e) {
-    if ( grepl("must be the same length as the vector", e) && length(thresholds) > 1 ) {
-      ret <- tryDivthresh(KINGmat, thresholds[2:length(thresholds)], retry=T)
+  }, error = function(e) {
+    if (grepl("must be the same length as the vector", e) &&
+        length(thresholds) > 1) {
+      ret <- try_divthresh(kinmat, divmat, thresholds[2:length(thresholds)],
+                          retry = TRUE)
       return(ret)
     } else {
       stop(e)
@@ -110,56 +139,59 @@ tryDivthresh <- function(KINGmat, thresholds, retry=F) {
   return(ret)
 }
 
-use_pcair <- function(fam, kingstem) {
-  raws <- import_KING_external(fam, kingstem) %>%
-    tryDivthresh(-2^-c(6, 6.5, 7, 8))
+use_pcair <- function(fam, kinmat, divmat) {
+  raws <- try_divthresh(kinmat, divmat, -2^-c(6, 6.5, 7, 8))
   print("Related set:")
   print(raws$rels)
   print("Unrelated set:")
   print(raws$unrels)
-  if ( length(raws$rels) + length(raws$unrels) < nrow(fam) ) {
+  if (length(raws$rels) + length(raws$unrels) < nrow(fam)) {
     stop("Length mismatch between KING output and famfile.")
   }
-  FIDIID <- fam %>%
+  fidiid <- fam %>%
     select(FID, IID)
   if (is.null(raws$rels)) raws$rels <- c("")
   rel <- raws$rels %>%
     tibble(IID = .) %>%
-    inner_join(FIDIID, by = "IID") %>%
+    inner_join(fidiid, by = "IID") %>%
     select(FID, IID)
   unrel <- raws$unrels %>%
     tibble(IID = .) %>%
-    inner_join(FIDIID, by = "IID") %>%
+    inner_join(fidiid, by = "IID") %>%
     select(FID, IID)
   return(list(rels = rel, unrels = unrel))
 }
 
-pca_intern <- function(gds, unrel_iid) {
-  PCA_unrelate <- snpgdsPCA(gds, sample.id = unrel_iid)
-  
-  loadings <- snpgdsPCASNPLoading(PCA_unrelate, gds)
-  
-  PCA_all <- snpgdsPCASampLoading(loadings, gds)
-  
-  PCA_tibble <- function(pc, iid) {
-    pc = as.data.frame(pc)
-    colnames(pc) <- paste0("PC", 1:ncol(pc))
+pca_intern <- function(gds, unrel_iid, fast = FALSE) {
+  if (fast) {
+    algo <- "randomized"
+  } else {
+    algo <- "exact"
+  }
+  pca_unrelate <- snpgdsPCA(gds, sample.id = unrel_iid, num.thread = 48,
+                            algorithm = algo)
+  loadings <- snpgdsPCASNPLoading(pca_unrelate, gds, num.thread = 48)
+  pca_all <- snpgdsPCASampLoading(loadings, gds, num.thread = 48)
+
+  pca_tibble <- function(pc, iid) {
+    pc <- as.data.frame(pc)
+    colnames(pc) <- paste0("PC", seq_len(ncol(pc)))
     as_tibble(pc) %>%
       mutate(IID = as.character(iid)) %>%
       select(IID, everything())
   }
-  
-  PCA_all_fmt <- PCA_tibble(PCA_all$eigenvect, PCA_all$sample.id)
-  PCA_eigenvals <- PCA_unrelate$eigenval[1:ncol(PCA_unrelate$eigenvect)]
-  
-  return(list(eigenvals = PCA_eigenvals,
-              eigenvecs = PCA_all_fmt,
-              PCA_unrel = PCA_unrelate,
-              PCA_all   = PCA_all))
+
+  pca_all_fmt <- pca_tibble(pca_all$eigenvect, pca_all$sample.id)
+  pca_eigenvals <- pca_unrelate$eigenval[seq_len(ncol(pca_unrelate$eigenvect))]
+
+  return(list(eigenvals = pca_eigenvals,
+              eigenvecs = pca_all_fmt,
+              PCA_unrel = pca_unrelate,
+              PCA_all   = pca_all))
 }
 
-partition <- function(fam, kingstem, iterlist, iids) {
-  if ( length(unique(iids)) < length(iids)) {
+partition <- function(fam, kinmat, divmat, iterlist, iids) {
+  if (length(unique(iids)) < length(iids)) {
     parts <- use_iterlist(fam, iterlist)
     method <- "iterative (plink)"
     reason <- "There are non-unique IIDs."
@@ -167,7 +199,7 @@ partition <- function(fam, kingstem, iterlist, iids) {
                 iid_repeats = TRUE)
   } else {
     out <- tryCatch({
-      parts <- use_pcair(fam, kingstem)
+      parts <- use_pcair(fam, kinmat, divmat)
       method <- "PC-AiR"
       reason <- "This is the default method."
       list(parts = parts, method = method, reason = reason, iid_repeats = FALSE)
@@ -183,40 +215,124 @@ partition <- function(fam, kingstem, iterlist, iids) {
       }
     })
   }
+  unrel <- out$parts$unrels %>%
+    mutate(cluster = "unrelated")
+  rel <- out$parts$rels %>%
+    mutate(cluster = "related")
+  out$relatedness <- bind_rows(unrel, rel)
   return(out)
 }
 
-partitioning <- partition(fam, kingstem, iterlist, iids)
+choose_eigencount <- function(eigenvals, thresh) {
+  eigenvals_no_na <- tidyr::replace_na(eigenvals, 0)
+  tot <- sum(eigenvals_no_na)
+  pve <- 0
+  n_eig <- 0
+  while (pve < thresh && n_eig <= length(eigenvals_no_na)) {
+    n_eig <- n_eig + 1
+    pve <- sum(eigenvals_no_na[seq_len(n_eig)] / tot)
+  }
+  message(sprintf("Selecting %i PCs out of %i. (PVE = %f)",
+                  n_eig, length(eigenvals_no_na), pve))
+  return(n_eig)
+}
+
+if (length(unique(iids)) < length(iids)) {
+  kingobj <- ""
+} else if (length(iids) < 20000) {
+  kingobj <- import_king_external(fam, kingstem)
+} else {
+  kingobj <- generate_king_intern(fam, fstem_unpruned)
+}
+
+message("Performing initial partitioning")
+partitioning <- partition(fam, kingobj, kingobj, iterlist, iids)
+
 parts <- partitioning$parts
 method <- partitioning$method
 reason <- partitioning$reason
 iid_repeats <- partitioning$iid_repeats
-unrel <- parts$unrels %>%
-  mutate(cluster = "unrelated")
-rel <- parts$rels %>%
-  mutate(cluster = "related")
-relatedness <- bind_rows(unrel, rel)
-logtxt <- c(method, reason)
+relatedness <- partitioning$relatedness
 
-write_delim(relatedness, paste0(fstem, ".unrel"), col_names = F)
-write_lines(logtxt, paste0(fstem, ".partition.log"))
+write_lines(c(method, reason), paste0(fstem, ".partition.log"))
+
+save.image(file = paste0(fstem, ".rda"))
 
 if (iid_repeats) {
+  write_delim(relatedness, paste0(fstem, ".unrel"), col_names = FALSE)
   save(iid_repeats, method, reason, relatedness, file = paste0(fstem, ".rda"))
 } else {
+  message("Creating Pruned GDS")
+  gdsfile <- paste0(fstem, ".gds")
   snpgdsBED2GDS(
     paste0(fstem, ".bed"), paste0(fstem, ".fam"), paste0(fstem, ".bim"),
-    paste0(fstem, ".gds"), family=T)
-  gds <- snpgdsOpen(paste0(fstem, ".gds"))
-  pca <- pca_intern(gds, parts$unrels$IID)
+    gdsfile, family = TRUE)
+
+  parobj <- BiocParallel::MulticoreParam(workers = 48)
+
+  # first iteration
+  save.image(file = paste0(fstem, ".rda"))
+  message("Performing initial PCA")
+  gds <- snpgdsOpen(gdsfile)
+  pca_initial <- pca_intern(gds, parts$unrels$IID, fast = TRUE)
+  n_eig <- choose_eigencount(pca_initial$PCA_unrel$eigenval, 0.8)
+  pcmat_initial <- pca_initial$PCA_all$eigenvect
+  rownames(pcmat_initial) <- as.character(pca_initial$PCA_all$sample.id)
+  snpgdsClose(gds)
+  # create a GenotypeData class object
+  save.image(file = paste0(fstem, ".rda"))
+
+  message("Performing initial PCRelate")
+  gds_geno <- GWASTools::GdsGenotypeReader(filename = gdsfile)
+  genodata <- GWASTools::GenotypeData(gds_geno)
+  genoiter <- GWASTools::GenotypeBlockIterator(genodata)
+  pcrel_initial <- pcrelate(gdsobj = genoiter,
+                            pcs = pcmat_initial[, seq_len(min(n_eig, 16))],
+                            training.set = parts$unrels$IID,
+                            small.samp.correct = nrow(fam) < 5000,
+                            ibd.probs = FALSE,
+                            BPPARAM = parobj)
+  GWASTools::close(genodata)
+  # second iteration
+
+  message("Repartitioning")
+  kinmat <- pcrelateToMatrix(pcrel_initial, thresh = 2^(-11 / 2))
+  partitioning_second <- partition(fam, kinmat, kingobj, iterlist, iids)
+
+  message("Performing final PCA")
+  gds <- snpgdsOpen(gdsfile)
+  pca <- pca_intern(gds, partitioning_second$parts$unrels$IID)
+  snpgdsClose(gds)
+
+  pcmat <- pca$PCA_all$eigenvect
+  rownames(pcmat) <- as.character(pca$PCA_all$sample.id)
+  n_eig_final <- choose_eigencount(pca$PCA_unrel$eigenval, 0.8)
+
+  message("Performing final PCRelate")
+  gds_geno <- GWASTools::GdsGenotypeReader(filename = gdsfile)
+  genodata <- GWASTools::GenotypeData(gds_geno)
+  genoiter <- GWASTools::GenotypeBlockIterator(genodata)
+  pcrel <- pcrelate(gdsobj = genoiter,
+                    pcs = pcmat[, seq_len(min(n_eig, 16))],
+                    sample.include = iids,
+                    training.set = partitioning_second$parts$unrels$IID,
+                    small.samp.correct = nrow(fam) < 5000,
+                    BPPARAM = parobj)
+  GWASTools::close(genodata)
+
+  message("Writing Results")
+
   pca$eigenvecs <- pca$eigenvecs %>%
     left_join(select(fam, FID, IID), by = "IID") %>%
     select(FID, IID, everything())
-  snpgdsClose(gds)
   eigenvals <- pca$eigenvals
   eigenvecs <- pca$eigenvecs
   write_lines(eigenvals, paste0(fstem, ".pcair.eigenval"))
-  write_delim(eigenvecs, paste0(fstem, ".pcair.eigenvec"), col_names = F)
-  save(iid_repeats, method, reason, relatedness, eigenvals, eigenvecs,
-       file = paste0(fstem, ".rda"))
+  write_delim(eigenvecs, paste0(fstem, ".pcair.eigenvec"), col_names = FALSE)
+
+  relatedness <- partitioning_second$relatedness
+  write_delim(relatedness, paste0(fstem, ".unrel"), col_names = FALSE)
+
+  save(iid_repeats, partitioning_second, method, reason, relatedness,
+       eigenvals, eigenvecs, pcrel, file = paste0(fstem, ".rda"))
 }
