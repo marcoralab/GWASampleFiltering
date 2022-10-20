@@ -115,6 +115,7 @@ rule relatedness_sample_fail:
         geno = rules.relatedness_QC.params.out
     output:
         out = "{dataout}/{sample}_exclude.relatedness",
+        allrelate = "{dataout}/{sample}_exclude.relatedness_all" if FAMILY == 'T' else [],
         rdat = "{dataout}/{sample}_IBDQC.Rdata"
     threads: 8
     resources:

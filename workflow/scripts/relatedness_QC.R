@@ -18,7 +18,9 @@ threshold <- as.numeric(snakemake@params[["threshold"]])
 family <- as.logical(snakemake@params[["Family"]])
 # .tsv file to be output
 outfile <- snakemake@output[["out"]]
+outfile_allrelate <- snakemake@output[["allrelate"]]
 rdat <- snakemake@output[["rdat"]]
+# save.image(file = paste0(rdat, '.rda'))
 
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
 ##  Read in Data
@@ -85,7 +87,7 @@ if (kin0) {
     mutate(PI_HAT = ifelse(Kinship > 0, 2 * Kinship, 0))
 }
 
-if (!norel & kin0_rel_exists) {
+if (!norel && kin0_rel_exists) {
   dat_inter_kin0 <- dat_inter_kin0_path %>%
     read_kinship(col_types = cols(
       .default = col_double(),
@@ -112,7 +114,7 @@ if (kin) {
     mutate(FID2 = FID1, PI_HAT = ifelse(Kinship > 0, 2 * Kinship, 0))
 }
 
-if (!norel & kin_rel_exists) {
+if (!norel && kin_rel_exists) {
   dat_inter_kin <- dat_inter_kin_path %>%
     read_kinship(col_types = cols(
       .default = col_double(),
@@ -126,22 +128,22 @@ if (!norel & kin_rel_exists) {
     mutate(FID2 = FID1)
 }
 
-if (!norel & kin0_rel_exists & kin_rel_exists) {
+if (!norel && kin0_rel_exists && kin_rel_exists) {
   print("Relatedness kin and kin0 files present")
   dat_inter <- bind_rows(dat_inter_kin0, dat_inter_kin) %>%
-    distinct(FID1, IID1, FID2, IID2, .keep_all = T)
-} else if (!norel & kin0_rel_exists) {
+    distinct(FID1, IID1, FID2, IID2, .keep_all = TRUE)
+} else if (!norel && kin0_rel_exists) {
   print("Relatedness kin0 file present")
   dat_inter <- dat_inter_kin0
-} else if (!norel & kin_rel_exists) {
+} else if (!norel && kin_rel_exists) {
   print("Relatedness kin file present")
   dat_inter <- dat_inter_kin
 }
 
-if (kin0 & kin) {
+if (kin0 && kin) {
   print("Kin and kin0 files present")
   dat_inter_all <- bind_rows(dat_inter_all_kin0, dat_inter_all_kin) %>%
-    distinct(FID1, IID1, FID2, IID2, .keep_all = T)
+    distinct(FID1, IID1, FID2, IID2, .keep_all = TRUE)
 } else if (kin0) {
   print("Kin0 file present")
   dat_inter_all <- dat_inter_all_kin0
@@ -149,6 +151,7 @@ if (kin0 & kin) {
   print("Kin file present")
   dat_inter_all <- dat_inter_all_kin
 }
+
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
 ##  IBD relationship
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
@@ -185,18 +188,15 @@ closest <- function(vals, ref) {
 
 if (!norel) {
   dat_inter %<>%
-    mutate(relationship = InfType) %>%
-    mutate(relationship = ifelse(
-      relationship %in% c("1st", "2nd", "3rd", "4th"),
-      paste(relationship, "degree"), relationship)) %>%
-    mutate(relationship = ifelse(
-      relationship == "UN", "unrelated", relationship)) %>%
-    mutate(relationship = ifelse(
-      relationship == "Dup/MZ", "identical-twins", relationship)) %>%
-    mutate(relationship = ifelse(
-      relationship == "PO", "parent-child", relationship)) %>%
-    mutate(relationship = ifelse(
-      relationship == "FS", "full-siblings", relationship))
+    mutate(
+      relationship = case_when(
+        InfType %in% c("1st", "2nd", "3rd", "4th") ~
+          paste(InfType, "degree"),
+        InfType == "UN" ~ "unrelated",
+        InfType == "Dup/MZ" ~ "identical-twins",
+        InfType == "PO" ~ "parent-child",
+        InfType == "FS" ~ "full-siblings",
+        TRUE ~ InfType))
 }
 
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
@@ -259,27 +259,30 @@ if (norel) {
   exclude_samples <- tibble(FID = character(), IID = character())
   ibd_tab <- tibble(message = "No related samples.")
 } else {
-  if (family == F | family == "F") {
-    ibdcoeff <- dat_inter %>%
-      filter(PI_HAT > threshold)
-  } else {
-    ibdcoeff <- dat_inter %>%
-      filter(relationship == "identicial-twins")
-  }
+  ibdcoeff <- dat_inter %>%
+    filter(PI_HAT > threshold)
 
-  ibd_tab <- ibdcoeff %>%
+  ibd_tab_create <- . %>%
     select(FID1, IID1, FID2, IID2, IBS0, Kinship, PI_HAT, relationship)
 
   # Iterativly remove subjects with the highest number of
   #   pairwise kinship cofficents > threshold
   # see http://www.stat-gen.org/tut/tut_preproc.html
 
-  if (family == F | family == "F") {
+  if (family == FALSE || family == "F") {
+    ibd_tab <- ibd_tab_create(ibdcoeff) %>%
+      select(FID1, IID1, FID2, IID2, IBS0, Kinship, PI_HAT, relationship)
     message("Working with unrelated samples.")
     removal <- remove_samples(ibdcoeff, fam)
   } else {
+    ibdcoeff_dup <- dat_inter %>%
+      filter(relationship == "identical-twins")
+    ibd_tab <- ibd_tab_create(ibdcoeff_dup)
     message("Working with related samples.")
-    removal <- remove_samples(ibdcoeff, fam, "duplicate/twin of")
+    message("Finding duplicates/twins")
+    removal <- remove_samples(ibdcoeff_dup, fam, "duplicate/twin of")
+    message("\nFinding all relationships")
+    removal_allrelate <- remove_samples(ibdcoeff, fam)
   }
   # Don't simplify fam_table. It will break.
   fam_table <- removal$fam_table
@@ -289,9 +292,14 @@ if (norel) {
 dat_forplots <- dat_inter_all
 
 ##  write out samples to be excluded
-write_tsv(exclude_samples, outfile, col_names = T)
+write_tsv(exclude_samples, outfile, col_names = TRUE)
 if (norel) {
   save(norel, dat_forplots, rel_tab, fam_table, ibd_tab, file = rdat)
+} else if (family == TRUE || family == "T") {
+  write_tsv(removal_allrelate$exclude_samples,
+            outfile_allrelate, col_names = TRUE)
+  save(norel, dat_inter, dat_forplots, rel_tab, fam_table, ibd_tab,
+       exclude_unrelated, removal_allrelate, file = rdat)
 } else {
   save(norel, dat_inter, dat_forplots, rel_tab, fam_table, ibd_tab,
        exclude_unrelated, file = rdat)
