@@ -28,35 +28,37 @@ author: "Written and maintained by Brian Fulton-Howard and Shea Andrews"
 Pipeline version `r snakemake@params[["pipeline_version"]]`
 
 
-```{r setup, include=FALSE, echo=F, message=F, warning=F}
+```{r setup, echo=F, cache=F, warning=F, message=F, include=F}
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(root.dir = snakemake@params[["rwd"]])
-cr_tf <- (snakemake@input[["imiss"]] != "/dev/null" ||
-          snakemake@input[["frq"]] != "/dev/null")
-sexcheck_tf <- snakemake@input[["SexFile"]] != "/dev/null"
-hetcheck_tf <- snakemake@input[["HetFile"]] != "/dev/null"
-relcheck_tf <- snakemake@input[["IBD_stats"]] != "/dev/null"
-pcacheck_tf <- snakemake@input[["PCA_rdat"]] != "/dev/null"
-strat_tf <- snakemake@input[["PopStrat_eigenvec"]] != "/dev/null"
+run_tf <- list(
+  cr = (snakemake@input[["imiss"]] != "/dev/null" ||
+        snakemake@input[["frq"]] != "/dev/null"),
+  sexcheck = snakemake@input[["SexFile"]] != "/dev/null",
+  hetcheck = snakemake@input[["HetFile"]] != "/dev/null",
+  relcheck = snakemake@input[["IBD_stats"]] != "/dev/null",
+  pcacheck = snakemake@input[["PCA_rdat"]] != "/dev/null",
+  strat = snakemake@input[["PopStrat_eigenvec"]] != "/dev/null")
+
 sdir <- function(x) sprintf("%s/%s", snakemake@scriptdir, x)
 ```
 
-```{r child = sdir('call_rates.Rmd'), eval = cr_tf}
+```{r child = sdir('call_rates.Rmd'), eval = run_tf$cr}
 ```
 
-```{r child = sdir('sexcheck_QC.Rmd'), eval = sexcheck_tf}
+```{r child = sdir('sexcheck_QC.Rmd'), eval = run_tf$sexcheck}
 ```
 
-```{r child = sdir('Heterozygosity_QC.Rmd'), eval = hetcheck_tf}
+```{r child = sdir('Heterozygosity_QC.Rmd'), eval = run_tf$hetcheck}
 ```
 
 # Population and family structure
 
-```{r child = sdir('relatedness_QC.Rmd'), eval = relcheck_tf}
+```{r child = sdir('relatedness_QC.Rmd'), eval = run_tf$relcheck}
 ```
 
-```{r child = sdir('PCA_QC.Rmd'), eval = pcacheck_tf}
+```{r child = sdir('PCA_QC.Rmd'), eval = run_tf$pcacheck}
 ```
 
-```{r child = sdir('population_stratification_QC.Rmd'), eval = strat_tf}
+```{r child = sdir('population_stratification_QC.Rmd'), eval = run_tf$strat}
 ```
