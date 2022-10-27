@@ -34,6 +34,16 @@ disptab <- function(x) {
   }
 }
 
+famstudy <- (snakemake@params[["Family"]] == "T" ||
+             snakemake@params[["Family"]] == TRUE)
+
+if (!famstudy) {
+  relationship_removed <- sprintf("proportion of IBD sharing > %e",
+                                  snakemake@params[["pi_threshold"]])
+} else {
+  relationship_removed <- "twin or duplicate relationship"
+}
+
 message("Knitting relatedness QC")
 ```
 
@@ -115,8 +125,7 @@ The following plot (Fig. \@ref(fig:relplot)) shows the `r plot2Ydesc` by the pro
 ```{r relplot, echo=FALSE, fig.width=7.5, fig.height=4.7, fig.align="center", fig.cap="Pairs of individuals plotted by their degree of relatedness"}
 
 pht <- snakemake@params[["pi_threshold"]]
-if (snakemake@params[["Family"]] == "F" ||
-    snakemake@params[["Family"]] == FALSE) {
+if (!famstudy) {
   dat_forplots %>%
     select(-FID1, -IID1, -FID2, -IID2) %>%
     mutate(related = PI_HAT > pht) %>%
@@ -137,13 +146,13 @@ if (snakemake@params[["Family"]] == "F" ||
 }
 ```
 
-`r tabcap("ibdfail", sprintf("Samples with a proportion of IBD sharing > %e", snakemake@params[["pi_threshold"]]))`
+`r tabcap("ibdfail", paste0("Sample pairs with a", relationship_removed))`
 
 ```{r table ibd, echo=FALSE}
 ibd_tab %>% disptab
 ```
 
-To construct a sample of unrelated individuals, participants with the highest number of proportions of IBD sharing > `r snakemake@params[["pi_threshold"]]` were iteratively removed.
+To construct a sample of unrelated individuals, participants with the highest number of pairs with a `r relationship_removed` were iteratively removed.
 
 `r tabcap("famexcluded", "The following samples were excluded due to relatedness:")`
 
