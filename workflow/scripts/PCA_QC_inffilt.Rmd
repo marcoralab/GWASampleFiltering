@@ -220,16 +220,17 @@ plot_ly(pca %>% mark_refs %>% fix_plotly_drops,
 
 ### Population Outliers
 
-```{r early_exit, echo=F, results='asis', eval=no_outliers}
-cat('No outliers were removed')
-knitr::knit_exit()
+```{r early_exit, echo=F, results="asis", eval=no_outliers}
+cat("No outliers were removed")
 ```
 
-Individuals not in the selected ancestry(s) based on the above inference were removed.
+```{r, population outliers table, echo=F, results="asis", eval=!no_outliers}
+paste("Individuals not in the selected ancestry(s)",
+      "based on the above inference were removed.\n") %>%
+  cat()
 
-`r tabcap("popoutliers", "Population outliers")`
+cat(tabcap("popoutliers", "Population outliers"))
 
-```{r, population outliers table, echo=F, results='asis'}
 tab_pop_exclusions %>%
   disptab
 ```
