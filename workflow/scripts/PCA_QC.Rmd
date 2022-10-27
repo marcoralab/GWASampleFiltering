@@ -9,8 +9,10 @@ editor_options:
   chunk_output_type: console
 ---
 
-```{r setupPCA, include=FALSE, cache=F}
+```{r setupPCA, include=FALSE, cache=F, echo=F, message=F, warning=F}
 knitr::opts_chunk$set(echo = TRUE)
+
+message("Knitting PCA QC")
 
 ## ---- Load Required R packages ---- ##
 library(ggplot2)    ## For ploting

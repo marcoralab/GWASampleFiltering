@@ -7,7 +7,7 @@ editor_options:
   chunk_output_type: console
 ---
 
-```{r setup relatedness, include=FALSE}
+```{r setup relatedness, include=FALSE, echo=F, message=F, warning=F}
 knitr::opts_chunk$set(echo = TRUE)
 
 ## ---- Load Pacakges ---- ##
@@ -33,6 +33,8 @@ disptab <- function(x) {
     return(kable(x))
   }
 }
+
+message("Knitting relatedness QC")
 ```
 
 ```{r readData, echo=F, warning=F, message=F}

@@ -22,7 +22,7 @@ plink --bfile raw-GWA-data \
 
 ```{r setup population stratification, include=FALSE, echo=F, message=F, warning=F}
 knitr::opts_chunk$set(echo = TRUE)
-
+message("Knitting stratification")
 ## ---- Load Required R packages ---- ##
 library(readr)
 library(dplyr)
