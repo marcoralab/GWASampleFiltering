@@ -1,4 +1,4 @@
-```{r prepLabels, include=FALSE, cache=F}
+```{r prepLabels, include=F, cache=F}
 library(dplyr)
 library(readr)
 library(tibble)
@@ -14,7 +14,9 @@ library(kableExtra)
 
 tg_subpop <- snakemake@input[["tgpops"]]
 
-if (!file.exists(here(tg_subpop))) here <- function(x) paste0(snakemake@params[["rwd"]], "/", x)
+if (!file.exists(here(tg_subpop))) {
+  here <- function(x) paste0(snakemake@params[["rwd"]], "/", x)
+}
 
 tg_labs <- tg_subpop %>%
   here() %>%
@@ -24,7 +26,7 @@ tg_labs <- tg_subpop %>%
 sp_labs <- tg_labs %>% select(spop, description_spop) %>% distinct %>% deframe
 
 paste_pretty <- function(x) {
-  begin <- paste(x[1:length(x) - 1], collapse = ", ")
+  begin <- paste(x[seq_len(length(x) - 1)], collapse = ", ")
   sprintf("%s and %s", begin, x[[length(x)]])
 }
 
@@ -44,13 +46,13 @@ Populations have been inferred based on minimum distance from the geometric medi
 ```{r pcastats, echo=F}
 tab_1 %>%
   mutate(across(where(is.double), ~ round(.x, digits = 3))) %>%
-  kable(booktabs = T, caption = "Geometric medians of each PC in reference superpopulations") %>%
+  kable(booktabs = TRUE, caption = "Geometric medians of each PC in reference superpopulations") %>%
   kable_styling(bootstrap_options = c("striped", "hover"))
 ```
 
 The following plots show the population structure of `r snakemake@wildcards[["sample"]]` (Black Triangles) based on the first three principal components. In Fig. \@ref(fig:ternplots_assign), the reference and projected samples are displayed on a ternary plot. Fig. \@ref(fig:3PCinteractiveSuperPops) contains the same data as an interactive 3d plot.
 
-```{r ternplots_assign, echo=F, fig.width=7.5, fig.height=3.4, fig.align='center', fig.cap='Ancestry assignment viewed on PCs 1-3'}
+```{r ternplots_assign, echo=F, fig.width=7.5, fig.height=3.4, fig.align="center", fig.cap="Ancestry assignment viewed on PCs 1-3"}
 
 
 # Format data for ploting ternery PCA
@@ -69,14 +71,15 @@ mark_refs <- . %>%
     superpop_infered))
 
 pc_ternplot <- function(x) {
-  ggtern(x, aes(x=PC1, y=PC2, z=PC3, color = superpop_infered, shape = cohort2)) +
+  ggtern(x, aes(x = PC1, y = PC2, z = PC3,
+         color = superpop_infered, shape = cohort2)) +
     geom_point(size = 1) +
     scale_shape_manual(values = c(Reference = 16, Sample = 17)) +
     theme_bw() +
     theme_showarrows() +
     theme_notitles() +
     theme_hidelabels() +
-    theme(text = element_text(size=10))
+    theme(text = element_text(size = 10))
 }
 
 pca_col2 <- pca_col %>% filter(color != "black") %>% select(-n)
@@ -108,10 +111,11 @@ legend <- get_legend(
 )
 
 p1 <- plot_grid(
-  ggplotGrob(p_ref + theme(legend.position="none", plot.margin=unit(c(-15,-7,-7,-7), "mm"))),
-  ggplotGrob(p_sample + theme(plot.margin=unit(c(-15,-7,-7,-7), "mm"))),
+  ggplotGrob(p_ref + theme(legend.position = "none",
+                           plot.margin = unit(c(-15, -7, -7, -7), "mm"))),
+  ggplotGrob(p_sample + theme(plot.margin = unit(c(-15, -7, -7, -7), "mm"))),
   legend,
-  labels = c('Reference', 'Sample'), label_size = 12, ncol = 3,
+  labels = c("Reference", "Sample"), label_size = 12, ncol = 3,
   rel_widths = c(1, 1, 0.4)
   )
 
@@ -119,10 +123,11 @@ ggsave("plot.pdf", plot = p1, width = 7.5, height = 3.4, unit = "in")
 
 p1
 
-detach("package:ggtern", unload=TRUE)
+detach("package:ggtern", unload = TRUE)
 ```
 
-```{r umap, echo=F, include=F, eval=F, fig.width=7.5, fig.height=3.4, fig.align='center', fig.cap='Ancestry assignment viewed on PCs 1-3'}
+```{r umap, echo=F, include=F, eval=F, fig.width=7.5, fig.height=3.4,
+    fig.align="center", fig.cap="Ancestry assignment viewed on PCs 1-3"}
 # pca_umap <- select(pca, starts_with("PC")) %>%
 #   umap() %$%
 #   set_colnames(layout, c("UMPC1", "UMPC2")) %>%
@@ -142,7 +147,7 @@ detach("package:ggtern", unload=TRUE)
 
 The following plots are interactive so that outliers can be identified graphically for further removal. Geometric medians are applied across all `r as.character(nrow(eigenval))` principle componants, so some of the clusters used to distinguish ancestries may not be visible on the plot.
 
-```{r 3PCinteractiveSuperPops_tern, echo=F, fig.width=7.5, fig.height=5, fig.align='center', fig.cap='Tridimensional plot of ancestery clustering of PC 1, 2 & 3'}
+```{r 3PCinteractiveSuperPops_tern, echo=F, fig.width=7.5, fig.height=5, fig.align="center", fig.cap="Tridimensional plot of ancestery clustering of PC 1, 2 & 3"}
 
 # Plotly drops colors with only one point
 fix_plotly_drops <- function(df) {
@@ -162,7 +167,7 @@ axis <- function(title) {
     tickfont = list(
       size = 8
     ),
-    tickcolor = 'rgba(0,0,0,0)',
+    tickcolor = "rgba(0,0,0,0)",
     ticklen = 5
   )
 }
@@ -173,23 +178,23 @@ plot_tern_interact <- plot_ly() %>%
   config(displaylogo = FALSE) %>%
   add_trace(data = p_sample_dat_plotly %>% filter(cohort2 == "Reference"),
             a = ~PC2, b = ~PC1, c = ~PC3, color = ~superpop_infered,
-    type = 'scatterternary', mode = 'markers', marker = list(size = 3),
-    colors = unlist(pca_col2), hoverinfo="none") %>%
+    type = "scatterternary", mode = "markers", marker = list(size = 3),
+    colors = unlist(pca_col2), hoverinfo = "none") %>%
   add_trace(data = p_sample_dat_plotly %>% filter(cohort2 != "Reference"),
             a = ~PC2, b = ~PC1, c = ~PC3, color = ~superpop_infered,
-    type = 'scatterternary', mode = 'markers', marker = list(size = 3),
-    colors = unlist(pca_col2), hoverinfo = 'text',
-    text = ~paste('</br> ID: ', IID, '</br> Population: ', superpop_infered,
-                '</br> PC1: ', round(PC1, 2), '</br> PC2: ', round(PC2, 2),
-                '</br> PC3: ', round(PC3, 2)))
+    type = "scatterternary", mode = "markers", marker = list(size = 3),
+    colors = unlist(pca_col2), hoverinfo = "text",
+    text = ~paste("</br> ID: ", IID, "</br> Population: ", superpop_infered,
+                "</br> PC1: ", round(PC1, 2), "</br> PC2: ", round(PC2, 2),
+                "</br> PC3: ", round(PC3, 2)))
 
 plot_tern_interact %>%
     plotly::layout(
       ternary = list(
         sum = 100,
-        aaxis = axis('PC 2'),
-        baxis = axis('PC 1'),
-        caxis = axis('PC 3')
+        aaxis = axis("PC 2"),
+        baxis = axis("PC 1"),
+        caxis = axis("PC 3")
       )
     )
 
@@ -198,16 +203,16 @@ plot_tern_interact %>%
 
 A 3D version follows for further exploration.
 
-```{r 3PCinteractiveSuperPops, echo=F, fig.width=7.5, fig.height=4.7, fig.align='center', fig.cap='Tridimensional plot of ancestery clustering of PC 1, 2 & 3'}
+```{r 3PCinteractiveSuperPops, echo=F, fig.width=7.5, fig.height=4.7, fig.align="center", fig.cap="Tridimensional plot of ancestery clustering of PC 1, 2 & 3"}
 
 ##  Plot superpops, PC1 + PC2 + PC3
 plot_ly(pca %>% mark_refs %>% fix_plotly_drops,
         x = ~PC2, y = ~PC1, z = ~PC3, color = ~superpop_infered,
-  type = 'scatter3d', mode = 'markers', marker = list(size = 3),
-  colors = unlist(pca_col2), hoverinfo = 'text',
-  text = ~paste('</br> ID: ', IID, '</br> Population: ', superpop_infered,
-                '</br> PC1: ', round(PC1, 2), '</br> PC2: ', round(PC2, 2),
-                '</br> PC3: ', round(PC3, 2)))
+  type = "scatter3d", mode = "markers", marker = list(size = 3),
+  colors = unlist(pca_col2), hoverinfo = "text",
+  text = ~paste("</br> ID: ", IID, "</br> Population: ", superpop_infered,
+                "</br> PC1: ", round(PC1, 2), "</br> PC2: ", round(PC2, 2),
+                "</br> PC3: ", round(PC3, 2)))
 
 ```
 
