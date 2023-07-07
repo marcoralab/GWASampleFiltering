@@ -219,7 +219,7 @@ rule GWAS_QC_Report:
         hwe = "{dataout}/{sample}_SnpQc.hwe" if qc_type['variant'] else ancient('/dev/null'),
         frq = "{dataout}/{sample}_SnpQc.frq" if qc_type['variant'] else ancient('/dev/null'),
         frqx = "{dataout}/{sample}_SnpQc.frqx" if qc_type['variant'] else ancient('/dev/null'),
-        imiss = "{dataout}/{sample}_callRate.imiss" if qc_type['callrate'] else ancient('/dev/null'),
+        imiss = "{dataout}/{sample}_imiss_callRate.imiss" if qc_type['callrate'] else ancient('/dev/null'),
         HetFile = "{dataout}/{sample}_HetQC.het" if qc_type['heterozygosity'] else ancient('/dev/null'),
         IBD_stats = "{dataout}/{sample}_IBDQC.Rdata" if qc_type['relatedness'] else ancient('/dev/null'),
         PCA_rdat = "{dataout}/{sample}_pca.Rdata" if qc_type['ancestry'] else ancient('/dev/null'),
