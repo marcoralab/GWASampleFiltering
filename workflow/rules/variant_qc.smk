@@ -49,7 +49,7 @@ rule sample_callRate_imiss:
     output:
         "{dataout}/{sample}_imiss_callRate.imiss"
     params:
-        indat = rules.sample_callRate.params.indat
+        indat = rules.sample_callRate.params.indat,
         out = apply_prefix("{dataout}/{sample}_imiss_callRate")
     resources:
         mem_mb = 10000,
