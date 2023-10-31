@@ -52,7 +52,7 @@ rule relatedness_QC:
         dataout = apply_prefix(DATAOUT)
     threads: 24
     resources:
-        mem_mb = 4000,
+        mem_mb = 6000,
         walltime = '144:00'
     conda: "../envs/king.yaml"
     shell:
@@ -76,7 +76,7 @@ rule king_all:
         dataout = apply_prefix(DATAOUT)
     threads: 24
     resources:
-        mem_mb = 4000,
+        mem_mb = 6000,
         walltime = '144:00'
     conda: "../envs/king.yaml"
     shell:
