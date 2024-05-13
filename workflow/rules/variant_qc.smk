@@ -13,7 +13,7 @@ rule snp_qc:
         MAF = config['QC']['MAF'],
         HWE = config['QC']['HWE']
     resources:
-        mem_mb = 10000,
+        mem_mb = 30000,
         time_min = 30
     conda: "../envs/plink.yaml"
     shell:
