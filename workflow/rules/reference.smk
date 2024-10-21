@@ -68,7 +68,7 @@ default_ref = (("custom_ref" not in config)
                or (config['custom_ref']['file'] is False)
                or (config['custom_ref']['name'] is False))
 
-tgbase = "http://ftp-trace.ncbi.nih.gov/1000genomes/ftp/"
+tgbase = "ftp-trace.ncbi.nih.gov/1000genomes/ftp/"
 tgbase_38 = "ftp.1000genomes.ebi.ac.uk/vol1/ftp/"
 
 tgfasta = dict(
