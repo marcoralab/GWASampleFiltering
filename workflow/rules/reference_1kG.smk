@@ -21,7 +21,6 @@ def md5_remote(wc):
         return
     return HTTP.remote(tgurls[wc.gbuild]['md5'])
 
-
 rule download_md5_b38:
     input: FTP.remote(tgurls['GRCh38']['md5'], immediate_close=True)
     output: 'reference/md5.GRCh38.vcfs.txt'
