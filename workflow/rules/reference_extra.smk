@@ -84,7 +84,7 @@ elif ereftype != 'none': #PLINK fileset of all chromosomes
         resources:
             mem_mb = 10000,
             time_min = 30
-        container: 'docker://befh/flippyr:0.6.0'
+        container: 'docker://befh/flippyr:0.6.1'
         shell: "flippyr -p {input.fasta} -o {DATAOUT}/extraref_{wildcards.gbuild}_flipped {input.bim}"
 
     rule Ref_ChromPosRefAlt_extra:
