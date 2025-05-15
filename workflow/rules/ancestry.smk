@@ -138,7 +138,7 @@ rule Sample_ChromPosRefAlt:
         snplist = temp("{dataout}/{sample}_flipped_snplist")
     threads: 2
     resources:
-        mem_mb = 8000,
+        mem_mb = 16000,
         time_min = 30
     container: 'docker://befh/r_env_gwasamplefilt:5'
     script: '../scripts/bim_ChromPosRefAlt.R'
@@ -232,8 +232,8 @@ rule Reference_prune:
         tbi = temp("{dataout}/{sample}_{refname}pruned.vcf.gz.tbi")
     threads: 4
     resources:
-        mem_mb = 4000,
-        walltime = '4:00'
+        mem_mb = 16000,
+        runtime: "4h"
     container: "docker://befh/bcftools-htslib-samtools:1.15"
     shell:
         '''
@@ -314,8 +314,8 @@ rule Merge_RefenceSample:
         out = "{dataout}/{sample}_{refname}_merged.vcf"
     threads: 4
     resources:
-        mem_mb = 4000,
-        walltime = '4:00'
+        mem_mb = 16000,
+        runtime: "4h"
     container: "docker://befh/bcftools-htslib-samtools:1.15"
     shell:
         r'''

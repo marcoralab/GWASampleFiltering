@@ -245,7 +245,7 @@ rule GWAS_QC_Report:
         pipeline_version = version_
     threads: 17
     resources:
-        mem_mb = 8000,
-        walltime = '24:00'
+        mem_mb = 136000,
+        runtime: "24h"
     container: 'docker://befh/r_env_gwasamplefilt:5'
     script: "scripts/GWAS_QC.Rmd"

@@ -19,10 +19,10 @@ def md5_remote(wc):
     gbuild = wc.gbuild
     if gbuild == 'GRCh38':
         return
-    return HTTP.remote(tgurls[wc.gbuild]['md5'])
+    return http(tgurls[wc.gbuild]['md5'])
 
 rule download_md5_b38:
-    input: FTP.remote(tgurls['GRCh38']['md5'], immediate_close=True)
+    input: ftp(tgurls['GRCh38']['md5'])
     output: 'reference/md5.GRCh38.vcfs.txt'
     shell:
         r'''
@@ -32,7 +32,7 @@ awk 'match($1, "chr[0-9]+", chrom) && match($1, "[.]vcf.+", ext) \
 '''
 
 rule download_md5_hg19:
-    input: HTTP.remote(tgurls['hg19']['md5'])
+    input: http(tgurls['hg19']['md5'])
     output: 'reference/md5.hg19.vcfs.txt'
     shell:
         r'''
@@ -48,10 +48,10 @@ def vcf_remote(wc):
     gbuild = wc.gbuild
     vcf = tgurls[gbuild]['vcf']
     if gbuild == 'GRCh38':
-        outs = {'vcf': FTP.remote(vcf, immediate_close=True),
-                'tbi': FTP.remote(vcf + '.tbi', immediate_close=True)}
+        outs = {'vcf': ftp(vcf),
+                'tbi': ftp(vcf + '.tbi')}
     else:
-        outs = {'vcf': HTTP.remote(vcf), 'tbi': HTTP.remote(vcf + '.tbi')}
+        outs = {'vcf': http(vcf), 'tbi': http(vcf + '.tbi')}
     return {'md5': f'reference/md5.{gbuild}.vcfs.txt', **outs}
 
 
@@ -75,7 +75,7 @@ tgped = "reference/20130606_g1k.ped"
 
 rule download_tg_ped:
     input:
-        ped = FTP.remote(tgurls['ped'], immediate_close=True),
+        ped = ftp(tgurls['ped']),
         md5 = 'reference/md5.hg19.vcfs.txt'
     output: tgped
     cache: True
@@ -116,8 +116,8 @@ rule Reference_foundersonly:
         tbi = temp("reference/1000gFounders.{gbuild}.chr{chrom}.vcf.gz.tbi")
     threads: 4
     resources:
-        mem_mb = 4000,
-        walltime = '4:00'
+        mem_mb = 16000,
+        runtime: "4h"
     container: "docker://befh/bcftools-htslib-samtools:1.15"
     shell:
         r'''

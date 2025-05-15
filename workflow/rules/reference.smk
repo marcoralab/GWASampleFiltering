@@ -2,34 +2,22 @@
 
 # from scripts.parse_config_GWASampleFiltering import parser
 
-from snakemake.remote.FTP import RemoteProvider as FTPRemoteProvider
-from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
 
 from urllib.request import urlopen
 from urllib.error import URLError
-
-try:
-    response = urlopen('https://www.google.com/', timeout=10)
-    iconnect = True
-except URLError as ex:
-    iconnect = False
-
-
-class dummyprovider:
-    def remote(string_, allow_redirects="foo", immediate_close="bar"):
-        return string_
-
 
 if not 'config' in locals() or not config:
     configfile: "config/references.yaml"
     config['ref_only'] = True
 
-if iconnect and not ('nointernet' in config and config['nointernet']):
-    FTP = FTPRemoteProvider()
-    HTTP = HTTPRemoteProvider()
-else:
-    FTP = dummyprovider
-    HTTP = dummyprovider
+iconnect = False
+if not ('nointernet' in config and config['nointernet']):
+    try:
+        response = urlopen('https://www.google.com/', timeout=10)
+        iconnect = True
+    except URLError as ex:
+        pass
+
 
 BPLINK = ["bed", "bim", "fam"]
 
@@ -136,9 +124,9 @@ cat <(for i in {{1..22}} X Y; do echo chr$i $i; done) <(echo chrM MT) > {output}
 def fasta_remote(wc):
     gbuild = wc.gbuild
     if gbuild == 'GRCh38':
-        return FTP.remote(tgfasta['GRCh38'], immediate_close=True)
+        return ftp(tgfasta['GRCh38'])
     else:
-        return HTTP.remote(tgfasta[gbuild])
+        return http(tgfasta[gbuild])
 
 def fasta_md5(wc):
     gbuild = wc.gbuild
@@ -184,8 +172,8 @@ if reftype == 'vcfchr':
                  + '.maxmiss{miss}.vcf.gz')
         threads: 12
         resources:
-            mem_mb = 4000,
-            walltime = '4:00'
+            mem_mb = 48000,
+            runtime: "4h"
         container: "docker://befh/bcftools-htslib-samtools:1.15"
         shell:
             '''
@@ -208,8 +196,8 @@ bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
         #cache: True
         threads: 2
         resources:
-            mem_mb = 4000,
-            walltime = '4:00'
+            mem_mb = 8000,
+            runtime: "4h"
         container: "docker://befh/bcftools-htslib-samtools:1.15"
         shell:
             '''
@@ -229,8 +217,8 @@ elif creftype == 'vcf':
         #cache: True
         threads: 12
         resources:
-            mem_mb = 4000,
-            walltime = '4:00'
+            mem_mb = 48000,
+            runtime: "4h"
         container: "docker://befh/bcftools-htslib-samtools:1.15"
         shell:
             '''
@@ -314,8 +302,8 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
         #cache: True
         threads: 12
         resources:
-            mem_mb = 4000,
-            walltime = '4:00'
+            mem_mb = 48000,
+            runtime: "4h"
         container: "docker://befh/bcftools-htslib-samtools:1.15"
         shell:
             '''

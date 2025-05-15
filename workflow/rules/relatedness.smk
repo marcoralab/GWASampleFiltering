@@ -52,8 +52,8 @@ rule relatedness_QC:
         dataout = apply_prefix(DATAOUT)
     threads: 24
     resources:
-        mem_mb = 6000,
-        walltime = '144:00'
+        mem_mb = 144000,
+        runtime: "144h"
     conda: "../envs/king.yaml"
     shell:
         '''
@@ -76,8 +76,8 @@ rule king_all:
         dataout = apply_prefix(DATAOUT)
     threads: 24
     resources:
-        mem_mb = 6000,
-        walltime = '144:00'
+        mem_mb = 144000,
+        runtime: "144h"
     conda: "../envs/king.yaml"
     shell:
         '''
@@ -119,7 +119,7 @@ rule relatedness_sample_fail:
         rdat = "{dataout}/{sample}_IBDQC.Rdata"
     threads: 8
     resources:
-        mem_mb = 64000,
-        walltime = '24:00'
+        mem_mb = 512000,
+        runtime: "24h"
     container: 'docker://befh/r_env_gwasamplefilt:7'
     script: '../scripts/relatedness_QC.R'

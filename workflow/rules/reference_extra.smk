@@ -19,8 +19,8 @@ if ereftype == 'vcfchr':
         output: temp("{dataout}/extraref.{gbuild}.chr{chrom}.maxmiss{miss}.vcf.gz")
         threads: 12
         resources:
-            mem_mb = 4000,
-            walltime = '4:00'
+            mem_mb = 48000,
+            runtime: "4h"
         container: "docker://befh/bcftools-htslib-samtools:1.15"
         shell:
             '''
@@ -40,7 +40,7 @@ bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
             tbi = "{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
         threads: 2
         resources:
-            mem_mb = 10000,
+            mem_mb = 20000,
             time_min = 30
         container: "docker://befh/bcftools-htslib-samtools:1.15"
         shell:
@@ -59,7 +59,7 @@ elif ereftype == 'vcf':
             tbi = "{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
         threads: 12
         resources:
-            mem_mb = 4000,
+            mem_mb = 48000,
             time_min = 30
         container: "docker://befh/bcftools-htslib-samtools:1.15"
         shell:
@@ -138,7 +138,7 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
             tbi = "{dataout}/extraref_{gbuild}_allChr_maxmiss{miss}.vcf.gz.tbi"
         threads: 12
         resources:
-            mem_mb = 4000,
+            mem_mb = 48000,
             time_min = 30
         container: "docker://befh/bcftools-htslib-samtools:1.15"
         shell:

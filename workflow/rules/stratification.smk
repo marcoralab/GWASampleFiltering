@@ -84,7 +84,7 @@ plink --keep-allele-order --bfile {params.ins} \
             indat = apply_prefix("{dataout}/{sample}_IBDQC.all"),
         threads: 6
         resources:
-            mem_mb = 10000,
+            mem_mb = 60000,
             time_min = 60
         container: 'docker://befh/r_env_gwasamplefilt:5'
         script: '../scripts/filterKing.R'
@@ -103,8 +103,8 @@ plink --keep-allele-order --bfile {params.ins} \
             king = rules.filterKING.params.indat + ".popfilt" if qc_type['ancestry'] else rules.filterKING.params.indat
         threads: 48
         resources:
-            mem_mb = 30000,
-            walltime = '100:00'
+            mem_mb = 1440000,
+            runtime: "100h"
         container: 'docker://befh/genesis_env_gwasamplefilt:3.0'
         script: '../scripts/RunPCAiR.R'
 
