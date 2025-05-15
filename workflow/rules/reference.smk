@@ -18,6 +18,8 @@ if not ('nointernet' in config and config['nointernet']):
     except URLError as ex:
         pass
 
+ftp = storage.ftp if iconnect else lambda x: x
+http = storage.http if iconnect else lambda x: x
 
 BPLINK = ["bed", "bim", "fam"]
 
