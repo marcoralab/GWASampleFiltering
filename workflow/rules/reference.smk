@@ -175,7 +175,7 @@ if reftype == 'vcfchr':
         threads: 12
         resources:
             mem_mb = 48000,
-            runtime: "4h"
+            runtime = "4h"
         container: "docker://befh/bcftools-htslib-samtools:1.15"
         shell:
             '''
@@ -199,7 +199,7 @@ bcftools annotate --set-id '%CHROM:%POS:%REF:%ALT' --threads 6 -Oz -o {output}
         threads: 2
         resources:
             mem_mb = 8000,
-            runtime: "4h"
+            runtime = "4h"
         container: "docker://befh/bcftools-htslib-samtools:1.15"
         shell:
             '''
@@ -220,7 +220,7 @@ elif creftype == 'vcf':
         threads: 12
         resources:
             mem_mb = 48000,
-            runtime: "4h"
+            runtime = "4h"
         container: "docker://befh/bcftools-htslib-samtools:1.15"
         shell:
             '''
@@ -305,7 +305,7 @@ plink --bfile {params.inp} --bim {input.bim} --recode vcf bgz \
         threads: 12
         resources:
             mem_mb = 48000,
-            runtime: "4h"
+            runtime = "4h"
         container: "docker://befh/bcftools-htslib-samtools:1.15"
         shell:
             '''

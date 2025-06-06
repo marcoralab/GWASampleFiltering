@@ -4,6 +4,8 @@ version_ = "0.4.2"
 
 import os
 import warnings
+from snakemake.utils import min_version
+min_version("8.0")
 
 
 configfile: "config/config.yaml"
@@ -246,6 +248,6 @@ rule GWAS_QC_Report:
     threads: 17
     resources:
         mem_mb = 136000,
-        runtime: "24h"
+        runtime = "24h"
     container: 'docker://befh/r_env_gwasamplefilt:5'
     script: "scripts/GWAS_QC.Rmd"

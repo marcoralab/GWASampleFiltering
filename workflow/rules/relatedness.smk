@@ -53,7 +53,7 @@ rule relatedness_QC:
     threads: 24
     resources:
         mem_mb = 144000,
-        runtime: "144h"
+        runtime = "144h"
     conda: "../envs/king.yaml"
     shell:
         '''
@@ -77,7 +77,7 @@ rule king_all:
     threads: 24
     resources:
         mem_mb = 144000,
-        runtime: "144h"
+        runtime = "144h"
     conda: "../envs/king.yaml"
     shell:
         '''
@@ -120,6 +120,6 @@ rule relatedness_sample_fail:
     threads: 8
     resources:
         mem_mb = 512000,
-        runtime: "24h"
+        runtime = "24h"
     container: 'docker://befh/r_env_gwasamplefilt:7'
     script: '../scripts/relatedness_QC.R'

@@ -104,7 +104,7 @@ plink --keep-allele-order --bfile {params.ins} \
         threads: 48
         resources:
             mem_mb = 1440000,
-            runtime: "100h"
+            runtime = "100h"
         container: 'docker://befh/genesis_env_gwasamplefilt:3.0'
         script: '../scripts/RunPCAiR.R'
 

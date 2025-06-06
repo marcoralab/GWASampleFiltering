@@ -117,7 +117,7 @@ rule Reference_foundersonly:
     threads: 4
     resources:
         mem_mb = 16000,
-        runtime: "4h"
+        runtime = "4h"
     container: "docker://befh/bcftools-htslib-samtools:1.15"
     shell:
         r'''

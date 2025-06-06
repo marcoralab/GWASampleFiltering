@@ -233,7 +233,7 @@ rule Reference_prune:
     threads: 4
     resources:
         mem_mb = 16000,
-        runtime: "4h"
+        runtime = "4h"
     container: "docker://befh/bcftools-htslib-samtools:1.15"
     shell:
         '''
@@ -315,7 +315,7 @@ rule Merge_RefenceSample:
     threads: 4
     resources:
         mem_mb = 16000,
-        runtime: "4h"
+        runtime = "4h"
     container: "docker://befh/bcftools-htslib-samtools:1.15"
     shell:
         r'''

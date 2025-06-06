@@ -20,7 +20,7 @@ if ereftype == 'vcfchr':
         threads: 12
         resources:
             mem_mb = 48000,
-            runtime: "4h"
+            runtime = "4h"
         container: "docker://befh/bcftools-htslib-samtools:1.15"
         shell:
             '''
