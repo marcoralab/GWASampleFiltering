@@ -24,6 +24,7 @@ def md5_remote(wc):
 rule download_md5_b38:
     input: ftp(tgurls['GRCh38']['md5'])
     output: 'reference/md5.GRCh38.vcfs.txt'
+    localrule: True
     shell:
         r'''
 awk 'match($1, "chr[0-9]+", chrom) && match($1, "[.]vcf.+", ext) \
@@ -34,6 +35,7 @@ awk 'match($1, "chr[0-9]+", chrom) && match($1, "[.]vcf.+", ext) \
 rule download_md5_hg19:
     input: http(tgurls['hg19']['md5'])
     output: 'reference/md5.hg19.vcfs.txt'
+    localrule: True
     shell:
         r'''
 awk '{{FS="\t"}} match($1, "chr[0-9]+", chrom) && match($1, "[.]vcf.+", ext) \
@@ -60,6 +62,7 @@ rule download_tg_chrom:
     output:
         vcf = temp("reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz"),
         tbi = temp("reference/1000gRaw.{gbuild}.chr{chrom}.vcf.gz.tbi")
+    localrule: True
     resources:
         mem_mb = 10000,
         time_min = 30
@@ -78,7 +81,8 @@ rule download_tg_ped:
         ped = ftp(tgurls['ped']),
         md5 = 'reference/md5.hg19.vcfs.txt'
     output: tgped
-    cache: True
+    #cache: True
+    localrule: True
     resources:
         mem_mb = 10000,
         time_min = 30
@@ -96,7 +100,7 @@ thousand genomes.
 rule Reference_find_founders:
     input: tgped
     output: "reference/20130606_g1k.founders"
-    cache: True
+    #cache: True
     resources:
         mem_mb = 10000,
         time_min = 30

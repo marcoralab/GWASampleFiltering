@@ -40,8 +40,6 @@ elif (isinstance(config['genome_build'], list)
 else:
     raise ValueError("Genome build must be a string or list of strings.")
 
-localrules: download_tg_fa, download_tg_ped, download_tg_chrom, download_md5_b38, download_md5_hg19
-
 
 def detect_ref_type(reffile):
     if '.vcf' in reffile or '.bcf' in reffile:
@@ -142,6 +140,7 @@ rule download_tg_fa:
     output:
         "reference/human_g1k_{gbuild}.fasta",
         "reference/human_g1k_{gbuild}.fasta.fai"
+    localrule: True
     params:
         md5 = lambda wc: fasta_md5(wc)
     resources:
